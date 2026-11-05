@@ -8,7 +8,7 @@ const PARTIES = require('./public/parties.js');
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Copy .env.example to .env and add your Neon connection string.');
-  process.exit(1);
+  if (require.main === module) process.exit(1);
 }
 
 const IS_PROD = process.env.NODE_ENV === 'production';
