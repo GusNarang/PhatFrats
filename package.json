@@ -1,0 +1,19 @@
+{
+  "name": "phatfrats",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Penn State party finder with accounts stored in Neon",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "db:setup": "node --env-file-if-exists=.env scripts/db-setup.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.3",
+    "pg": "^8.23.1"
+  }
+}

@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+
+<title>PhatFrats</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Shade&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one long party-night scroll — neon hero, then a hand-drawn map of the State College grid with a detail rail, then party cards, the full house directory, and safety notes. Deliberately single dark theme: it's always 10pm on PhatFrats. */
+:root{
+  color-scheme: dark;
+  --night:#0b1026;
+  --night-2:#131b40;
+  --night-3:#1b2556;
+  --ink:#f5f2ff;
+  --muted:#a7add8;
+  --line:rgba(190,200,255,.16);
+  --pink:#ff3fa4;
+  --cyan:#35e0ff;
+  --gold:#ffd23f;
+  --lime:#9dff4a;
+  --violet:#b48cff;
+  --orange:#ff8a3d;
+  --map-bldg:#25316c;
+  --map-road:#323e7c;
+  --map-major:#4b58a6;
+  --map-foot:#273270;
+  --map-green:#163049;
+  --display:"Bungee", "Impact", "Arial Black", sans-serif;
+  --shade:"Bungee Shade", "Bungee", "Impact", sans-serif;
+  --body:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --mono:"DM Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--night);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  background-image:
+    radial-gradient(900px 500px at 85% -10%, rgba(255,63,164,.22), transparent 60%),
+    radial-gradient(800px 500px at -10% 20%, rgba(53,224,255,.14), transparent 60%);
+  background-repeat:no-repeat;
+  overflow-x:clip;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--night)}
+.wrap{max-width:1180px;margin:0 auto}
+a{color:var(--cyan)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3{text-wrap:balance;margin:0}
+h2{font-family:var(--display);font-weight:400;font-size:clamp(1.6rem,3.6vw,2.4rem);line-height:1.05;letter-spacing:.01em}
+h3{font-weight:800;font-size:1.15rem;line-height:1.2}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+
+/* ---------- header ---------- */
+header.top{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+  background:rgba(11,16,38,.86);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  margin-left:calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  margin-right:calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.top .wrap{display:flex;align-items:center;gap:20px;padding-block:10px}
+.logo-sm{font-family:var(--display);font-size:1.35rem;color:var(--ink);text-decoration:none;text-shadow:2px 2px 0 var(--pink)}
+.logo-sm span{color:var(--gold)}
+nav.links{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
+nav.links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:.95rem}
+nav.links a:hover{color:var(--ink)}
+@media (max-width:760px){nav.links{display:none}.top .wrap{justify-content:space-between}}
+
+.btn{
+  font:inherit;font-weight:800;cursor:pointer;border:0;border-radius:999px;
+  padding:.7em 1.3em;background:var(--pink);color:#1a0010;
+  box-shadow:0 4px 0 #a3105f;transition:transform .12s, box-shadow .12s;
+  white-space:nowrap;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 0 #a3105f}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #a3105f}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+.btn.ghost:hover{box-shadow:inset 0 0 0 2px var(--cyan)}
+.btn.gold{background:var(--gold);color:#241a00;box-shadow:0 4px 0 #a9850e}
+.btn.small{padding:.45em .95em;font-size:.88rem}
+.btn[disabled]{opacity:.55;cursor:default;transform:none}
+.user-chip{display:flex;align-items:center;gap:10px}
+.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-size:.85rem;background:var(--cyan);color:#00222b}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:1.25fr 1fr;gap:40px;align-items:center;padding-block:56px 40px}
+@media (max-width:900px){.hero{grid-template-columns:1fr;padding-block:36px 24px}}
+.hero-copy{display:flex;flex-direction:column;gap:18px;min-width:0}
+.logo-big{
+  font-family:var(--display);font-weight:400;
+  font-size:clamp(3.4rem,11vw,7.6rem);line-height:.9;letter-spacing:-.01em;
+  color:var(--ink);
+  text-shadow:4px 4px 0 var(--pink), 8px 8px 0 var(--cyan);
+  transform:rotate(-3deg);transform-origin:left center;
+  margin-block:8px 10px;
+}
+.logo-big .ph{color:var(--gold)}
+.tagline{font-family:var(--shade);font-size:clamp(1.2rem,3vw,1.7rem);color:var(--cyan);line-height:1.1}
+.lede{font-size:1.1rem;max-width:58ch}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+.byline{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:.85rem;color:var(--muted)}
+.byline strong{color:var(--ink);font-weight:500}
+.byline .dot{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 10px var(--lime)}
+
+.ticket{
+  position:relative;background:var(--night-2);border-radius:20px;padding:22px;
+  border:2px dashed rgba(255,210,63,.45);display:flex;flex-direction:column;gap:14px;min-width:0;
+  transform:rotate(1.5deg);
+}
+.ticket::before,.ticket::after{content:"";position:absolute;width:28px;height:28px;border-radius:50%;background:var(--night);top:50%;translate:0 -50%}
+.ticket::before{left:-16px}.ticket::after{right:-16px}
+.ticket h3{font-family:var(--display);font-weight:400;font-size:1.1rem;color:var(--gold)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--night-3);border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-family:var(--display);font-weight:400;font-size:1.9rem;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.stat span{font-size:.78rem;color:var(--muted)}
+.next-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.next-list li{display:flex;justify-content:space-between;gap:10px;font-size:.92rem;border-top:1px solid var(--line);padding-top:8px}
+.next-list li span:last-child{font-family:var(--mono);color:var(--muted);white-space:nowrap}
+
+/* marquee */
+.marquee{
+  overflow:hidden;border-block:2px solid var(--gold);background:var(--gold);color:#1d1600;
+  margin-left:calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  margin-right:calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  transform:rotate(-1deg);margin-block:10px 30px;
+}
+.marquee-track{display:flex;gap:40px;width:max-content;padding-block:10px;font-family:var(--display);font-size:1.05rem;animation:scroll 40s linear infinite}
+.marquee-track span::after{content:"✦";margin-left:40px;color:var(--pink)}
+@keyframes scroll{to{transform:translateX(-50%)}}
+
+section{padding-block:40px}
+.sec-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
+.sec-head > div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.sec-head p{max-width:62ch}
+
+/* ---------- filters ---------- */
+.filters{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:16px}
+.chip-group{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  font:inherit;font-size:.86rem;font-weight:600;cursor:pointer;
+  border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--muted);
+  padding:.35em .9em;display:inline-flex;align-items:center;gap:6px;
+}
+.chip:hover{color:var(--ink);border-color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--night);border-color:var(--ink)}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.toggle{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--muted);cursor:pointer}
+.toggle input{accent-color:var(--pink);width:16px;height:16px}
+
+/* ---------- map ---------- */
+.gate{position:relative}
+.gate.locked .gated{filter:blur(7px) saturate(.6);pointer-events:none;user-select:none}
+.lock-card{
+  display:none;position:absolute;inset:0;z-index:5;place-items:center;padding:16px;
+}
+.gate.locked .lock-card{display:grid}
+.lock-inner{
+  background:var(--night-2);border:2px solid var(--pink);border-radius:20px;padding:28px;max-width:420px;text-align:center;
+  display:flex;flex-direction:column;gap:14px;align-items:center;box-shadow:0 20px 60px rgba(0,0,0,.5), 0 0 40px rgba(255,63,164,.25);
+}
+.lock-inner h3{font-family:var(--display);font-weight:400;font-size:1.5rem}
+
+.map-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.map-layout{grid-template-columns:1fr}}
+.map-box{
+  background:var(--night-2);border-radius:20px;border:1px solid var(--line);overflow:hidden;position:relative;
+}
+.map-box svg{display:block;width:100%;height:auto;aspect-ratio:1000/648;cursor:grab;touch-action:none;user-select:none}
+.map-box svg.dragging{cursor:grabbing}
+.map-tools{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:6px;z-index:2}
+.mt{
+  font:inherit;font-weight:800;font-size:.85rem;cursor:pointer;min-width:34px;height:34px;padding:0 10px;
+  border-radius:10px;border:1px solid var(--line);background:rgba(11,16,38,.88);color:var(--ink);
+}
+.mt:hover{border-color:var(--cyan)}
+.mt[aria-pressed="true"]{background:var(--ink);color:var(--night)}
+@media (max-width:600px){.map-tools{position:static;padding:10px 10px 8px;border-bottom:1px solid var(--line)}.mt{height:30px;min-width:30px;padding:0 9px;font-size:.78rem}}
+.area-label{font-family:var(--display);fill:#8892cc;letter-spacing:.06em;pointer-events:none}
+.landmark{font-family:var(--body);font-weight:600;fill:#c3cbf5;pointer-events:none}
+.map-legend a{color:var(--muted)}
+.map-legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 14px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+.map-legend span{display:inline-flex;align-items:center;gap:6px}
+.map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.street-label{font-family:var(--mono);fill:#9aa3d9;letter-spacing:.06em;text-transform:uppercase;paint-order:stroke;stroke:var(--night-2);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.pin{cursor:pointer}
+.pin:focus{outline:none}
+.pin:focus-visible .pin-core{stroke:var(--gold);stroke-width:3}
+.pin .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.8s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.7);opacity:.85}100%{transform:scale(2.3);opacity:0}}
+.pin-house .pin-core{transition:r .15s}
+.pin-house:hover .pin-core{r:9}
+.pin.selected .sel-ring{opacity:1}
+.sel-ring{opacity:0}
+
+.detail{
+  background:var(--night-2);border-radius:20px;border:1px solid var(--line);padding:20px;
+  display:flex;flex-direction:column;gap:14px;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 74px);
+}
+@media (max-width:900px){.detail{position:static}}
+.detail .empty{display:flex;flex-direction:column;gap:10px;color:var(--muted)}
+.detail .empty b{font-family:var(--display);font-weight:400;color:var(--ink);font-size:1.25rem}
+.letters{
+  font-family:var(--display);font-size:1.7rem;line-height:1;color:var(--night);
+  background:var(--c, var(--gold));padding:.25em .4em;border-radius:10px;display:inline-block;align-self:flex-start;
+}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.92rem;margin:0}
+.kv dt{color:var(--muted);font-family:var(--mono);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;padding-top:2px}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.hype{display:flex;flex-direction:column;gap:6px}
+.hype-bar{height:12px;border-radius:999px;background:var(--night-3);overflow:hidden}
+.hype-bar div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cyan),var(--pink),var(--gold))}
+.hype-row{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);font-family:var(--mono)}
+.link-row{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:.9rem}
+.status-pill{font-family:var(--mono);font-size:.75rem;padding:.25em .7em;border-radius:999px;text-transform:uppercase;letter-spacing:.08em;display:inline-block}
+.st-pending{background:rgba(255,210,63,.15);color:var(--gold)}
+.st-approved{background:rgba(157,255,74,.15);color:var(--lime)}
+.st-waitlist{background:rgba(255,138,61,.15);color:var(--orange)}
+
+/* ---------- party cards ---------- */
+.party-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:26px}
+.party{
+  background:var(--night-2);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:10px;
+  border-top:5px solid var(--c);cursor:pointer;transition:transform .15s, background .15s;min-width:0;
+}
+.party:hover{transform:translateY(-3px) rotate(-.4deg);background:var(--night-3)}
+.party.selected{outline:2px solid var(--c)}
+.party-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.vibe-tag{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--c)}
+.when{font-family:var(--mono);font-size:.8rem;color:var(--muted);white-space:nowrap}
+.party h3{font-family:var(--display);font-weight:400;font-size:1.25rem;line-height:1.05}
+.party .host{font-size:.88rem;color:var(--muted)}
+.party p.blurb{font-size:.92rem}
+.party .foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:6px}
+.mini-hype{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.no-results{grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);border:1.5px dashed var(--line);border-radius:var(--r)}
+
+/* ---------- my invites ---------- */
+.invites{display:flex;flex-direction:column;gap:8px}
+.invite-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--night-2);border-radius:12px;padding:12px 16px}
+.invite-row .lt{font-family:var(--display);font-size:1rem;color:var(--c)}
+.invite-row small{display:block;color:var(--muted);font-size:.82rem}
+
+/* ---------- directory ---------- */
+.dir-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.input{
+  font:inherit;color:var(--ink);background:var(--night-2);border:1.5px solid var(--line);border-radius:12px;padding:.6em .9em;min-width:0;
+}
+.input::placeholder{color:#7b82b3}
+.dir-tools .input{flex:1 1 240px}
+.dir-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--line)}
+table.dir{width:100%;border-collapse:collapse;min-width:640px;font-size:.93rem}
+.dir th{font-family:var(--mono);font-weight:500;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;padding:12px 14px;background:var(--night-2);position:sticky;top:0}
+.dir td{padding:11px 14px;border-top:1px solid var(--line);vertical-align:middle}
+.dir tr:hover td{background:rgba(255,255,255,.03)}
+.dir .gl{font-family:var(--display);font-size:1rem;color:var(--gold);white-space:nowrap}
+.dir .nm{font-weight:700}
+.dir .nm small{display:block;font-weight:400;color:var(--muted)}
+.dir .addr a,.dir .ig a{font-family:var(--mono);font-size:.85rem;text-decoration:none}
+.dir .addr a:hover,.dir .ig a:hover{text-decoration:underline}
+.party-flag{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--pink);background:rgba(255,63,164,.12);padding:.25em .6em;border-radius:999px;white-space:nowrap;cursor:pointer;border:0}
+.dir-note{font-size:.85rem;color:var(--muted);margin-top:10px}
+
+/* ---------- how it works / safety ---------- */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.step{display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:var(--r);background:var(--night-2)}
+.step .n{font-family:var(--shade);font-size:2.2rem;line-height:1;color:var(--pink)}
+.safety{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.safe{border:1.5px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:6px}
+.safe h3{color:var(--lime);font-size:1.02rem}
+.safe p{font-size:.92rem;color:var(--muted)}
+
+footer{border-top:1px solid var(--line);margin-top:30px;padding-block:30px 40px}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px;align-items:flex-start}
+footer .fl{font-family:var(--display);font-size:1.6rem;text-shadow:2px 2px 0 var(--pink)}
+footer .fl span{color:var(--gold)}
+footer p{font-size:.88rem;color:var(--muted);max-width:60ch}
+footer .made{font-size:1rem;color:var(--ink)}
+footer .made strong{color:var(--gold)}
+
+/* ---------- dialogs & toast ---------- */
+dialog{
+  border:0;border-radius:22px;padding:0;background:var(--night-2);color:var(--ink);
+  width:min(460px, calc(100vw - 32px));box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 2px var(--pink);
+}
+dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
+.dlg{padding:26px;display:flex;flex-direction:column;gap:14px}
+.dlg h3{font-family:var(--display);font-weight:400;font-size:1.5rem;line-height:1.05}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:.85rem;font-weight:600;color:var(--muted)}
+.field .input{width:100%}
+.err{color:var(--orange);font-size:.85rem;min-height:1.2em}
+.dlg-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.88rem;color:var(--muted)}
+.check input{accent-color:var(--pink);margin-top:4px}
+.guests{display:flex;gap:6px}
+.guests .chip{min-width:44px;justify-content:center}
+.toast{
+  position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:50;
+  background:var(--lime);color:#122200;font-weight:800;padding:12px 20px;border-radius:999px;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 32px);text-align:center;
+}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.plan-card{background:var(--night-2);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:14px;border:2px dashed var(--line);min-width:0}
+.plan-card.full{border-color:var(--gold);box-shadow:0 0 34px rgba(255,210,63,.14)}
+.plan-card h3{font-family:var(--display);font-weight:400;font-size:1.35rem}
+.plan-price{font-family:var(--display);font-size:2.6rem;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.plan-card.full .plan-price{color:var(--gold)}
+.plan-price small{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-left:8px}
+.plan-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:.95rem}
+.plan-list li{display:flex;gap:10px}
+.plan-list li::before{content:"✦";color:var(--pink);flex:none}
+.plan-card.full .plan-list li::before{color:var(--gold)}
+.plan-card .plan-cta{margin-top:auto;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.plan-badge{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;padding:.3em .7em;border-radius:999px;background:var(--night-3);color:var(--muted);white-space:nowrap}
+.plan-badge.full{background:var(--gold);color:#241a00}
+.plan-note{background:var(--night-3);border-radius:12px;padding:12px 16px;font-size:.92rem;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;align-items:center}
+.st-locked{background:rgba(180,140,255,.15);color:var(--violet)}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--night-3);padding:4px;border-radius:12px}
+.auth-tab{font:inherit;font-weight:800;font-size:.9rem;border:0;border-radius:9px;padding:.55em;background:transparent;color:var(--muted);cursor:pointer}
+.auth-tab[aria-selected="true"]{background:var(--ink);color:var(--night)}
+.pass-choice{display:flex;flex-direction:column;gap:8px;border:0;margin:0;padding:0}
+.pass-choice legend{font-size:.85rem;font-weight:600;color:var(--muted);padding:0 0 6px}
+.pass-opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.9rem;cursor:pointer}
+.pass-opt:has(input:checked){border-color:var(--pink)}
+.pass-opt.off{opacity:.6;cursor:default}
+.pass-opt input{accent-color:var(--pink);margin-top:4px}
+.pass-opt small{display:block;color:var(--muted)}
+.demo-note{font-family:var(--mono);font-size:.75rem;color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:8px 10px}
+
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .marquee-track,.pin .pulse{animation:none}
+  .party:hover,.btn:hover{transform:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="logo-sm" href="#top"><span>Phat</span>Frats</a>
+    <nav class="links" aria-label="Sections">
+      <a href="#plans">Passes</a>
+      <a href="#map">Party map</a>
+      <a href="#parties">This week</a>
+      <a href="#directory">All houses</a>
+      <a href="#safety">Party smart</a>
+    </nav>
+    <div id="authArea"></div>
+  </div>
+</header>
+
+<main class="wrap" id="top">
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">Penn State · University Park · IFC houses</span>
+      <h1 class="logo-big"><span class="ph">Phat</span>Frats</h1>
+      <p class="tagline">Your whole weekend, mapped.</p>
+      <p class="lede">
+        PhatFrats is a party finder for Penn State students. Create an account with your Penn State email and you get a live map of every
+        Interfraternity Council house around State College, with this week's parties lit up on it. Tap a glowing house to see the
+        theme, start time, dress code and how full it's getting, then request an invite straight from the page. Free accounts can see the whole map and request an invite to one party. Full Access is a one-time $0.75 that removes the limit and moves your requests up the line. The full directory of all 34 chapters is open to everyone.
+      </p>
+      <div class="cta-row">
+        <button class="btn" id="heroLogin" type="button">Log in to see the map</button>
+        <a class="btn ghost" href="#directory">Browse all 34 houses</a>
+      </div>
+      <span class="byline"><span class="dot"></span>Built by&nbsp;<strong class="builder">Agastya Narang</strong>&nbsp;· Penn State</span>
+    </div>
+
+    <aside class="ticket" aria-label="This week at a glance">
+      <h3>Admit one · week of Nov 5</h3>
+      <div class="stats">
+        <div class="stat"><b id="statChapters">34</b><span>chapters</span></div>
+        <div class="stat"><b id="statMapped">31</b><span>houses mapped</span></div>
+        <div class="stat"><b id="statParties">0</b><span>parties this week</span></div>
+      </div>
+      <ul class="next-list" id="nextList"></ul>
+    </aside>
+  </div>
+</main>
+
+<div class="marquee" aria-hidden="true"><div class="marquee-track" id="marquee"></div></div>
+
+<main class="wrap">
+  <!-- HOW IT WORKS -->
+  <section aria-labelledby="howTitle" style="padding-top:10px">
+    <div class="sec-head"><div><span class="eyebrow">How it works</span><h2 id="howTitle">Three taps to the front door</h2></div></div>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><h3>Create your account</h3><p class="muted">Sign up with your @psu.edu address and pick a pass. Log back in anytime.</p></div>
+      <div class="step"><span class="n">2</span><h3>Find the glow</h3><p class="muted">Houses with parties pulse on the map. Filter by night or by vibe.</p></div>
+      <div class="step"><span class="n">3</span><h3>Request an invite</h3><p class="muted">Tell the house who you're bringing. Watch your request go from pending to on the list.</p></div>
+    </div>
+  </section>
+
+  <!-- PASSES -->
+  <section id="plans" aria-labelledby="plansTitle">
+    <div class="sec-head"><div><span class="eyebrow">Two ways in</span><h2 id="plansTitle">Pick your pass</h2></div></div>
+    <div class="plans">
+      <article class="plan-card">
+        <h3>Free</h3>
+        <p class="plan-price">$0</p>
+        <ul class="plan-list">
+          <li>See the full party map and every party's details</li>
+          <li>Request an invite to one party</li>
+          <li>Browse all 34 houses</li>
+        </ul>
+        <div class="plan-cta" id="freeCta"></div>
+      </article>
+      <article class="plan-card full">
+        <h3>Full Access</h3>
+        <p class="plan-price">$0.75<small>one time</small></p>
+        <ul class="plan-list">
+          <li>Everything in Free</li>
+          <li>Request invites to as many parties as you want</li>
+          <li>Higher preference: your requests go to the front of the host's line</li>
+        </ul>
+        <div class="plan-cta">
+          <button class="btn gold" type="button" disabled>Checkout coming soon</button>
+          <span class="muted" style="font-size:.85rem">Checkout isn't open yet. Start free and upgrade when it is.</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section id="map" aria-labelledby="mapTitle">
+    <div class="sec-head">
+      <div>
+        <span class="eyebrow">Live party map</span>
+        <h2 id="mapTitle">Downtown State College, lit up</h2>
+        <p class="muted">Every IFC house with a listed address is pinned at its real location. Glowing pins have a party. Drag to pan, scroll or use the buttons to zoom, and click any house for details.</p>
+      </div>
+    </div>
+
+    <div class="gate locked" id="gate">
+      <div class="gated">
+        <div class="filters" role="group" aria-label="Map filters">
+          <div class="chip-group" id="dayChips" role="group" aria-label="Night"></div>
+          <div class="chip-group" id="vibeChips" role="group" aria-label="Vibe"></div>
+          <label class="toggle"><input type="checkbox" id="showAll" checked> Show houses without parties</label>
+        </div>
+        <div class="map-layout">
+          <div class="map-box">
+            <div class="map-tools" role="group" aria-label="Map view">
+              <button type="button" class="mt" data-zoom="in" aria-label="Zoom in">+</button>
+              <button type="button" class="mt" data-zoom="out" aria-label="Zoom out">−</button>
+              <button type="button" class="mt" data-view="default">All houses</button>
+              <button type="button" class="mt" data-view="highlands">Highlands</button>
+              <button type="button" class="mt" data-view="all">Whole map</button>
+            </div>
+            <svg id="mapSvg" viewBox="450 160 480 311" role="img" aria-label="Map of State College with fraternity houses pinned at their addresses"></svg>
+            <div class="map-legend" id="legend"></div>
+          </div>
+          <aside class="detail" id="detail" aria-live="polite"></aside>
+        </div>
+
+        <div id="parties" style="scroll-margin-top:80px">
+          <div class="sec-head" style="margin-top:44px;margin-bottom:0">
+            <div><span class="eyebrow">On the schedule</span><h2>This week's parties</h2></div>
+            <span class="mono muted" id="partyCount"></span>
+          </div>
+          <div class="party-grid" id="partyGrid"></div>
+        </div>
+
+        <div id="myInvitesWrap" style="margin-top:40px">
+          <div class="sec-head" style="margin-bottom:14px"><div><span class="eyebrow">Your requests</span><h2>My invites</h2></div></div>
+          <div class="invites" id="myInvites"></div>
+        </div>
+      </div>
+
+      <div class="lock-card">
+        <div class="lock-inner">
+          <span class="eyebrow">Students only</span>
+          <h3>The party map is behind the velvet rope</h3>
+          <p class="muted">Log in or create a free account to see where the parties are and request invites.</p>
+          <div class="cta-row" style="justify-content:center"><button class="btn" type="button" data-signup>Sign up free</button><button class="btn ghost" type="button" data-login>Log in</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SAFETY -->
+  <section id="safety" aria-labelledby="safeTitle">
+    <div class="sec-head"><div><span class="eyebrow">Party smart</span><h2 id="safeTitle">Before you head out</h2></div></div>
+    <div class="safety">
+      <div class="safe"><h3>Bring your PSU ID</h3><p>Hosts check names against the invite list at the door. No list, no entry, and that's on purpose.</p></div>
+      <div class="safe"><h3>Arrive with your crew, leave with your crew</h3><p>Set a meet-up spot and a time to check in. Charge your phone before you go.</p></div>
+      <div class="safe"><h3>Look out for each other</h3><p>Penn State's Responsible Action Protocol is there so students call for help. If someone needs medical attention, call 911.</p></div>
+      <div class="safe"><h3>Respect the house</h3><p>You're a guest in someone's home and on a residential street. Keep it down on the walk back through the Highlands.</p></div>
+    </div>
+  </section>
+
+  <!-- DIRECTORY -->
+  <section id="directory" aria-labelledby="dirTitle">
+    <div class="sec-head">
+      <div>
+        <span class="eyebrow">Every chapter</span>
+        <h2 id="dirTitle">The house directory</h2>
+        <p class="muted">All 34 chapters listed by Penn State's Interfraternity Council. Addresses open in Google Maps; handles open Instagram.</p>
+      </div>
+      <div class="dir-tools">
+        <input class="input" id="dirSearch" type="search" placeholder="Search a name, letters or street…" aria-label="Search chapters">
+        <select class="input" id="dirSort" aria-label="Sort chapters">
+          <option value="name">A to Z</option>
+          <option value="street">By street</option>
+          <option value="party">Partying first</option>
+        </select>
+      </div>
+    </div>
+    <div class="dir-wrap">
+      <table class="dir">
+        <thead><tr><th>Letters</th><th>Chapter</th><th>Address</th><th>Instagram</th><th>This week</th></tr></thead>
+        <tbody id="dirBody"></tbody>
+      </table>
+    </div>
+    <p class="dir-note">Source: <a href="https://www.pennstateifc.org/chapters" target="_blank" rel="noopener">pennstateifc.org/chapters</a>. Sigma Nu, Kappa Sigma and Delta Kappa Epsilon have no house address listed there, so they aren't pinned on the map.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span class="fl"><span>Phat</span>Frats</span>
+      <p class="made">Designed and built by <strong class="builder">Agastya Narang</strong></p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <p>Concept prototype. Chapter names and addresses come from the Penn State IFC chapter list; every party and approval on this page is fictional demo data. Accounts and invite requests are stored in a Neon database.</p>
+      <p>PhatFrats is not affiliated with Penn State University or the Interfraternity Council. Street map from OpenStreetMap; house pins placed from the IFC-listed addresses.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- LOGIN -->
+<dialog id="loginDlg" aria-labelledby="loginTitle">
+  <form class="dlg" id="loginForm" novalidate>
+    <div class="auth-tabs" role="tablist" aria-label="Account">
+      <button class="auth-tab" type="button" role="tab" id="tabLogin" data-auth-mode="login">Log in</button>
+      <button class="auth-tab" type="button" role="tab" id="tabSignup" data-auth-mode="signup">Sign up</button>
+    </div>
+    <h3 id="loginTitle">Welcome back</h3>
+    <div class="field" id="nameField"><label for="loginName">Your name</label><input class="input" id="loginName" autocomplete="name" placeholder="Nittany Lion"></div>
+    <div class="field"><label for="loginEmail">Penn State email</label><input class="input" id="loginEmail" type="email" autocomplete="username" placeholder="abc1234@psu.edu"></div>
+    <div class="field"><label for="loginPassword">Password</label><input class="input" id="loginPassword" type="password" autocomplete="current-password"></div>
+    <fieldset class="pass-choice" id="passChoice">
+      <legend>Your pass</legend>
+      <label class="pass-opt"><input type="radio" name="pass" id="passFree" checked><span><b>Free</b><small>See the map and request an invite to one party.</small></span></label>
+      <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · $0.75</b><small>Checkout coming soon. Start free and upgrade later.</small></span></label>
+    </fieldset>
+    <p class="err" id="loginErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn" type="submit" id="loginSubmit">Log in</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- INVITE -->
+<dialog id="inviteDlg" aria-labelledby="invTitle">
+  <form class="dlg" id="inviteForm" novalidate>
+    <span class="eyebrow" id="invHost">Request an invite</span>
+    <h3 id="invTitle">Party</h3>
+    <p class="muted mono" id="invWhen" style="font-size:.85rem"></p>
+    <div class="field">
+      <span style="font-size:.85rem;font-weight:600;color:var(--muted)">Plus-ones</span>
+      <div class="guests" id="guestChips" role="group" aria-label="Plus-ones"></div>
+    </div>
+    <div class="field"><label for="invMsg">Note to the house (optional)</label><textarea class="input" id="invMsg" rows="3" placeholder="Who you know, who you're bringing, your best costume idea…"></textarea></div>
+    <label class="check"><input type="checkbox" id="invAgree"> I'll bring my PSU ID and follow the house rules.</label>
+    <p class="err" id="invErr"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn" type="submit">Send request</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="/parties.js"></script>
+<script src="/map-data.js"></script>
+<script>
+(function(){
+  // ---------- data ----------
+  // Chapters from pennstateifc.org/chapters. x/y place each house on the stylized grid (null = no address listed).
+  const CHAPTERS = [
+    {id:1, name:"Alpha Chi Rho", gl:"ΑΧΡ", addr:"425 Locust Lane", street:"Locust Lane", ig:"axp.psu"},
+    {id:2, name:"Alpha Delta Phi", gl:"ΑΔΦ", addr:"225 E Foster Ave", street:"Foster Ave", ig:"psualphadelt"},
+    {id:3, name:"Alpha Epsilon Pi", gl:"ΑΕΠ", addr:"240 E Prospect Ave", street:"Prospect Ave", ig:"aepi_pennstate"},
+    {id:4, name:"Alpha Gamma Rho", gl:"ΑΓΡ", addr:"322 Fraternity Row", street:"Fraternity Row", ig:"agrpsu"},
+    {id:5, name:"Alpha Kappa Lambda", gl:"ΑΚΛ", addr:"339 Fraternity Row", street:"Fraternity Row", ig:"akl_psu"},
+    {id:6, name:"Alpha Phi Delta", gl:"ΑΦΔ", addr:"329 E Prospect Ave", street:"Prospect Ave", ig:"apdpsu"},
+    {id:7, name:"Alpha Rho Chi", gl:"ΑΡΧ", addr:"320 S Frasier St", street:"Frasier St", ig:"apxvitruvius"},
+    {id:8, name:"Alpha Sigma Phi", gl:"ΑΣΦ", addr:"420 E Prospect Ave", street:"Prospect Ave", ig:"alphasig_psu"},
+    {id:9, name:"Alpha Tau Omega", gl:"ΑΤΩ", addr:"321 E Fairmount Ave", street:"Fairmount Ave", ig:"atopennstate"},
+    {id:10, name:"Alpha Zeta", gl:"ΑΖ", addr:"360 N Burrowes St", street:"Burrowes St", ig:"alphazeta.psu"},
+    {id:11, name:"Beta Sigma Beta", gl:"ΒΣΒ", addr:"255 E Fairmount Ave", street:"Fairmount Ave", ig:"betasigmabeta_psu"},
+    {id:12, name:"Chi Phi", gl:"ΧΦ", addr:"360 E Hamilton Ave", street:"Hamilton Ave", ig:"chiphipsu"},
+    {id:13, name:"Delta Sigma Phi", gl:"ΔΣΦ", addr:"508 Locust Lane", street:"Locust Lane", ig:"deltasigmaphipsu"},
+    {id:14, name:"Sigma Nu", gl:"ΣΝ", addr:null, street:"", ig:"psu_sigmanu"},
+    {id:15, name:"Delta Upsilon", gl:"ΔΥ", addr:"229 Locust Lane", street:"Locust Lane", ig:"psudeltaupsilon"},
+    {id:16, name:"Delta Theta Sigma", gl:"ΔΘΣ", nick:"DTS", addr:"101 N Patterson St", street:"Patterson St", ig:"dtsbeta"},
+    {id:17, name:"Theta Delta Chi", gl:"ΘΔΧ", nick:"TDX", addr:"305 E Prospect Ave", street:"Prospect Ave", ig:"tdxpsu"},
+    {id:18, name:"Tau Epsilon Phi", gl:"ΤΕΦ", addr:"328 E Foster Ave", street:"Foster Ave", ig:"psu_tep"},
+    {id:19, name:"Phi Gamma Delta", gl:"ΦΓΔ", nick:"FIJI", addr:"319 N Burrowes Rd", street:"Burrowes St", ig:"fijipsu"},
+    {id:20, name:"Phi Kappa Psi", gl:"ΦΚΨ", addr:"403 Locust Lane", street:"Locust Lane", ig:"phipsipsu"},
+    {id:21, name:"Zeta Beta Tau", gl:"ΖΒΤ", nick:"ZBT", addr:"429 E Hamilton Ave", street:"Hamilton Ave", ig:"zbt_psu"},
+    {id:22, name:"Phi Kappa Tau", gl:"ΦΚΤ", addr:"408 E Fairmount Ave", street:"Fairmount Ave", ig:"psu_phitau"},
+    {id:23, name:"Phi Kappa Theta", gl:"ΦΚΘ", nick:"Phi Who", addr:"338 E Fairmount Ave", street:"Fairmount Ave", ig:"phiwhopsu"},
+    {id:24, name:"Phi Sigma Kappa", gl:"ΦΣΚ", addr:"501 S Allen St", street:"Allen St", ig:"phisigpsu"},
+    {id:25, name:"Pi Kappa Phi", gl:"ΠΚΦ", nick:"Pi Kapp", addr:"409 E Fairmount Ave", street:"Fairmount Ave", ig:"pikapp_psu"},
+    {id:26, name:"Sigma Alpha Epsilon", gl:"ΣΑΕ", addr:"200 E Beaver Ave", street:"Beaver Ave", ig:"sae_psu"},
+    {id:27, name:"Sigma Phi Epsilon", gl:"ΣΦΕ", nick:"SigEp", addr:"524 Locust Lane", street:"Locust Lane", ig:"sigep_psu"},
+    {id:28, name:"Lambda Chi Alpha", gl:"ΛΧΑ", addr:"351 E Fairmount Ave", street:"Fairmount Ave", ig:"lambdachipsu"},
+    {id:29, name:"Tau Phi Delta", gl:"ΤΦΔ", addr:"427 E Fairmount Ave", street:"Fairmount Ave", ig:"tauphideltapsu"},
+    {id:30, name:"Theta Chi", gl:"ΘΧ", addr:"523 S Allen St", street:"Allen St", ig:"thetachipsu"},
+    {id:31, name:"Phi Delta Theta", gl:"ΦΔΘ", nick:"Phi Delt", addr:"328 E Fairmount Ave", street:"Fairmount Ave", ig:"psuphidelt"},
+    {id:32, name:"Triangle", gl:"Δ", addr:"226 E Beaver Ave", street:"Beaver Ave", ig:"psutriangle"},
+    {id:33, name:"Kappa Sigma", gl:"ΚΣ", addr:null, street:"", ig:"kappasigpsu"},
+    {id:34, name:"Delta Kappa Epsilon", gl:"ΔΚΕ", addr:null, street:"", ig:"dke_pennstate"}
+  ];
+  const byId = Object.fromEntries(CHAPTERS.map(c=>[c.id,c]));
+
+  // Real State College streets and buildings from OpenStreetMap, projected onto a 1000-unit-wide SVG.
+  // pins: each house geocoded from its IFC address (OSM Nominatim, US Census geocoder as fallback).
+  const MAP = window.PF_MAP;
+  MAP.pins.forEach(p=>{ const c = byId[p.id]; if(c){ c.x = p.x; c.y = p.y; } });
+
+  const DAYS = [
+    {k:"thu", label:"Thu", date:"Nov 5"},
+    {k:"fri", label:"Fri", date:"Nov 6"},
+    {k:"sat", label:"Sat", date:"Nov 7"},
+    {k:"sun", label:"Sun", date:"Nov 8"}
+  ];
+  const VIBES = {
+    neon:   {label:"Neon / EDM", c:"var(--pink)"},
+    theme:  {label:"Costume theme", c:"var(--violet)"},
+    day:    {label:"Daytime", c:"var(--gold)"},
+    chill:  {label:"Chill", c:"var(--cyan)"},
+    formal: {label:"Dress up", c:"var(--orange)"},
+    charity:{label:"Philanthropy", c:"var(--lime)"}
+  };
+
+  const PARTIES = window.PF_PARTIES;
+  const partyById = Object.fromEntries(PARTIES.map(p=>[p.id,p]));
+
+  // ---------- state ----------
+  const state = {
+    user: null,
+    requests: [],
+    day: "all",
+    vibe: "all",
+    showAll: true,
+    selected: null // {type:'party'|'house', id}
+  };
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  const mapsUrl = a => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(a + ", State College, PA 16801");
+  const igUrl = h => "https://www.instagram.com/" + encodeURIComponent(h) + "/";
+  const dayOf = k => DAYS.find(d=>d.k===k);
+  const whenText = p => { const d = dayOf(p.day); return d.label + " " + d.date + " · " + p.time; };
+  const partiesFor = chId => PARTIES.filter(p=>p.ch===chId);
+  const visibleParties = () => PARTIES.filter(p => (state.day==="all"||p.day===state.day) && (state.vibe==="all"||p.vibe===state.vibe));
+  const requestFor = pid => state.requests.find(r=>r.pid===pid);
+  const initials = n => n.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("") || "PS";
+
+  async function api(path, body){
+    const opts = body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)};
+    let res;
+    try { res = await fetch(path, opts); }
+    catch(e){ throw new Error("Can't reach PhatFrats. Check your connection and try again."); }
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){ const err = new Error(data.error || "Something went wrong. Try again."); err.code = data.code; throw err; }
+    return data;
+  }
+  const isFree = () => !!state.user && state.user.plan !== "full";
+  const freeInviteUsed = () => isFree() && state.requests.length >= state.user.freeLimit;
+
+  function toast(msg){
+    const t = $("#toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast._t); toast._t = setTimeout(()=>{ t.hidden = true; }, 3200);
+  }
+
+  // Pending requests are answered by the server; check back until they settle.
+  async function refreshRequests(){
+    if(!state.user) return;
+    let data;
+    try { data = await api("/api/requests"); } catch(e){ return; }
+    let changed = false;
+    data.requests.forEach(r=>{
+      const old = requestFor(r.pid);
+      if(old && old.status === r.status) return;
+      changed = true;
+      const p = partyById[r.pid]; if(!p || !old) return;
+      const c = byId[p.ch];
+      if(r.status==="approved") toast(c.gl + " put you on the list for " + p.title + "!");
+      if(r.status==="waitlist") toast(c.gl + " waitlisted you for " + p.title + ". It's packed.");
+    });
+    if(changed){ state.requests = data.requests; renderAll(); }
+  }
+  setInterval(()=>{ if(state.requests.some(r=>r.status==="pending")) refreshRequests(); }, 1500);
+
+  // ---------- header / auth ----------
+  function renderAuth(){
+    const a = $("#authArea");
+    if(state.user){
+      const full = state.user.plan === "full";
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><span class="avatar" aria-hidden="true">'+esc(initials(state.user.name))+'</span><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      $("#logoutBtn").onclick = async ()=>{
+        try { await api("/api/logout", {}); } catch(e){ toast(e.message); return; }
+        state.user = null; state.requests = []; state.selected = null; renderAll();
+        toast("Logged out. See you next weekend.");
+      };
+    } else {
+      a.innerHTML = '<button class="btn small" type="button" data-login>Log in</button>';
+    }
+    $("#freeCta").innerHTML = state.user
+      ? '<span class="plan-badge">'+(state.user.plan==="full" ? 'Included in your pass' : 'Your current pass')+'</span>'
+      : '<button class="btn" type="button" data-signup>Sign up free</button>';
+    $("#gate").classList.toggle("locked", !state.user);
+    $("#heroLogin").textContent = state.user ? "Open the party map" : "Log in to see the map";
+  }
+
+  // ---------- hero ----------
+  function renderHero(){
+    $("#statChapters").textContent = CHAPTERS.length;
+    $("#statMapped").textContent = CHAPTERS.filter(c=>c.x!=null).length;
+    $("#statParties").textContent = PARTIES.length;
+    const top = [...PARTIES].sort((a,b)=>b.going/b.cap - a.going/a.cap).slice(0,4);
+    $("#nextList").innerHTML = '<li style="border:0;padding:0"><span class="eyebrow" style="color:var(--muted)">Filling up fastest</span><span></span></li>' +
+      top.map(p=>'<li><span><b>'+esc(p.title)+'</b> · '+esc(byId[p.ch].gl)+'</span><span>'+Math.round(p.going/p.cap*100)+'% full</span></li>').join("");
+    const items = PARTIES.map(p=>'<span>'+esc(byId[p.ch].gl)+' '+esc(p.title)+'</span>').join("");
+    $("#marquee").innerHTML = items + items;
+  }
+
+  // ---------- filters ----------
+  function renderFilters(){
+    $("#dayChips").innerHTML = [{k:"all",label:"All nights"}, ...DAYS.map(d=>({k:d.k,label:d.label+" "+d.date}))]
+      .map(d=>'<button type="button" class="chip" data-day="'+d.k+'" aria-pressed="'+(state.day===d.k)+'">'+esc(d.label)+'</button>').join("");
+    $("#vibeChips").innerHTML = '<button type="button" class="chip" data-vibe="all" aria-pressed="'+(state.vibe==="all")+'">Any vibe</button>' +
+      Object.entries(VIBES).map(([k,v])=>'<button type="button" class="chip" data-vibe="'+k+'" aria-pressed="'+(state.vibe===k)+'"><i style="background:'+v.c+'"></i>'+esc(v.label)+'</button>').join("");
+    $("#legend").innerHTML = Object.values(VIBES).map(v=>'<span><i style="background:'+v.c+'"></i>'+esc(v.label)+'</span>').join("") +
+      '<span><i style="background:#56609a"></i>No party listed</span><span class="mono">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</span>';
+  }
+
+  // ---------- map ----------
+  const MAP_W = 1000, MAP_H = MAP.H;
+  // Default view: frame every pinned house, centered, with a margin around the outermost pins.
+  function fitAllHouses(){
+    const xs = CHAPTERS.filter(c=>c.x!=null).map(c=>c.x), ys = CHAPTERS.filter(c=>c.x!=null).map(c=>c.y);
+    const pad = 45, x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+    const w = Math.min(MAP_W, Math.max(x1 - x0, (y1 - y0) * MAP_W / MAP_H));
+    return {x:(x0 + x1)/2 - w/2, y:(y0 + y1)/2 - w*MAP_H/MAP_W/2, w};
+  }
+  const VIEWS = {
+    default:  fitAllHouses(),
+    highlands:{x:600, y:150, w:320},
+    all:      {x:0, y:0, w:MAP_W}
+  };
+  const view = {...VIEWS.default};
+  let mapReady = false;
+  const KEY_STREETS = ["East College Avenue","West College Avenue","East Beaver Avenue","East Foster Avenue","East Fairmount Avenue","East Prospect Avenue","East Hamilton Avenue","Locust Lane","Fraternity Row","South Allen Street","South Pugh Street","South Garner Street","South Fraser Street","North Burrowes Road","North Burrowes Street","North Patterson Street","East Calder Way","West Beaver Avenue"];
+  const AREAS = [
+    {t:"Penn State · University Park", x:300, y:110, a:-45},
+    {t:"Downtown", x:540, y:330, a:-45},
+    {t:"The Highlands", x:860, y:385, a:-45}
+  ];
+  const abbrev = n => n.replace(/^East /,"E ").replace(/^West /,"W ").replace(/^North /,"N ").replace(/^South /,"S ")
+    .replace(/ Avenue$/," Ave").replace(/ Street$/," St").replace(/ Road$/," Rd").replace(/ Lane$/," Ln");
+
+  function viewH(){ return view.w * MAP_H / MAP_W; }
+  function clampView(){
+    view.w = Math.max(110, Math.min(MAP_W, view.w));
+    view.x = Math.max(0, Math.min(MAP_W - view.w, view.x));
+    view.y = Math.max(0, Math.min(MAP_H - viewH(), view.y));
+  }
+  // Map units per screen pixel, so pins and labels keep a steady on-screen size at any zoom.
+  function unitsPerPx(){ const w = $("#mapSvg").getBoundingClientRect().width || 720; return view.w / w; }
+
+  function initMap(){
+    const P = MAP.paths;
+    $("#mapSvg").innerHTML =
+      '<rect x="0" y="0" width="'+MAP_W+'" height="'+MAP_H+'" fill="var(--night-2)"/>' +
+      '<path d="'+P.green+'" fill="var(--map-green)"/>' +
+      '<path d="'+P.foot+'" fill="none" stroke="var(--map-foot)" stroke-width="0.8"/>' +
+      '<path d="'+P.svc+'" fill="none" stroke="var(--map-road)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="'+P.res+'" fill="none" stroke="var(--map-road)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="'+P.major+'" fill="none" stroke="var(--map-major)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="'+P.bldg+'" fill="var(--map-bldg)"/>' +
+      '<g id="mapLabels"></g><g id="mapPins"></g>';
+    mapReady = true;
+  }
+
+  function renderLabels(){
+    const u = unitsPerPx(), zoomedIn = view.w <= 320;
+    let s = '';
+    AREAS.forEach(a=>{ s += '<text class="area-label" text-anchor="middle" transform="translate('+a.x+' '+a.y+') rotate('+a.a+')" style="font-size:'+(12*u)+'px">'+esc(a.t)+'</text>'; });
+    MAP.labels.forEach(l=>{
+      if(!KEY_STREETS.includes(l.name) && !(zoomedIn && l.len > 90)) return;
+      s += '<text class="street-label" text-anchor="middle" dy="0.35em" transform="translate('+l.x+' '+l.y+') rotate('+l.a+')" style="font-size:'+(10*u)+'px;stroke-width:'+(3*u)+'px">'+esc(abbrev(l.name))+'</text>';
+    });
+    if(view.w <= 600){
+      MAP.landmarks.forEach(m=>{
+        s += '<g transform="translate('+m.x+' '+m.y+')"><circle r="'+(3*u)+'" fill="var(--gold)"/><text class="landmark" x="'+(6*u)+'" dy="0.35em" style="font-size:'+(10.5*u)+'px">'+esc(m.name.replace("Hetzel Union Building","HUB"))+'</text></g>';
+      });
+    }
+    // Beaver Stadium sits just north of the map's edge.
+    s += '<text class="landmark" text-anchor="middle" x="'+MAP.extra.stadium[0]+'" y="'+(Math.max(view.y, 0) + 16*u)+'" style="font-size:'+(11*u)+'px;fill:var(--gold)">↑ Beaver Stadium</text>';
+    $("#mapLabels").innerHTML = s;
+  }
+
+  function renderPins(){
+    // Pins shrink a little when zoomed far out so close-together houses overlap less.
+    const sc = Math.min(1, Math.max(0.72, Math.sqrt(480 / view.w))) * unitsPerPx();
+    const vis = visibleParties();
+    const visByCh = {};
+    vis.forEach(p=>{ (visByCh[p.ch] = visByCh[p.ch] || []).push(p); });
+    const sel = state.selected;
+    let housePins = '', partyPins = '';
+    CHAPTERS.filter(c=>c.x!=null).forEach(c=>{
+      const ps = visByCh[c.id];
+      const at = 'transform="translate('+c.x+' '+c.y+') scale('+sc.toFixed(3)+')"';
+      if(ps){
+        const p = ps[0], col = VIBES[p.vibe].c;
+        const isSel = sel && ((sel.type==="party" && ps.some(q=>q.id===sel.id)) || (sel.type==="house" && sel.id===c.id));
+        partyPins += '<g class="pin'+(isSel?' selected':'')+'" tabindex="0" role="button" data-party="'+p.id+'" aria-label="'+esc(c.name+": "+p.title+", "+whenText(p))+'" '+at+'>' +
+          '<title>'+esc(c.gl+" · "+p.title+" · "+c.addr)+'</title>' +
+          '<circle class="pulse" r="14" fill="'+col+'" opacity=".6"/>' +
+          '<circle class="sel-ring" r="22" fill="none" stroke="var(--gold)" stroke-width="3"/>' +
+          '<circle class="pin-core" r="15" fill="'+col+'" stroke="var(--night)" stroke-width="2"/>' +
+          '<text text-anchor="middle" dy="4" style="font-family:var(--display);font-size:'+(c.gl.length>2?9:11)+'px;fill:#0b1026;pointer-events:none">'+esc(c.gl)+'</text>' +
+          (ps.length>1?'<circle cx="12" cy="-12" r="7" fill="var(--ink)"/><text x="12" y="-9" text-anchor="middle" style="font-size:9px;font-weight:800;fill:#0b1026">'+ps.length+'</text>':'') +
+          '</g>';
+      } else if(state.showAll){
+        const isSel = sel && sel.type==="house" && sel.id===c.id;
+        housePins += '<g class="pin pin-house'+(isSel?' selected':'')+'" tabindex="0" role="button" data-house="'+c.id+'" aria-label="'+esc(c.name+", "+c.addr)+'" '+at+'>' +
+          '<title>'+esc(c.gl+" · "+c.name+" · "+c.addr)+'</title>' +
+          '<circle class="sel-ring" r="13" fill="none" stroke="var(--gold)" stroke-width="2.5"/>' +
+          '<circle class="pin-core" r="7" fill="#7d87c4" stroke="var(--night)" stroke-width="2"/></g>';
+      }
+    });
+    $("#mapPins").innerHTML = housePins + partyPins;
+  }
+
+  function renderMap(){
+    if(!mapReady) initMap();
+    clampView();
+    $("#mapSvg").setAttribute("viewBox", view.x.toFixed(1)+" "+view.y.toFixed(1)+" "+view.w.toFixed(1)+" "+viewH().toFixed(1));
+    document.querySelectorAll("[data-view]").forEach(b=>{
+      const v = VIEWS[b.dataset.view];
+      b.setAttribute("aria-pressed", String(Math.abs(v.x-view.x)<1 && Math.abs(v.w-view.w)<1));
+    });
+    renderLabels(); renderPins();
+  }
+
+  function zoomAt(f, cx, cy){
+    const nw = Math.max(110, Math.min(MAP_W, view.w * f)), k = nw / view.w;
+    view.x = cx - (cx - view.x) * k;
+    view.y = cy - (cy - view.y) * k;
+    view.w = nw;
+    renderMap();
+  }
+  function centerOn(x, y){
+    const h = viewH(), pad = 0.12;
+    if(x > view.x + view.w*pad && x < view.x + view.w*(1-pad) && y > view.y + h*pad && y < view.y + h*(1-pad)) return;
+    view.x = x - view.w/2; view.y = y - h/2;
+    renderMap();
+  }
+  function svgPoint(e){
+    const r = $("#mapSvg").getBoundingClientRect();
+    return [view.x + (e.clientX - r.left) / r.width * view.w, view.y + (e.clientY - r.top) / r.height * viewH()];
+  }
+
+  (function wireMap(){
+    const svg = $("#mapSvg");
+    let drag = null, suppressClick = false;
+    svg.addEventListener("wheel", e=>{
+      e.preventDefault();
+      const [cx, cy] = svgPoint(e);
+      zoomAt(e.deltaY > 0 ? 1.18 : 1/1.18, cx, cy);
+    }, {passive:false});
+    svg.addEventListener("pointerdown", e=>{
+      if(e.button !== 0) return;
+      drag = {sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y, moved:false, id:e.pointerId};
+    });
+    svg.addEventListener("pointermove", e=>{
+      if(!drag) return;
+      const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+      if(!drag.moved && Math.hypot(dx, dy) < 5) return;
+      if(!drag.moved){ drag.moved = true; svg.setPointerCapture(drag.id); svg.classList.add("dragging"); }
+      const u = unitsPerPx();
+      view.x = drag.vx - dx * u; view.y = drag.vy - dy * u;
+      clampView();
+      svg.setAttribute("viewBox", view.x.toFixed(1)+" "+view.y.toFixed(1)+" "+view.w.toFixed(1)+" "+viewH().toFixed(1));
+    });
+    const end = ()=>{
+      if(drag && drag.moved){ suppressClick = true; setTimeout(()=>{ suppressClick = false; }, 0); renderMap(); }
+      drag = null; svg.classList.remove("dragging");
+    };
+    svg.addEventListener("pointerup", end);
+    svg.addEventListener("pointercancel", end);
+    svg.addEventListener("click", e=>{ if(suppressClick){ e.stopPropagation(); e.preventDefault(); } }, true);
+    let rt; window.addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(renderMap, 120); });
+  })();
+
+  // ---------- detail panel ----------
+  function hypeBlock(p){
+    const pct = Math.round(p.going/p.cap*100);
+    const label = pct>=95 ? "At capacity, waitlist likely" : pct>=80 ? "Filling up fast" : pct>=55 ? "Building" : "Plenty of room";
+    return '<div class="hype"><div class="hype-row"><span>Hype meter</span><span>'+p.going+' / '+p.cap+' going</span></div>' +
+      '<div class="hype-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'" aria-label="Capacity filled"><div style="width:'+Math.min(pct,100)+'%"></div></div>' +
+      '<div class="hype-row"><span>'+label+'</span><span>'+pct+'%</span></div></div>';
+  }
+  function reqButton(p, cls){
+    const r = requestFor(p.id);
+    if(!r && freeInviteUsed()) return '<a class="status-pill st-locked" href="#plans" style="text-decoration:none">Free invite used</a>';
+    if(!r) return '<button class="btn '+(cls||"")+'" type="button" data-request="'+p.id+'">Request invite</button>';
+    const map = {pending:["Requested · pending","st-pending"], approved:["You're on the list","st-approved"], waitlist:["Waitlisted","st-waitlist"]};
+    return '<span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span>';
+  }
+  function chapterLinks(c){
+    return '<div class="link-row">' +
+      (c.addr ? '<a href="'+mapsUrl(c.addr)+'" target="_blank" rel="noopener">'+esc(c.addr)+' ↗</a>' : '<span class="muted">No address listed</span>') +
+      '<a href="'+igUrl(c.ig)+'" target="_blank" rel="noopener">@'+esc(c.ig)+' ↗</a></div>';
+  }
+  function renderDetail(){
+    const d = $("#detail"), sel = state.selected;
+    if(!sel){
+      d.innerHTML = '<div class="empty"><b>Pick a house</b><p>Click a glowing pin on the map or a party card below. You\'ll see the theme, dress code, how full it is, and a button to request an invite.</p><p class="mono" style="font-size:.85rem">'+visibleParties().length+' parties match your filters.</p></div>';
+      return;
+    }
+    if(sel.type==="party"){
+      const p = partyById[sel.id], c = byId[p.ch], v = VIBES[p.vibe];
+      const others = partiesFor(c.id).filter(q=>q.id!==p.id);
+      d.innerHTML =
+        '<span class="letters" style="--c:'+v.c+'">'+esc(c.gl)+'</span>' +
+        '<div><span class="vibe-tag" style="--c:'+v.c+';color:'+v.c+'">'+esc(v.label)+'</span><h3 style="font-family:var(--display);font-weight:400;font-size:1.6rem;line-height:1.05;margin-top:4px">'+esc(p.title)+'</h3>' +
+        '<p class="muted">Hosted by '+esc(c.name)+(c.nick?' ('+esc(c.nick)+')':'')+'</p></div>' +
+        '<p>'+esc(p.blurb)+'</p>' +
+        '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>Invite list + PSU ID</dd></dl>' +
+        hypeBlock(p) + chapterLinks(c) +
+        '<div>'+reqButton(p)+'</div>' +
+        (others.length ? '<p class="muted" style="font-size:.88rem">Also at this house: '+others.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a> ('+esc(dayOf(o.day).label)+')').join(", ")+'</p>' : '');
+    } else {
+      const c = byId[sel.id], ps = partiesFor(c.id);
+      d.innerHTML =
+        '<span class="letters" style="--c:#8f99d6">'+esc(c.gl)+'</span>' +
+        '<div><h3 style="font-family:var(--display);font-weight:400;font-size:1.5rem;line-height:1.05">'+esc(c.name)+'</h3>'+(c.nick?'<p class="muted">a.k.a. '+esc(c.nick)+'</p>':'')+'</div>' +
+        chapterLinks(c) +
+        (ps.length ? '<p>Parties this week: '+ps.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a>').join(", ")+'. They\'re hidden by your current filters.</p>'
+                   : '<p class="muted">Nothing on the calendar here this week. Follow them on Instagram to catch the next one.</p>');
+    }
+  }
+
+  // ---------- party cards ----------
+  function renderParties(){
+    const vis = visibleParties();
+    $("#partyCount").textContent = vis.length + " of " + PARTIES.length + " shown";
+    const order = {thu:0,fri:1,sat:2,sun:3};
+    const sel = state.selected;
+    $("#partyGrid").innerHTML = vis.length ? vis.sort((a,b)=>order[a.day]-order[b.day]).map(p=>{
+      const c = byId[p.ch], v = VIBES[p.vibe];
+      return '<article class="party'+(sel&&sel.type==="party"&&sel.id===p.id?' selected':'')+'" style="--c:'+v.c+'" data-party="'+p.id+'" tabindex="0" aria-label="'+esc(p.title)+'">' +
+        '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
+        '<h3>'+esc(p.title)+'</h3><span class="host">'+esc(c.gl)+' · '+esc(c.name)+'</span>' +
+        '<p class="blurb">'+esc(p.blurb)+'</p>' +
+        '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span>'+reqButton(p,"small")+'</div></article>';
+    }).join("") : '<div class="no-results">No parties match that combo. Try another night or vibe.</div>';
+  }
+
+  // ---------- my invites ----------
+  function renderInvites(){
+    const el = $("#myInvites");
+    if(!state.user){ el.innerHTML = ""; return; }
+    const note = state.user.plan === "full"
+      ? '<div class="plan-note"><span><b>Full Access:</b> request as many parties as you want. Your requests go to the front of the line.</span></div>'
+      : '<div class="plan-note"><span><b>Free pass:</b> '+Math.min(state.requests.length, state.user.freeLimit)+' of '+state.user.freeLimit+' invite request used.</span><a href="#plans">See Full Access</a></div>';
+    if(!state.requests.length){ el.innerHTML = note + '<div class="no-results" style="text-align:left">No requests yet. Pick a party and hit <b>Request invite</b>. Hosts usually answer in seconds here.</div>'; return; }
+    const map = {pending:["Pending","st-pending"], approved:["On the list","st-approved"], waitlist:["Waitlist","st-waitlist"]};
+    el.innerHTML = note + [...state.requests].sort((a,b)=>b.ts-a.ts).map(r=>{
+      const p = partyById[r.pid]; if(!p) return ""; const c = byId[p.ch];
+      return '<div class="invite-row" style="--c:'+VIBES[p.vibe].c+'"><span class="lt">'+esc(c.gl)+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(whenText(p))+' · '+(r.guests? '+'+r.guests+' guest'+(r.guests>1?'s':'') : 'just you')+'</small></div><span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span></div>';
+    }).join("");
+  }
+
+  // ---------- directory ----------
+  function renderDirectory(){
+    const q = $("#dirSearch").value.trim().toLowerCase();
+    const sort = $("#dirSort").value;
+    let rows = CHAPTERS.filter(c => !q || [c.name,c.gl,c.nick||"",c.addr||"",c.ig].join(" ").toLowerCase().includes(q));
+    if(sort==="name") rows.sort((a,b)=>a.name.localeCompare(b.name));
+    if(sort==="street") rows.sort((a,b)=>(a.street||"~").localeCompare(b.street||"~") || (parseInt(a.addr)||0)-(parseInt(b.addr)||0));
+    if(sort==="party") rows.sort((a,b)=>partiesFor(b.id).length-partiesFor(a.id).length || a.name.localeCompare(b.name));
+    $("#dirBody").innerHTML = rows.length ? rows.map(c=>{
+      const ps = partiesFor(c.id);
+      return '<tr><td class="gl">'+esc(c.gl)+'</td><td class="nm">'+esc(c.name)+(c.nick?'<small>'+esc(c.nick)+'</small>':'')+'</td>' +
+        '<td class="addr">'+(c.addr?'<a href="'+mapsUrl(c.addr)+'" target="_blank" rel="noopener">'+esc(c.addr)+'</a>':'<span class="muted">Not listed</span>')+'</td>' +
+        '<td class="ig"><a href="'+igUrl(c.ig)+'" target="_blank" rel="noopener">@'+esc(c.ig)+'</a></td>' +
+        '<td>'+(ps.length?'<button type="button" class="party-flag" data-goto="'+ps[0].id+'">'+ps.length+' part'+(ps.length>1?'ies':'y')+'</button>':'<span class="muted">—</span>')+'</td></tr>';
+    }).join("") : '<tr><td colspan="5" class="muted" style="text-align:center;padding:24px">No chapter matches "'+esc(q)+'".</td></tr>';
+  }
+
+  function renderAll(){
+    renderAuth(); renderFilters(); renderMap(); renderDetail(); renderParties(); renderInvites(); renderDirectory();
+  }
+
+  // ---------- dialogs ----------
+  const loginDlg = $("#loginDlg"), inviteDlg = $("#inviteDlg");
+  let authMode = "login";
+  function setAuthMode(mode){
+    authMode = mode;
+    const signup = mode === "signup";
+    $("#tabLogin").setAttribute("aria-selected", String(!signup));
+    $("#tabSignup").setAttribute("aria-selected", String(signup));
+    $("#nameField").hidden = !signup;
+    $("#passChoice").hidden = !signup;
+    $("#loginTitle").textContent = signup ? "Get on the map" : "Welcome back";
+    $("#loginSubmit").textContent = signup ? "Create my account" : "Log in";
+    $("#loginPassword").autocomplete = signup ? "new-password" : "current-password";
+    $("#loginPassword").placeholder = signup ? "At least 8 characters" : "";
+    $("#loginErr").textContent = "";
+  }
+  function openLogin(mode){
+    setAuthMode(mode || "login");
+    $("#loginPassword").value = "";
+    if(loginDlg.showModal) loginDlg.showModal(); else loginDlg.setAttribute("open","");
+    (authMode === "signup" ? $("#loginName") : $("#loginEmail")).focus();
+  }
+  document.querySelectorAll("dialog [data-close]").forEach(b=>b.addEventListener("click", ()=>b.closest("dialog").close()));
+  $("#loginForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const signup = authMode === "signup";
+    const body = {email:$("#loginEmail").value, password:$("#loginPassword").value};
+    if(signup) body.name = $("#loginName").value;
+    const btn = $("#loginSubmit");
+    btn.disabled = true; $("#loginErr").textContent = "";
+    try {
+      const data = await api(signup ? "/api/signup" : "/api/login", body);
+      state.user = data.user; state.requests = data.requests;
+      $("#loginPassword").value = "";
+      loginDlg.close(); renderAll();
+      const first = state.user.name.split(" ")[0];
+      toast(signup ? "Welcome in, " + first + ". The map is live." : "Welcome back, " + first + ".");
+      document.getElementById("map").scrollIntoView();
+    } catch(err){
+      $("#loginErr").textContent = err.message;
+    } finally { btn.disabled = false; }
+  });
+
+  let pendingParty = null, guestCount = 0;
+  function renderGuests(){
+    $("#guestChips").innerHTML = [0,1,2,3].map(n=>'<button type="button" class="chip" data-guests="'+n+'" aria-pressed="'+(guestCount===n)+'">'+(n?'+'+n:'Solo')+'</button>').join("");
+  }
+  function openInvite(pid){
+    if(!state.user){ openLogin(); return; }
+    const p = partyById[pid], c = byId[p.ch];
+    pendingParty = pid; guestCount = 0; renderGuests();
+    $("#invHost").textContent = "Request an invite · " + c.gl + " " + c.name;
+    $("#invTitle").textContent = p.title;
+    $("#invWhen").textContent = whenText(p) + " · " + (c.addr || "");
+    $("#invMsg").value = ""; $("#invAgree").checked = false; $("#invErr").textContent = "";
+    if(inviteDlg.showModal) inviteDlg.showModal(); else inviteDlg.setAttribute("open","");
+  }
+  $("#guestChips").addEventListener("click", e=>{ const b = e.target.closest("[data-guests]"); if(b){ guestCount = +b.dataset.guests; renderGuests(); } });
+  $("#inviteForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    if(!$("#invAgree").checked){ $("#invErr").textContent = "Tick the box to agree to bring your PSU ID and follow house rules."; return; }
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true; $("#invErr").textContent = "";
+    try {
+      const data = await api("/api/requests", {partyId:pendingParty, guests:guestCount, note:$("#invMsg").value});
+      state.requests = data.requests;
+      inviteDlg.close(); renderAll();
+      toast("Request sent to " + byId[partyById[pendingParty].ch].gl + ". Waiting on the house…");
+    } catch(err){
+      $("#invErr").textContent = err.message;
+    } finally { btn.disabled = false; }
+  });
+
+  // ---------- events ----------
+  function select(sel, scroll){
+    state.selected = sel;
+    const c = sel.type==="party" ? byId[partyById[sel.id].ch] : byId[sel.id];
+    if(c && c.x!=null) centerOn(c.x, c.y);
+    renderMap(); renderDetail(); renderParties();
+    if(scroll) document.getElementById("map").scrollIntoView();
+  }
+  document.addEventListener("click", e=>{
+    const t = e.target;
+    const mode = t.closest("[data-auth-mode]"); if(mode){ setAuthMode(mode.dataset.authMode); return; }
+    if(t.closest("[data-signup]")){ openLogin("signup"); return; }
+    if(t.closest('a[href="#plans"]')) return;
+    if(t.closest("[data-login]") || t.closest("#heroLogin")){
+      if(state.user && t.closest("#heroLogin")) document.getElementById("map").scrollIntoView(); else openLogin();
+      return;
+    }
+    const zb = t.closest("[data-zoom]"); if(zb){ zoomAt(zb.dataset.zoom==="in" ? 1/1.5 : 1.5, view.x + view.w/2, view.y + viewH()/2); return; }
+    const vb = t.closest("[data-view]"); if(vb){ Object.assign(view, VIEWS[vb.dataset.view]); renderMap(); return; }
+    const req = t.closest("[data-request]"); if(req){ e.stopPropagation(); openInvite(req.dataset.request); return; }
+    const pl = t.closest("[data-party-link]"); if(pl){ e.preventDefault(); const p = partyById[pl.dataset.partyLink]; state.day="all"; state.vibe="all"; select({type:"party", id:p.id}); renderFilters(); return; }
+    const go = t.closest("[data-goto]"); if(go){ if(!state.user){ openLogin(); return; } state.day="all"; state.vibe="all"; renderFilters(); select({type:"party", id:go.dataset.goto}, true); return; }
+    const dc = t.closest("[data-day]"); if(dc){ state.day = dc.dataset.day; renderAll(); return; }
+    const vc = t.closest("[data-vibe]"); if(vc){ state.vibe = vc.dataset.vibe; renderAll(); return; }
+    const pin = t.closest("[data-party]"); if(pin){ const isCard = pin.classList.contains("party"); select({type:"party", id:pin.dataset.party}, isCard); return; }
+    const house = t.closest("[data-house]"); if(house){ select({type:"house", id:+house.dataset.house}); return; }
+  });
+  document.addEventListener("keydown", e=>{
+    if(e.key!=="Enter" && e.key!==" ") return;
+    const el = e.target.closest && e.target.closest("[data-party],[data-house]");
+    if(el && el === e.target){ e.preventDefault(); el.dispatchEvent(new MouseEvent("click",{bubbles:true})); }
+  });
+  $("#showAll").addEventListener("change", e=>{ state.showAll = e.target.checked; renderMap(); });
+  $("#dirSearch").addEventListener("input", renderDirectory);
+  $("#dirSort").addEventListener("change", renderDirectory);
+
+  renderHero();
+  renderAll();
+  api("/api/me").then(data=>{
+    if(data.user){ state.user = data.user; state.requests = data.requests; renderAll(); }
+  }).catch(err=>toast(err.message));
+})();
+</script>
+
+</body>
+</html>

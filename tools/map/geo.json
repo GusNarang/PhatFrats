@@ -1,0 +1,281 @@
+﻿[
+    {
+        "id":  "1",
+        "addr":  "425 Locust Lane",
+        "lat":  40.7942746,
+        "lon":  -77.8541217,
+        "hn":  "425",
+        "road":  "Locust Lane",
+        "name":  "Alpha Chi Rho"
+    },
+    {
+        "id":  "2",
+        "addr":  "225 East Foster Avenue",
+        "lat":  40.7940093,
+        "lon":  -77.8570357,
+        "hn":  "225",
+        "road":  "East Foster Avenue",
+        "name":  "Zeta Psi"
+    },
+    {
+        "id":  "3",
+        "addr":  "240 East Prospect Avenue",
+        "lat":  40.7926562,
+        "lon":  -77.8530919,
+        "hn":  "240",
+        "road":  "East Prospect Avenue",
+        "name":  "Alpha Epsilon Pi"
+    },
+    {
+        "id":  "4",
+        "addr":  "322 Fraternity Row",
+        "lat":  40.7949426,
+        "lon":  -77.8543327,
+        "hn":  "322",
+        "road":  "Fraternity Row",
+        "name":  "Alpha Gamma Rho"
+    },
+    {
+        "id":  "5",
+        "addr":  "339 Fraternity Row",
+        "lat":  40.795098,
+        "lon":  -77.8534536,
+        "hn":  "339",
+        "road":  "Fraternity Row",
+        "name":  "Alpha Kappa Lambda"
+    },
+    {
+        "id":  "6",
+        "addr":  "329 East Prospect Avenue",
+        "lat":  40.7944403,
+        "lon":  -77.8524594,
+        "hn":  "329",
+        "road":  "East Prospect Avenue",
+        "name":  ""
+    },
+    {
+        "id":  "7",
+        "addr":  "320 South Frasier Street",
+        "lat":  40.790984245037,
+        "lon":  -77.859828075398,
+        "hn":  "C",
+        "road":  "320 S FRASER ST, STATE COLLEGE, PA, 16801",
+        "name":  "census"
+    },
+    {
+        "id":  "8",
+        "addr":  "420 East Prospect Avenue",
+        "lat":  40.7955701,
+        "lon":  -77.8506784,
+        "hn":  "420",
+        "road":  "East Prospect Avenue",
+        "name":  "Kappa Sigma"
+    },
+    {
+        "id":  "9",
+        "addr":  "321 East Fairmount Avenue",
+        "lat":  40.7946806,
+        "lon":  -77.8538629,
+        "hn":  "321",
+        "road":  "East Fairmount Avenue",
+        "name":  "Alpha Tau Omega"
+    },
+    {
+        "id":  "10",
+        "addr":  "360 North Burrowes Street",
+        "lat":  40.7955821,
+        "lon":  -77.8679203,
+        "hn":  "360",
+        "road":  "North Burrowes Street",
+        "name":  ""
+    },
+    {
+        "id":  "11",
+        "addr":  "255 East Fairmount Avenue",
+        "lat":  40.7938493,
+        "lon":  -77.8544213,
+        "hn":  "255",
+        "road":  "East Fairmount Avenue",
+        "name":  "Beta Sigma Beta"
+    },
+    {
+        "id":  "12",
+        "addr":  "360 East Hamilton Avenue",
+        "lat":  40.7942039,
+        "lon":  -77.8501751,
+        "hn":  "360",
+        "road":  "East Hamilton Avenue",
+        "name":  "Chi Phi"
+    },
+    {
+        "id":  "13",
+        "addr":  "508 Locust Lane",
+        "lat":  40.7934634,
+        "lon":  -77.8538054,
+        "hn":  "508",
+        "road":  "Locust Lane",
+        "name":  "Delta Sigma Phi"
+    },
+    {
+        "id":  "15",
+        "addr":  "229 Locust Lane",
+        "lat":  40.7954568,
+        "lon":  -77.8561627,
+        "hn":  "229",
+        "road":  "Locust Lane",
+        "name":  "Delta Upsilon"
+    },
+    {
+        "id":  "16",
+        "addr":  "101 North Patterson Street",
+        "lat":  40.7884828,
+        "lon":  -77.8701178,
+        "hn":  "101",
+        "road":  "North Patterson Street",
+        "name":  "Delta Theta Sigma"
+    },
+    {
+        "id":  "17",
+        "addr":  "305 East Prospect Avenue",
+        "lat":  40.7937726,
+        "lon":  -77.8529481,
+        "hn":  "305",
+        "road":  "East Prospect Avenue",
+        "name":  "Theta Delta Chi"
+    },
+    {
+        "id":  "18",
+        "addr":  "328 East Foster Avenue",
+        "lat":  40.7951341,
+        "lon":  -77.8549099,
+        "hn":  "328",
+        "road":  "East Foster Avenue",
+        "name":  "Delta Kappa Epsilon"
+    },
+    {
+        "id":  "19",
+        "addr":  "319 North Burrowes Road",
+        "lat":  40.795053911275,
+        "lon":  -77.866953882682,
+        "hn":  "C",
+        "road":  "319 N BURROWES RD, STATE COLLEGE, PA, 16801",
+        "name":  "census"
+    },
+    {
+        "id":  "20",
+        "addr":  "403 Locust Lane",
+        "lat":  40.7945584,
+        "lon":  -77.8546599,
+        "hn":  "403",
+        "road":  "Locust Lane",
+        "name":  "Phi Kappa Psi"
+    },
+    {
+        "id":  "21",
+        "addr":  "429 East Hamilton Avenue",
+        "lat":  40.795494,
+        "lon":  -77.8502605,
+        "hn":  "429",
+        "road":  "East Hamilton Avenue",
+        "name":  "Tau Epsilon Phi"
+    },
+    {
+        "id":  "22",
+        "addr":  "408 East Fairmount Avenue",
+        "lat":  40.7956911,
+        "lon":  -77.8521448,
+        "hn":  "408",
+        "road":  "East Fairmount Avenue",
+        "name":  "Phi Kappa Tau"
+    },
+    {
+        "id":  "23",
+        "addr":  "338 East Fairmount Avenue",
+        "lat":  40.7948025,
+        "lon":  -77.8529652,
+        "hn":  "338",
+        "road":  "East Fairmount Avenue",
+        "name":  "Phi Kappa Theta"
+    },
+    {
+        "id":  "24",
+        "addr":  "501 South Allen Street",
+        "lat":  40.7912248,
+        "lon":  -77.8556109,
+        "hn":  "501",
+        "road":  "South Allen Street",
+        "name":  "Phi Sigma Kappa"
+    },
+    {
+        "id":  "25",
+        "addr":  "409 East Fairmount Avenue",
+        "lat":  40.795906,
+        "lon":  -77.8528393,
+        "hn":  "409",
+        "road":  "East Fairmount Avenue",
+        "name":  "Pi Kappa Phi"
+    },
+    {
+        "id":  "26",
+        "addr":  "200 East Beaver Avenue",
+        "lat":  40.7942805,
+        "lon":  -77.8583466,
+        "hn":  "200",
+        "road":  "East Beaver Avenue",
+        "name":  "Phi Sigma Sigma"
+    },
+    {
+        "id":  "27",
+        "addr":  "524 Locust Lane",
+        "lat":  40.7933118,
+        "lon":  -77.8533893,
+        "hn":  "524",
+        "road":  "Locust Lane",
+        "name":  "Sigma Phi Epsilon"
+    },
+    {
+        "id":  "28",
+        "addr":  "351 East Fairmount Avenue",
+        "lat":  40.7954294,
+        "lon":  -77.8532532,
+        "hn":  "351",
+        "road":  "East Fairmount Avenue",
+        "name":  "Lambda Chi Alpha"
+    },
+    {
+        "id":  "29",
+        "addr":  "427 East Fairmount Avenue",
+        "lat":  40.7963055,
+        "lon":  -77.8525761,
+        "hn":  "427",
+        "road":  "East Fairmount Avenue",
+        "name":  "Tau Phi Delta"
+    },
+    {
+        "id":  "30",
+        "addr":  "523 South Allen Street",
+        "lat":  40.7910424,
+        "lon":  -77.8552546,
+        "hn":  "523",
+        "road":  "South Allen Street",
+        "name":  "Theta Chi"
+    },
+    {
+        "id":  "31",
+        "addr":  "328 East Fairmount Avenue",
+        "lat":  40.7944523,
+        "lon":  -77.8531123,
+        "hn":  "328",
+        "road":  "East Fairmount Avenue",
+        "name":  "Zeta Beta Tau"
+    },
+    {
+        "id":  "32",
+        "addr":  "226 East Beaver Avenue",
+        "lat":  40.7946697,
+        "lon":  -77.8582648,
+        "hn":  "226",
+        "road":  "East Beaver Avenue",
+        "name":  "Triangle Fraternity"
+    }
+]
