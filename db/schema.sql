@@ -10,6 +10,20 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Stays empty until the owner types the code emailed to them.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+
+-- One live confirmation code per user. Only its hash is stored.
+CREATE TABLE IF NOT EXISTS email_codes (
+  user_id           BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  code_hash         TEXT NOT NULL,
+  expires_at        TIMESTAMPTZ NOT NULL,
+  attempts          SMALLINT NOT NULL DEFAULT 0,
+  last_sent_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_in_window    SMALLINT NOT NULL DEFAULT 1
+);
+
 -- Only a hash of each session token is stored, so a database leak can't be used to log in.
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,

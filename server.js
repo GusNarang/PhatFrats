@@ -4,6 +4,7 @@ const { promisify } = require('util');
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
+const nodemailer = require('nodemailer');
 const PARTIES = require('./public/parties.js');
 
 if (!process.env.DATABASE_URL) {
@@ -14,7 +15,12 @@ if (!process.env.DATABASE_URL) {
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SESSION_COOKIE = 'pf_session';
 const SESSION_DAYS = 30;
-const FREE_INVITE_LIMIT = 1;
+const FREE_INVITES_PER_WEEK = 1;
+// Weeks start Monday at midnight in State College.
+const WEEK_START_SQL = `(date_trunc('week', now() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York')`;
+const CODE_MINUTES = 15;
+const CODE_MAX_ATTEMPTS = 5;
+const CODES_PER_HOUR = 5;
 const partyById = new Map(PARTIES.map((p) => [p.id, p]));
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
@@ -68,13 +74,81 @@ async function currentUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
   const { rows } = await pool.query(
-    `SELECT u.id, u.name, u.email, u.plan FROM sessions s JOIN users u ON u.id = s.user_id
+    `SELECT u.id, u.name, u.email, u.plan, u.email_verified_at FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [hashToken(token)]
   );
   return rows[0] || null;
 }
-const publicUser = (u) => ({ name: u.name, email: u.email, plan: u.plan, freeLimit: FREE_INVITE_LIMIT });
+const publicUser = (u) => ({
+  name: u.name,
+  email: u.email,
+  plan: u.plan,
+  verified: !!u.email_verified_at,
+  freeLimit: FREE_INVITES_PER_WEEK,
+});
+async function accountPayload(user) {
+  return { user: publicUser(user), requests: user.email_verified_at ? await listRequests(user) : [] };
+}
+
+// ---------- email confirmation codes ----------
+const mailer = process.env.SMTP_HOST
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 465,
+      secure: (Number(process.env.SMTP_PORT) || 465) === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    })
+  : null;
+
+async function sendCodeEmail(to, code) {
+  if (!mailer) {
+    if (IS_PROD) throw new Error('SMTP_HOST is not set, so confirmation emails cannot be sent.');
+    console.log(`[dev only] Confirmation code for ${to}: ${code}`);
+    return;
+  }
+  await mailer.sendMail({
+    from: `"PhatFrats" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+    to,
+    subject: 'Your PhatFrats confirmation code',
+    text: `Your PhatFrats confirmation code is ${code}.\n\nIt expires in ${CODE_MINUTES} minutes. If you didn't sign up for PhatFrats, you can ignore this email.`,
+  });
+}
+const hashCode = (userId, code) => crypto.createHash('sha256').update(`${userId}:${code}`).digest('hex');
+
+// Returns 'sent', 'throttled' (a code went out too recently) or 'failed' (the email didn't send).
+async function issueCode(user) {
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  // The limits live in this one statement, so they hold across every server instance.
+  const { rows } = await pool.query(
+    `INSERT INTO email_codes (user_id, code_hash, expires_at)
+     VALUES ($1, $2, now() + make_interval(mins => $3))
+     ON CONFLICT (user_id) DO UPDATE SET
+       code_hash = EXCLUDED.code_hash,
+       expires_at = EXCLUDED.expires_at,
+       attempts = 0,
+       last_sent_at = now(),
+       sent_in_window = CASE WHEN email_codes.window_started_at < now() - interval '1 hour' THEN 1 ELSE email_codes.sent_in_window + 1 END,
+       window_started_at = CASE WHEN email_codes.window_started_at < now() - interval '1 hour' THEN now() ELSE email_codes.window_started_at END
+     WHERE email_codes.last_sent_at < now() - interval '1 minute'
+       AND (email_codes.window_started_at < now() - interval '1 hour' OR email_codes.sent_in_window < $4)
+     RETURNING user_id`,
+    [user.id, hashCode(user.id, code), CODE_MINUTES, CODES_PER_HOUR]
+  );
+  if (!rows[0]) return 'throttled';
+  try {
+    await sendCodeEmail(user.email, code);
+    return 'sent';
+  } catch (err) {
+    console.error('Confirmation email failed:', err.message);
+    // Lets them retry right away. The hourly cap still counts this attempt.
+    await pool.query(`UPDATE email_codes SET last_sent_at = now() - interval '2 minutes' WHERE user_id = $1`, [user.id]);
+    return 'failed';
+  }
+}
 
 // ---------- invite requests ----------
 // Demo stand-in for a host's reply until hosts have real accounts. Full Access is approved at
@@ -97,8 +171,8 @@ async function listRequests(user) {
     ]);
   }
   const { rows } = await pool.query(
-    `SELECT party_id, guests, note, status, priority, created_at FROM invite_requests
-     WHERE user_id = $1 ORDER BY created_at DESC`,
+    `SELECT party_id, guests, note, status, priority, created_at, created_at >= ${WEEK_START_SQL} AS this_week
+     FROM invite_requests WHERE user_id = $1 ORDER BY created_at DESC`,
     [user.id]
   );
   return rows.map((r) => ({
@@ -108,6 +182,7 @@ async function listRequests(user) {
     status: r.status,
     priority: r.priority,
     ts: new Date(r.created_at).getTime(),
+    thisWeek: r.this_week,
   }));
 }
 
@@ -124,6 +199,10 @@ const requireUser = wrap(async (req, res, next) => {
   if (!req.user) return fail(res, 401, 'Log in to do that.', 'NOT_LOGGED_IN');
   next();
 });
+const requireVerified = [requireUser, (req, res, next) => {
+  if (!req.user.email_verified_at) return fail(res, 403, 'Confirm your email to do that.', 'EMAIL_NOT_VERIFIED');
+  next();
+}];
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -148,25 +227,56 @@ app.post('/api/signup', authLimiter, wrap(async (req, res) => {
   // New accounts are always free. Only a confirmed payment may set plan = 'full'.
   const { rows } = await pool.query(
     `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
-     ON CONFLICT (email) DO NOTHING RETURNING id, name, email, plan`,
+     ON CONFLICT (email) DO NOTHING RETURNING id, name, email, plan, email_verified_at`,
     [email, name, passwordHash]
   );
   if (!rows[0]) return fail(res, 409, 'That email already has an account. Log in instead.', 'EMAIL_TAKEN');
   await startSession(res, rows[0].id);
-  res.status(201).json({ user: publicUser(rows[0]), requests: [] });
+  const codeStatus = await issueCode(rows[0]);
+  res.status(201).json({ ...(await accountPayload(rows[0])), codeStatus });
 }));
 
 app.post('/api/login', authLimiter, wrap(async (req, res) => {
   const email = cleanEmail(req.body?.email);
   const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
   const { rows } = await pool.query(
-    'SELECT id, name, email, plan, password_hash FROM users WHERE email = $1',
+    'SELECT id, name, email, plan, password_hash, email_verified_at FROM users WHERE email = $1',
     [email]
   );
   const ok = await verifyPassword(password, rows[0] ? rows[0].password_hash : await dummyHash);
   if (!rows[0] || !ok) return fail(res, 401, 'That email and password do not match.', 'BAD_LOGIN');
   await startSession(res, rows[0].id);
-  res.json({ user: publicUser(rows[0]), requests: await listRequests(rows[0]) });
+  const codeStatus = rows[0].email_verified_at ? undefined : await issueCode(rows[0]);
+  res.json({ ...(await accountPayload(rows[0])), codeStatus });
+}));
+
+app.post('/api/verify', authLimiter, requireUser, wrap(async (req, res) => {
+  if (req.user.email_verified_at) return res.json(await accountPayload(req.user));
+  const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\D/g, '') : '';
+  if (code.length !== 6) return fail(res, 400, 'Enter the 6-digit code from your email.');
+  // Counts the try before checking it, so parallel guesses can't get past the limit.
+  const { rows } = await pool.query(
+    `UPDATE email_codes SET attempts = attempts + 1
+     WHERE user_id = $1 AND expires_at > now() AND attempts < $2 RETURNING code_hash`,
+    [req.user.id, CODE_MAX_ATTEMPTS]
+  );
+  if (!rows[0]) return fail(res, 400, 'That code has expired or had too many tries. Send yourself a new one.', 'CODE_EXPIRED');
+  const matches = crypto.timingSafeEqual(Buffer.from(rows[0].code_hash), Buffer.from(hashCode(req.user.id, code)));
+  if (!matches) return fail(res, 400, "That code doesn't match. Check your email and try again.", 'CODE_WRONG');
+  const { rows: [user] } = await pool.query(
+    `UPDATE users SET email_verified_at = now() WHERE id = $1 RETURNING id, name, email, plan, email_verified_at`,
+    [req.user.id]
+  );
+  await pool.query('DELETE FROM email_codes WHERE user_id = $1', [req.user.id]);
+  res.json(await accountPayload(user));
+}));
+
+app.post('/api/verify/resend', authLimiter, requireUser, wrap(async (req, res) => {
+  if (req.user.email_verified_at) return res.json({ codeStatus: 'verified' });
+  const codeStatus = await issueCode(req.user);
+  if (codeStatus === 'throttled') return fail(res, 429, 'A code just went out. Check your spam folder, or wait a minute before asking for another.', 'CODE_THROTTLED');
+  if (codeStatus === 'failed') return fail(res, 502, "We couldn't send your code just now. Try again in a moment.", 'CODE_NOT_SENT');
+  res.json({ codeStatus });
 }));
 
 app.post('/api/logout', wrap(async (req, res) => {
@@ -179,14 +289,14 @@ app.post('/api/logout', wrap(async (req, res) => {
 app.get('/api/me', wrap(async (req, res) => {
   const user = await currentUser(req);
   if (!user) return res.json({ user: null, requests: [] });
-  res.json({ user: publicUser(user), requests: await listRequests(user) });
+  res.json(await accountPayload(user));
 }));
 
-app.get('/api/requests', requireUser, wrap(async (req, res) => {
+app.get('/api/requests', requireVerified, wrap(async (req, res) => {
   res.json({ requests: await listRequests(req.user) });
 }));
 
-app.post('/api/requests', requireUser, wrap(async (req, res) => {
+app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   const partyId = req.body?.partyId;
   if (typeof partyId !== 'string' || !partyById.has(partyId)) return fail(res, 400, 'That party is not on the schedule.');
   const guests = Number.isInteger(req.body?.guests) ? req.body.guests : 0;
@@ -196,16 +306,19 @@ app.post('/api/requests', requireUser, wrap(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Locks this user's row so two requests sent at once can't both use the free invite.
+    // Locks this user's row so two requests sent at once can't both use the weekly free invite.
     const { rows: [user] } = await client.query('SELECT plan FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
-    const { rows: existing } = await client.query('SELECT party_id FROM invite_requests WHERE user_id = $1', [req.user.id]);
+    const { rows: existing } = await client.query(
+      `SELECT party_id, created_at >= ${WEEK_START_SQL} AS this_week FROM invite_requests WHERE user_id = $1`,
+      [req.user.id]
+    );
     if (existing.some((r) => r.party_id === partyId)) {
       await client.query('ROLLBACK');
       return fail(res, 409, 'You already requested an invite to this party.', 'ALREADY_REQUESTED');
     }
-    if (user.plan !== 'full' && existing.length >= FREE_INVITE_LIMIT) {
+    if (user.plan !== 'full' && existing.filter((r) => r.this_week).length >= FREE_INVITES_PER_WEEK) {
       await client.query('ROLLBACK');
-      return fail(res, 403, 'Free accounts can request an invite to one party. Full Access removes the limit.', 'FREE_LIMIT');
+      return fail(res, 403, 'Free accounts get one party invite per week. Yours resets Monday at midnight, or Full Access removes the limit.', 'FREE_LIMIT');
     }
     await client.query(
       'INSERT INTO invite_requests (user_id, party_id, guests, note, priority) VALUES ($1, $2, $3, $4, $5)',
