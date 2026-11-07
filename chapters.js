@@ -110,7 +110,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
         [ch]
       ),
       pool.query(
-        `SELECT b.id, 'h' || b.party_id AS party_id, b.email, b.guests, b.created_at,
+        `SELECT b.id, 'h' || b.party_id AS party_id, b.email, b.created_at,
            EXISTS (SELECT 1 FROM users u WHERE u.email = b.email) AS has_account
          FROM brother_invites b JOIN hosted_parties hp ON hp.id = b.party_id
          WHERE b.invited_by = $1 AND hp.chapter_id = $2 ORDER BY b.created_at DESC`,
@@ -133,7 +133,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
         id: String(m.id), name: m.name, role: m.role, joined: m.joined_at, invites: m.invites,
         ...(leader ? { email: m.email } : {}), you: String(m.id) === String(req.user.id),
       })),
-      myInvites: myInvites.rows.map((b) => ({ id: String(b.id), partyId: b.party_id, email: b.email, guests: b.guests, sent: b.created_at, hasAccount: b.has_account })),
+      myInvites: myInvites.rows.map((b) => ({ id: String(b.id), partyId: b.party_id, email: b.email, sent: b.created_at, hasAccount: b.has_account })),
       invitesPerParty: INVITES_PER_BROTHER_PER_PARTY,
     };
 
@@ -141,7 +141,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       // Every student request and every brother invite for this chapter's parties, Full Access first.
       const [requests, allInvites] = await Promise.all([
         pool.query(
-          `SELECT r.id, r.party_id, r.guests, r.note, r.status, r.priority, r.created_at, u.name, u.email, u.plan
+          `SELECT r.id, r.party_id, r.note, r.status, r.priority, r.created_at, u.name, u.email, u.plan
            FROM invite_requests r
            JOIN users u ON u.id = r.user_id
            JOIN hosted_parties hp ON 'h' || hp.id = r.party_id
@@ -150,7 +150,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
           [ch]
         ),
         pool.query(
-          `SELECT b.id, 'h' || b.party_id AS party_id, b.email, b.guests, b.created_at, inviter.name AS by_name
+          `SELECT b.id, 'h' || b.party_id AS party_id, b.email, b.created_at, inviter.name AS by_name
            FROM brother_invites b JOIN hosted_parties hp ON hp.id = b.party_id
            LEFT JOIN users inviter ON inviter.id = b.invited_by
            WHERE hp.chapter_id = $1 ORDER BY b.created_at DESC`,
@@ -158,10 +158,10 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
         ),
       ]);
       out.requests = requests.rows.map((r) => ({
-        id: String(r.id), partyId: r.party_id, name: r.name, email: r.email, full: r.plan === 'full', guests: r.guests,
+        id: String(r.id), partyId: r.party_id, name: r.name, email: r.email, full: r.plan === 'full',
         note: r.note, status: r.status, sent: r.created_at,
       }));
-      out.allInvites = allInvites.rows.map((b) => ({ id: String(b.id), partyId: b.party_id, email: b.email, guests: b.guests, by: b.by_name || 'A former brother', sent: b.created_at }));
+      out.allInvites = allInvites.rows.map((b) => ({ id: String(b.id), partyId: b.party_id, email: b.email, by: b.by_name || 'A former brother', sent: b.created_at }));
     }
     res.json(out);
   }));
@@ -247,10 +247,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   app.post('/api/chapter/invites', ...requireMember, inviteLimiter, wrap(async (req, res) => {
     const partyId = partyIdParam(req.body?.partyId);
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const guests = Number.isInteger(req.body?.guests) ? req.body.guests : 0;
     if (!partyId) return fail(res, 400, 'Pick a party.');
     if (!PSU_EMAIL.test(email)) return fail(res, 400, 'Use their Penn State email, like abc1234@psu.edu.');
-    if (guests < 0 || guests > 3) return fail(res, 400, 'They can bring up to 3 plus-ones.');
     const party = await partyList.findParty(pool, 'h' + partyId);
     const { rows: [own] } = await pool.query('SELECT chapter_id FROM hosted_parties WHERE id = $1', [partyId]);
     if (!party || !own || own.chapter_id !== req.member.chapter_id) return fail(res, 400, "That party isn't open for invites. It may be cancelled or already over.");
@@ -262,17 +260,17 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       return fail(res, 429, `You've used all ${INVITES_PER_BROTHER_PER_PARTY} of your invites for this party.`, 'INVITE_LIMIT');
     }
     const { rows: [made] } = await pool.query(
-      `INSERT INTO brother_invites (party_id, email, guests, invited_by) VALUES ($1, $2, $3, $4)
+      `INSERT INTO brother_invites (party_id, email, invited_by) VALUES ($1, $2, $3)
        ON CONFLICT (party_id, email) DO NOTHING RETURNING id`,
-      [partyId, email, guests, req.user.id]
+      [partyId, email, req.user.id]
     );
     if (!made) return fail(res, 409, 'Someone in your chapter already invited that person to this party.', 'ALREADY_INVITED');
     // If they already have an account, they're on the list right away.
     await pool.query(
-      `INSERT INTO invite_requests (user_id, party_id, guests, note, status, priority, invited_by)
-       SELECT u.id, $2, $3, '', 'approved', u.plan = 'full', $4 FROM users u WHERE u.email = $1
+      `INSERT INTO invite_requests (user_id, party_id, note, status, priority, invited_by)
+       SELECT u.id, $2, '', 'approved', u.plan = 'full', $3 FROM users u WHERE u.email = $1
        ON CONFLICT (user_id, party_id) DO UPDATE SET status = 'approved', invited_by = EXCLUDED.invited_by`,
-      [email, 'h' + partyId, guests, req.user.id]
+      [email, 'h' + partyId, req.user.id]
     );
     let emailed = true;
     try {

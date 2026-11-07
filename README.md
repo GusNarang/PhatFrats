@@ -93,6 +93,7 @@ Chapters manage their own parties at `/frats` (linked as **For frats** on the ma
 1. In the control room, under **Chapters**, set a chapter's password. That switches the chapter on. Then use **Add leader** with the leader's PhatFrats email.
 2. Brothers log in with their own accounts, open `/frats`, pick their chapter and enter the chapter password.
 3. Leaders post, edit and cancel parties (up to two weeks ahead), approve or waitlist students' invite requests (Full Access first), manage members and change the chapter password.
-4. Every brother can invite people by Penn State email, up to 20 per party. Invited people go straight on the list, get an email, and don't use their weekly free invite. Someone without an account joins the list when they sign up with that email.
+4. There are no plus-ones: everyone who comes needs their own invite request or brother invite.
+5. Every brother can invite people by Penn State email, up to 20 per party. Invited people go straight on the list, get an email, and don't use their weekly free invite. Someone without an account joins the list when they sign up with that email.
 
 Live chapter parties show on the map and in the party list next to the demo parties, marked "Posted by the house". Requests to them wait for the chapter instead of getting the demo's instant answer. PhatBot knows about them too.

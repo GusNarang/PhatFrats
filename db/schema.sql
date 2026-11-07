@@ -144,3 +144,8 @@ CREATE INDEX IF NOT EXISTS brother_invites_email_idx ON brother_invites(email);
 
 -- Set when the invite came from a brother rather than the student asking. These don't use the weekly free invite.
 ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS invited_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+
+-- Plus-ones were removed: everyone who comes needs their own invite. The guests columns stay at 0,
+-- and this clears any plus-ones saved before the change.
+UPDATE invite_requests SET guests = 0 WHERE guests <> 0;
+UPDATE brother_invites SET guests = 0 WHERE guests <> 0;

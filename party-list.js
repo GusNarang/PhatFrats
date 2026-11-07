@@ -33,10 +33,10 @@ function dayLabel(iso) {
 
 const isHostedId = (id) => typeof id === 'string' && /^h\d{1,18}$/.test(id);
 
-// People going to a posted party: approved requests plus brother invites not yet claimed, each with their plus-ones.
+// People going to a posted party: approved requests plus brother invites not yet claimed. One person per invite.
 const GOING_SQL = `(
-  coalesce((SELECT sum(1 + r.guests) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.status = 'approved'), 0) +
-  coalesce((SELECT sum(1 + b.guests) FROM brother_invites b WHERE b.party_id = hp.id AND NOT EXISTS (
+  coalesce((SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.status = 'approved'), 0) +
+  coalesce((SELECT count(*) FROM brother_invites b WHERE b.party_id = hp.id AND NOT EXISTS (
     SELECT 1 FROM invite_requests r JOIN users u ON u.id = r.user_id WHERE r.party_id = 'h' || hp.id AND u.email = b.email)), 0)
 )::int`;
 

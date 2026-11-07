@@ -318,8 +318,6 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 .dlg-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .check{display:flex;gap:10px;align-items:flex-start;font-size:.88rem;color:var(--muted)}
 .check input{accent-color:var(--pink);margin-top:4px}
-.guests{display:flex;gap:6px}
-.guests .chip{min-width:44px;justify-content:center}
 .toast{
   position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:50;
   background:var(--lime);color:#122200;font-weight:800;padding:12px 20px;border-radius:999px;
@@ -727,11 +725,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     <span class="eyebrow" id="invHost">Request an invite</span>
     <h3 id="invTitle">Party</h3>
     <p class="muted mono" id="invWhen" style="font-size:.85rem"></p>
-    <div class="field">
-      <span style="font-size:.85rem;font-weight:600;color:var(--muted)">Plus-ones</span>
-      <div class="guests" id="guestChips" role="group" aria-label="Plus-ones"></div>
-    </div>
-    <div class="field"><label for="invMsg">Note to the house (optional)</label><textarea class="input" id="invMsg" rows="3" placeholder="Who you know, who you're bringing, your best costume idea…"></textarea></div>
+    <p class="muted" style="font-size:.88rem;margin:0 0 12px">This invite is just for you. Friends coming with you each need to request their own.</p>
+    <div class="field"><label for="invMsg">Note to the house (optional)</label><textarea class="input" id="invMsg" rows="3" placeholder="Who you know, who you're coming with, your best costume idea…"></textarea></div>
     <label class="check"><input type="checkbox" id="invAgree"> I'll bring my PSU ID and follow the house rules.</label>
     <p class="err" id="invErr"></p>
     <div class="dlg-actions">
@@ -1171,7 +1166,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const map = {pending:["Pending","st-pending"], approved:["On the list","st-approved"], waitlist:["Waitlist","st-waitlist"]};
     el.innerHTML = note + [...state.requests].sort((a,b)=>b.ts-a.ts).map(r=>{
       const p = partyById[r.pid]; if(!p) return ""; const c = byId[p.ch];
-      return '<div class="invite-row" style="--c:'+VIBES[p.vibe].c+'"><span class="lt">'+esc(c.gl)+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(whenText(p))+' · '+(r.guests? '+'+r.guests+' guest'+(r.guests>1?'s':'') : 'just you')+(r.invitedBy ? ' · Invited by '+esc(r.invitedBy) : '')+'</small></div><span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span></div>';
+      return '<div class="invite-row" style="--c:'+VIBES[p.vibe].c+'"><span class="lt">'+esc(c.gl)+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(whenText(p))+(r.invitedBy ? ' · Invited by '+esc(r.invitedBy) : '')+'</small></div><span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span></div>';
     }).join("");
   }
 
@@ -1449,28 +1444,24 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     logOut().then(()=>verifyDlg.close()).catch(err=>{ $("#verifyErr").textContent = err.message; });
   });
 
-  let pendingParty = null, guestCount = 0;
-  function renderGuests(){
-    $("#guestChips").innerHTML = [0,1,2,3].map(n=>'<button type="button" class="chip" data-guests="'+n+'" aria-pressed="'+(guestCount===n)+'">'+(n?'+'+n:'Solo')+'</button>').join("");
-  }
+  let pendingParty = null;
   function openInvite(pid){
     if(!state.user){ openLogin(); return; }
     const p = partyById[pid], c = byId[p.ch];
-    pendingParty = pid; guestCount = 0; renderGuests();
+    pendingParty = pid;
     $("#invHost").textContent = "Request an invite · " + c.gl + " " + c.name;
     $("#invTitle").textContent = p.title;
     $("#invWhen").textContent = whenText(p) + " · " + (c.addr || "");
     $("#invMsg").value = ""; $("#invAgree").checked = false; $("#invErr").textContent = "";
     if(inviteDlg.showModal) inviteDlg.showModal(); else inviteDlg.setAttribute("open","");
   }
-  $("#guestChips").addEventListener("click", e=>{ const b = e.target.closest("[data-guests]"); if(b){ guestCount = +b.dataset.guests; renderGuests(); } });
   $("#inviteForm").addEventListener("submit", async e=>{
     e.preventDefault();
     if(!$("#invAgree").checked){ $("#invErr").textContent = "Tick the box to agree to bring your PSU ID and follow house rules."; return; }
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; $("#invErr").textContent = "";
     try {
-      const data = await api("/api/requests", {partyId:pendingParty, guests:guestCount, note:$("#invMsg").value});
+      const data = await api("/api/requests", {partyId:pendingParty, note:$("#invMsg").value});
       state.requests = data.requests;
       inviteDlg.close(); renderAll();
       const host = byId[partyById[pendingParty].ch].gl;

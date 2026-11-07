@@ -187,8 +187,8 @@ function demoDecision(partyId, plan) {
 async function listRequests(user) {
   // A brother's invite to this email becomes an approved spot the first time its owner shows up.
   await pool.query(
-    `INSERT INTO invite_requests (user_id, party_id, guests, note, status, priority, invited_by)
-     SELECT $1, 'h' || b.party_id, b.guests, '', 'approved', $3, b.invited_by
+    `INSERT INTO invite_requests (user_id, party_id, note, status, priority, invited_by)
+     SELECT $1, 'h' || b.party_id, '', 'approved', $3, b.invited_by
      FROM brother_invites b WHERE b.email = $2
      ON CONFLICT (user_id, party_id) DO UPDATE SET status = 'approved', invited_by = EXCLUDED.invited_by
        WHERE invite_requests.status <> 'approved'`,
@@ -206,7 +206,7 @@ async function listRequests(user) {
     ]);
   }
   const { rows } = await pool.query(
-    `SELECT r.party_id, r.guests, r.note, r.status, r.priority, r.created_at, r.invited_by IS NOT NULL AS invited,
+    `SELECT r.party_id, r.note, r.status, r.priority, r.created_at, r.invited_by IS NOT NULL AS invited,
        inviter.name AS invited_by_name, r.created_at >= ${WEEK_START_SQL} AND r.invited_by IS NULL AS this_week
      FROM invite_requests r LEFT JOIN users inviter ON inviter.id = r.invited_by
      WHERE r.user_id = $1 ORDER BY r.created_at DESC`,
@@ -214,7 +214,6 @@ async function listRequests(user) {
   );
   return rows.map((r) => ({
     pid: r.party_id,
-    guests: r.guests,
     note: r.note,
     status: r.status,
     priority: r.priority,
@@ -404,8 +403,6 @@ app.get('/api/requests', requireVerified, wrap(async (req, res) => {
 app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   const partyId = req.body?.partyId;
   if (typeof partyId !== 'string' || !(await partyList.findParty(pool, partyId))) return fail(res, 400, 'That party is not on the schedule.');
-  const guests = Number.isInteger(req.body?.guests) ? req.body.guests : 0;
-  if (guests < 0 || guests > 3) return fail(res, 400, 'You can bring up to 3 plus-ones.');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
 
   const client = await pool.connect();
@@ -426,8 +423,9 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
       return fail(res, 403, `That's your free invite for this week. It resets Monday at midnight, or go unlimited with Full Access for ${PRICING.money(PRICING.current())} a ${PRICING.term}.`, 'FREE_LIMIT');
     }
     await client.query(
-      'INSERT INTO invite_requests (user_id, party_id, guests, note, priority) VALUES ($1, $2, $3, $4, $5)',
-      [req.user.id, partyId, guests, note, user.plan === 'full']
+      // No plus-ones: everyone coming needs their own invite.
+      'INSERT INTO invite_requests (user_id, party_id, note, priority) VALUES ($1, $2, $3, $4)',
+      [req.user.id, partyId, note, user.plan === 'full']
     );
     await client.query('COMMIT');
   } catch (err) {

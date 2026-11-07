@@ -220,15 +220,9 @@ textarea{min-height:96px;resize:vertical}
               <label for="invParty">Party</label>
               <select id="invParty" required></select>
             </div>
-            <div class="grid2">
-              <div class="field">
-                <label for="invEmail">Their Penn State email</label>
-                <input id="invEmail" type="email" inputmode="email" autocomplete="off" placeholder="abc1234@psu.edu" required>
-              </div>
-              <div class="field">
-                <label for="invGuests">Plus-ones</label>
-                <select id="invGuests"><option value="0">Just them</option><option value="1">+1</option><option value="2">+2</option><option value="3">+3</option></select>
-              </div>
+            <div class="field">
+              <label for="invEmail">Their Penn State email <span class="hint">One invite per person. Friends coming with them need their own.</span></label>
+              <input id="invEmail" type="email" inputmode="email" autocomplete="off" placeholder="abc1234@psu.edu" required>
             </div>
             <button class="btn primary" type="submit" id="inviteSend">Send invite</button>
           </form>
@@ -471,7 +465,7 @@ textarea{min-height:96px;resize:vertical}
   function inviteRow(b, canDelete, showBy){
     const p = partyById(b.partyId);
     const status = showBy ? 'From '+esc(b.by) : (b.hasAccount ? "On the list" : "Emailed. They'll join the list when they sign up.");
-    return '<div class="row"><div class="who"><b>'+esc(b.email)+(b.guests?' +'+b.guests:'')+'</b><span>'+esc(p ? p.title+" · "+p.dayText : "Party removed")+' · '+status+'</span></div>'
+    return '<div class="row"><div class="who"><b>'+esc(b.email)+'</b><span>'+esc(p ? p.title+" · "+p.dayText : "Party removed")+' · '+status+'</span></div>'
       + (canDelete ? '<button class="btn slim danger" type="button" data-uninvite="'+b.id+'">Take back</button>' : '') + '</div>';
   }
   function renderInvite(){
@@ -493,8 +487,8 @@ textarea{min-height:96px;resize:vertical}
     const email = $("#invEmail").value.trim();
     try{
       if(!email) throw new Error("Enter their Penn State email.");
-      const r = await api("/api/chapter/invites", {partyId:$("#invParty").value, email, guests:Number($("#invGuests").value)});
-      $("#invEmail").value = ""; $("#invGuests").value = "0";
+      const r = await api("/api/chapter/invites", {partyId:$("#invParty").value, email});
+      $("#invEmail").value = "";
       say($("#inviteMsg"), r.emailed ? "Invite sent to "+email+"." : "Invite saved for "+email+", but the email didn't send. Let them know yourself.", "ok");
       await load();
       $("#invEmail").focus();
@@ -523,7 +517,7 @@ textarea{min-height:96px;resize:vertical}
       const btns = [];
       if(r.status!=="approved") btns.push('<button class="btn slim good" type="button" data-req="'+r.id+'" data-st="approved">Approve</button>');
       if(r.status!=="waitlist") btns.push('<button class="btn slim" type="button" data-req="'+r.id+'" data-st="waitlist">Waitlist</button>');
-      return '<div class="row"><div class="who"><b>'+esc(r.name)+(r.guests?' +'+r.guests:'')+' '+(r.full?'<span class="badge full">Full Access</span>':'')+'</b>'
+      return '<div class="row"><div class="who"><b>'+esc(r.name)+' '+(r.full?'<span class="badge full">Full Access</span>':'')+'</b>'
         + '<span>'+esc(r.email)+' · '+esc(p.title)+' · asked '+shortDate(r.sent)+' · <b>'+label[r.status]+'</b></span>'
         + (r.note ? '<div class="note">"'+esc(r.note)+'"</div>' : '') + '</div>'
         + '<div class="btn-row">'+btns.join("")+'</div></div>';
