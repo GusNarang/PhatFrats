@@ -212,11 +212,9 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     res.json({ ok: true });
   }));
 
+  // Anyone can leave, including the last leader. A chapter left without a leader keeps its brothers,
+  // parties and passwords, and a new leader can sign in with the leader password.
   app.post('/api/chapter/leave', ...requireMember, wrap(async (req, res) => {
-    if (req.member.role === 'leader') {
-      const { rows: [n] } = await pool.query(`SELECT count(*)::int AS n FROM chapter_members WHERE chapter_id = $1 AND role = 'leader'`, [req.member.chapter_id]);
-      if (n.n <= 1) return fail(res, 400, "You're the only leader. Make another brother a leader first, so the chapter isn't left without one.", 'LAST_LEADER');
-    }
     await pool.query('DELETE FROM chapter_members WHERE user_id = $1', [req.user.id]);
     res.json({ ok: true });
   }));

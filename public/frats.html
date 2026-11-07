@@ -311,7 +311,7 @@ textarea{min-height:96px;resize:vertical}
         </div>
         <div class="card">
           <h2>Leave chapter</h2>
-          <p class="muted" style="margin-top:0">You'll stop seeing this page. You can rejoin with the chapter password.</p>
+          <p class="muted" style="margin-top:0" id="leaveNote">You'll stop seeing this page. You can rejoin with the chapter password.</p>
           <button class="btn danger" type="button" id="leaveBtn">Leave chapter</button>
         </div>
       </div>
@@ -447,6 +447,10 @@ textarea{min-height:96px;resize:vertical}
     $("#newPartyBtn").hidden = !leader();
     $("#pwCard").hidden = !leader();
     $("#upgradeCard").hidden = leader();
+    const onlyLeader = leader() && d.members.filter(x=>x.role==="leader").length <= 1;
+    $("#leaveNote").textContent = onlyLeader
+      ? "You can leave even though you're the only leader. Your brothers, parties and passwords stay. A new leader can sign in later with the leader password."
+      : "You'll stop seeing this page. You can rejoin with the chapter password.";
     $("#allInvitesCard").hidden = !leader();
     renderTabs(); renderParties(); renderInvite(); renderRequests(); renderMembers();
   }
@@ -638,7 +642,12 @@ textarea{min-height:96px;resize:vertical}
     }catch(err){ say($("#pwMsg"), err.message); }
   });
   $("#leaveBtn").addEventListener("click", async ()=>{
-    if(!confirm("Leave "+state.data.membership.chapter.name+"?")) return;
+    const name = state.data.membership.chapter.name;
+    const onlyLeader = leader() && state.data.members.filter(m=>m.role==="leader").length <= 1;
+    const msg = onlyLeader
+      ? "Leave "+name+"? You're its only leader, so it will have no leader until someone signs in with the leader password. Its brothers, parties and passwords all stay as they are."
+      : "Leave "+name+"?";
+    if(!confirm(msg)) return;
     try{ await api("/api/chapter/leave", {}); toast("You left the chapter."); await load(); }
     catch(err){ toast(err.message); }
   });
