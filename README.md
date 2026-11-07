@@ -11,6 +11,7 @@ Create an account with a Penn State email and get a map of every Interfraternity
 | See the map and party details | Yes | Yes |
 | Invite requests | One party per week | Unlimited |
 | Place in the host's line | Normal | Front of the line |
+| PhatBot, the AI party guide | No | Yes |
 
 The free invite resets every Monday at midnight Eastern. Checkout isn't built yet, so every account is currently Free. Only a confirmed payment should ever set `plan = 'full'`.
 
@@ -24,11 +25,11 @@ Set the `SMTP_*` values from `.env.example` to send email.
 
 ## PhatBot
 
-PhatBot is an AI chat for logged-in accounts with a confirmed email. It knows this week's parties, every IFC chapter in the directory, and the person's own plan and invite requests, and helps both students and chapter members planning events. It can't send or manage invites yet.
+PhatBot is an AI chat for Full Access accounts with a confirmed email. It knows this week's parties, every IFC chapter in the directory, and the person's own plan and invite requests, and helps both students and chapter members planning events. It can't send or manage invites yet.
 
 - Runs on Claude through the Anthropic API (`ai.js`). Set `ANTHROPIC_API_KEY` to turn it on; without it the chat button stays hidden.
 - Uses Claude Opus 5.5 at low effort by default. `PHATBOT_MODEL` and `PHATBOT_EFFORT` change that.
-- Each account gets 20 messages a day on Free and 60 on Full Access (`chat_usage` table), plus at most 10 a minute.
+- Each Full Access account gets 60 messages a day (`chat_usage` table), plus at most 10 a minute. Free accounts don't see the chat.
 - Conversations aren't stored. The page keeps them until it's reloaded. Without `SMTP_HOST`, a local run prints the code in the terminal instead.
 
 ## Run it

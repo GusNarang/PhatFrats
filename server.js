@@ -22,8 +22,8 @@ const WEEK_START_SQL = `(date_trunc('week', now() AT TIME ZONE 'America/New_York
 const CODE_MINUTES = 15;
 const CODE_MAX_ATTEMPTS = 5;
 const CODES_PER_HOUR = 5;
-// PhatBot messages per day. Each one costs money, so the limits keep the bill predictable.
-const CHAT_LIMITS = { free: 20, full: 60 };
+// PhatBot is a Full Access perk. Each message costs money, so a daily limit keeps the bill predictable.
+const CHAT_DAILY_LIMIT = 60;
 const TODAY_SQL = `(now() AT TIME ZONE 'America/New_York')::date`;
 const partyById = new Map(PARTIES.map((p) => [p.id, p]));
 
@@ -90,7 +90,7 @@ const publicUser = (u) => ({
   plan: u.plan,
   verified: !!u.email_verified_at,
   freeLimit: FREE_INVITES_PER_WEEK,
-  chat: phatbot.isEnabled(),
+  chat: phatbot.isEnabled() && u.plan === 'full',
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
@@ -429,10 +429,11 @@ const chatLimiter = rateLimit({
 
 app.post('/api/chat', requireVerified, chatLimiter, wrap(async (req, res) => {
   if (!phatbot.isEnabled()) return fail(res, 503, "PhatBot isn't switched on yet. Check back soon.", 'CHAT_OFF');
+  if (req.user.plan !== 'full') return fail(res, 403, 'PhatBot is part of Full Access.', 'CHAT_FULL_ONLY');
   const messages = phatbot.cleanConversation(req.body?.messages);
   if (typeof messages === 'string') return fail(res, 400, messages);
 
-  const limit = CHAT_LIMITS[req.user.plan] || CHAT_LIMITS.free;
+  const limit = CHAT_DAILY_LIMIT;
   // Counts the message first, in one statement, so parallel requests can't go over the limit.
   const { rows: [counted] } = await pool.query(
     `INSERT INTO chat_usage (user_id, day, messages) VALUES ($1, ${TODAY_SQL}, 1)
