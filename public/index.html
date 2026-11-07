@@ -154,7 +154,7 @@ nav.links a:hover{color:var(--ink)}
 
 section{padding-block:40px}
 .sec-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
-.sec-head > div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.sec-head > div:not(.dir-tools){display:flex;flex-direction:column;gap:8px;min-width:0}
 .sec-head p{max-width:62ch}
 
 /* ---------- filters ---------- */
@@ -269,12 +269,13 @@ section{padding-block:40px}
 .guest-box legend{font-size:.85rem;font-weight:700;padding:0 6px}
 
 /* ---------- directory ---------- */
-.dir-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.dir-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:0 1 480px}
 .input{
   font:inherit;color:var(--ink);background:var(--night-2);border:1.5px solid var(--line);border-radius:12px;padding:.6em .9em;min-width:0;
 }
 .input::placeholder{color:#7b82b3}
 .dir-tools .input{flex:1 1 240px}
+.dir-tools select.input{flex:0 0 auto}
 .dir-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--line)}
 table.dir{width:100%;border-collapse:collapse;min-width:640px;font-size:.93rem}
 .dir th{font-family:var(--mono);font-weight:500;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;padding:12px 14px;background:var(--night-2);position:sticky;top:0}
