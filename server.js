@@ -79,7 +79,7 @@ async function currentUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
   const { rows } = await pool.query(
-    `SELECT u.id, u.name, u.email, u.plan, u.role, u.email_verified_at FROM sessions s JOIN users u ON u.id = s.user_id
+    `SELECT u.id, u.name, u.email, u.plan, u.role, u.email_verified_at, (s.admin_until > now()) AS admin_unlocked FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now() AND u.banned_at IS NULL`,
     [hashToken(token)]
   );
@@ -488,7 +488,7 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
   res.status(204).end();
 }));
 
-require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL });
+require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, verifyPassword, hashToken, readSessionToken });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));

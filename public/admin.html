@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>PhatFrats Control Room</title>
+<title>PhatFrats</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,8 +104,8 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 <body>
 
 <div class="gate" id="gate" hidden>
-  <h1>Control Room</h1>
-  <p id="gateMsg">This page is for the PhatFrats team. Log in with an admin account on the main page, then come back.</p>
+  <h1>404</h1>
+  <p>Page not found.</p>
   <a class="btn gold" href="/">Go to PhatFrats</a>
 </div>
 
@@ -115,6 +115,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     <div class="head-actions">
       <span class="updated" id="updated"></span>
       <button class="btn" type="button" id="refresh">Refresh</button>
+      <button class="btn" type="button" id="lock">Lock</button>
       <a class="btn" href="/">Back to site</a>
     </div>
   </header>
@@ -364,13 +365,14 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       const [overview, users] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users")]);
       state.overview = overview; state.users = users.users;
       $("#gate").hidden = true; $("#app").hidden = false;
+      document.title = "PhatFrats Control Room";
       renderTiles(overview); renderChart(); renderMoney(overview.money, overview.chat);
       renderParties(overview.topParties); renderActivity(overview); renderUsers();
       $("#updated").textContent = "Updated "+new Date(overview.generatedAt).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
     }catch(err){
       if(err.status===401 || err.status===404){
         $("#app").hidden = true; $("#gate").hidden = false;
-        if(err.status===404) $("#gateMsg").textContent = "Your account doesn't have access to the control room.";
+        document.title = "PhatFrats";
       } else toast(err.message);
     }finally{ $("#refresh").disabled = false; }
   }
@@ -410,6 +412,10 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 
   $("#search").addEventListener("input", (e)=>{ state.q = e.target.value; renderUsers(); });
   $("#refresh").addEventListener("click", load);
+  $("#lock").addEventListener("click", async ()=>{
+    await api("/api/admin/lock", {}).catch(()=>{});
+    location.href = "/";
+  });
   load();
 })();
 </script>

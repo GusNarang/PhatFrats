@@ -13,12 +13,35 @@ const AI_CREDIT = Number(process.env.AI_CREDIT_DOLLARS) || 5;
 const DAYS = 30;
 const PARTY_TITLES = new Map(require('./data/parties.js').map((p) => [p.id, p.title]));
 
-module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL }) {
+// After the admin password is entered, the control room stays open on that login for this long.
+const UNLOCK_HOURS = 12;
+
+module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, verifyPassword, hashToken, readSessionToken }) {
+  // Being an admin isn't enough on its own: this login must also have been unlocked with the admin password.
   const requireAdmin = [requireUser, (req, res, next) => {
-    if (req.user.role !== 'admin') return fail(res, 404, 'Not found.');
+    if (req.user.role !== 'admin' || !req.user.admin_unlocked) return fail(res, 404, 'Not found.');
     res.set('Cache-Control', 'no-store');
     next();
   }];
+
+  app.post('/api/admin/unlock', authLimiter, requireUser, wrap(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (req.user.role !== 'admin') return fail(res, 404, 'Not found.');
+    const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
+    const { rows: [u] } = await pool.query('SELECT admin_password_hash FROM users WHERE id = $1', [req.user.id]);
+    const ok = !!u?.admin_password_hash && password && (await verifyPassword(password, u.admin_password_hash));
+    if (!ok) return fail(res, 401, "That password isn't right.", 'BAD_ADMIN_PASSWORD');
+    await pool.query(
+      `UPDATE sessions SET admin_until = now() + make_interval(hours => $2) WHERE token_hash = $1`,
+      [hashToken(readSessionToken(req)), UNLOCK_HOURS]
+    );
+    res.json({ ok: true });
+  }));
+
+  app.post('/api/admin/lock', requireUser, wrap(async (req, res) => {
+    await pool.query('UPDATE sessions SET admin_until = NULL WHERE token_hash = $1', [hashToken(readSessionToken(req))]);
+    res.json({ ok: true });
+  }));
 
   const aiCost = (t) => {
     const p = AI_PRICES[phatbot.MODEL];

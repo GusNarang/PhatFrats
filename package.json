@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
-    "db:setup": "node --env-file-if-exists=.env scripts/db-setup.js"
+    "db:setup": "node --env-file-if-exists=.env scripts/db-setup.js",
+    "admin:password": "node --env-file-if-exists=.env scripts/set-admin-password.js"
   },
   "engines": {
     "node": ">=22"

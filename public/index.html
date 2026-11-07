@@ -893,7 +893,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const a = $("#authArea");
     if(state.user){
       const full = state.user.plan === "full";
-      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span>'+(state.user.admin?'<a class="btn ghost small" href="/admin">Control room</a>':'')+'<span class="avatar" aria-hidden="true">'+esc(initials(state.user.name))+'</span><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><span class="avatar" aria-hidden="true">'+esc(initials(state.user.name))+'</span><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
       $("#logoutBtn").onclick = ()=>logOut().catch(e=>toast(e.message));
     } else if(state.pending){
       a.innerHTML = '<button class="btn small" type="button" data-login>Enter your code</button>';
@@ -1534,6 +1534,53 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     enterAccount(data); renderAll();
     if(state.pending) openVerify();
   }).catch(err=>toast(err.message));
+
+  // Hidden way into the control room: Shift, Caps Lock, P, P, L, G, U, S, one after another.
+  // It does nothing unless an admin is logged in, and the server still asks for the admin password.
+  const SECRET = ["Shift","CapsLock","P","P","L","G","U","S"];
+  let typed = [];
+  document.addEventListener("keydown", e=>{
+    if(e.repeat) return;
+    const k = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    typed = typed.concat(k).slice(-SECRET.length);
+    if(typed.join() !== SECRET.join()) return;
+    typed = [];
+    if(state.user && state.user.admin) openAdminUnlock();
+  });
+  function openAdminUnlock(){
+    let dlg = document.getElementById("adminUnlock");
+    if(!dlg){
+      dlg = document.createElement("dialog");
+      dlg.id = "adminUnlock";
+      dlg.setAttribute("aria-label", "Admin password");
+      dlg.style.cssText = "background:var(--night-2);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:20px;width:min(360px,calc(100% - 32px))";
+      dlg.innerHTML = '<form id="adminUnlockForm" autocomplete="off">'
+        + '<label for="adminPw" style="display:block;font-weight:600;margin-bottom:8px">Password</label>'
+        + '<input id="adminPw" type="password" autocomplete="current-password" required style="width:100%;box-sizing:border-box;font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--night);color:var(--ink)">'
+        + '<p id="adminPwErr" role="alert" style="color:#ffc0c6;font-size:14px;margin:8px 0 0;min-height:1em"></p>'
+        + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'
+        + '<button class="btn ghost small" type="button" id="adminPwCancel">Cancel</button>'
+        + '<button class="btn small" type="submit" id="adminPwGo">Enter</button></div></form>';
+      document.body.appendChild(dlg);
+      dlg.querySelector("#adminPwCancel").onclick = ()=>dlg.close();
+      dlg.querySelector("#adminUnlockForm").onsubmit = async (ev)=>{
+        ev.preventDefault();
+        const go = dlg.querySelector("#adminPwGo"), err = dlg.querySelector("#adminPwErr");
+        go.disabled = true; err.textContent = "";
+        try{
+          await api("/api/admin/unlock", {password: dlg.querySelector("#adminPw").value});
+          location.href = "/admin";
+        }catch(e2){
+          err.textContent = e2.message;
+          dlg.querySelector("#adminPw").select();
+        }finally{ go.disabled = false; }
+      };
+    }
+    dlg.querySelector("#adminPw").value = "";
+    dlg.querySelector("#adminPwErr").textContent = "";
+    if(!dlg.open) dlg.showModal();
+    dlg.querySelector("#adminPw").focus();
+  }
 })();
 </script>
 

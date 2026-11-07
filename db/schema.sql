@@ -87,3 +87,8 @@ CREATE TABLE IF NOT EXISTS site_visits (
   views   INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (day, visitor)
 );
+
+-- The control room's second lock. Only a hash of the admin password is stored.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_password_hash TEXT;
+-- Set when a login is unlocked with the admin password. Logging out deletes the session, which locks it again.
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS admin_until TIMESTAMPTZ;
