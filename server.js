@@ -376,6 +376,10 @@ app.post('/api/logout', wrap(async (req, res) => {
 app.get('/api/me', wrap(async (req, res) => {
   const user = await currentUser(req);
   if (!user) return res.json({ user: null, requests: [], parties: [] });
+  // Opening the main site locks the control room again, so the admin password is needed every time.
+  if (user.admin_unlocked) {
+    await pool.query('UPDATE sessions SET admin_until = NULL WHERE token_hash = $1', [hashToken(readSessionToken(req))]);
+  }
   res.json(await accountPayload(user));
 }));
 

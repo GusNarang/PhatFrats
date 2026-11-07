@@ -13,8 +13,9 @@ const AI_CREDIT = Number(process.env.AI_CREDIT_DOLLARS) || 5;
 const DAYS = 30;
 const PARTY_TITLES = new Map(require('./data/parties.js').map((p) => [p.id, p.title]));
 
-// After the admin password is entered, the control room stays open on that login for this long.
-const UNLOCK_HOURS = 12;
+// Entering the admin password opens the control room for one visit. Leaving it, or opening the main
+// site, locks it again. This limit only matters if the tab is left open or the lock message gets lost.
+const UNLOCK_MINUTES = 120;
 
 module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, verifyPassword, hashToken, readSessionToken }) {
   // Being an admin isn't enough on its own: this login must also have been unlocked with the admin password.
@@ -32,8 +33,8 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     const ok = !!u?.admin_password_hash && password && (await verifyPassword(password, u.admin_password_hash));
     if (!ok) return fail(res, 401, "That password isn't right.", 'BAD_ADMIN_PASSWORD');
     await pool.query(
-      `UPDATE sessions SET admin_until = now() + make_interval(hours => $2) WHERE token_hash = $1`,
-      [hashToken(readSessionToken(req)), UNLOCK_HOURS]
+      `UPDATE sessions SET admin_until = now() + make_interval(mins => $2) WHERE token_hash = $1`,
+      [hashToken(readSessionToken(req)), UNLOCK_MINUTES]
     );
     res.json({ ok: true });
   }));

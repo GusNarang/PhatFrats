@@ -80,7 +80,7 @@ Passwords are hashed with scrypt and sessions last 30 days in an HttpOnly cookie
 The control room is hidden. A logged-in admin opens it by pressing Shift, Caps Lock, P, P, L, G, U, S one after another, then entering the admin password. It shows visitors, sign-ups, invite requests, PhatBot use, estimated money and every account. From there they can ban or unban accounts and switch Full Access on or off by hand.
 
 - A banned account is logged out everywhere and can't log back in or reset its password. Admins can't be banned.
-- For anyone else the keys do nothing, and `/admin` shows a 404 page. An unlock lasts 12 hours on that one login, until **Lock** is pressed, or until logout.
+- For anyone else the keys do nothing, and `/admin` shows a 404 page. The password works for one visit: leaving or reloading the control room, or opening the main site, locks it again.
 - Only a hash of the admin password is stored, in `users.admin_password_hash`. To change it: `$env:ADMIN_PASSWORD = 'new password'; npm run admin:password -- you@psu.edu; Remove-Item Env:ADMIN_PASSWORD`
 - To make someone an admin, run this in the Neon SQL editor, then set their password with the command above: `UPDATE users SET role = 'admin' WHERE email = 'their@psu.edu';`
 - Sales are estimated as paying Full Access members × the price until Stripe is connected. AI spend uses the token counts PhatBot records, priced in `admin.js`.
