@@ -154,3 +154,25 @@ UPDATE brother_invites SET guests = 0 WHERE guests <> 0;
 -- just one of the two passwords, so the brother password may be empty.
 ALTER TABLE chapter_accounts ADD COLUMN IF NOT EXISTS leader_password_hash TEXT;
 ALTER TABLE chapter_accounts ALTER COLUMN password_hash DROP NOT NULL;
+
+-- ---------- Outside guests ----------
+-- A leader can let each party take outside guests: people who aren't Penn State students.
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS allow_outside_guests BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Each outside guest is named and tied to the Penn State student or brother who vouches for them.
+-- One per sponsor per party. A student's guest waits for the leader; a brother's guest is approved.
+-- These rows are deleted two days after the party, so guests' details aren't kept.
+CREATE TABLE IF NOT EXISTS outside_guests (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  party_id    BIGINT NOT NULL REFERENCES hosted_parties(id) ON DELETE CASCADE,
+  sponsor_id  BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  email       TEXT,
+  phone       TEXT,
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'waitlist')),
+  notified_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (party_id, sponsor_id),
+  CHECK (email IS NOT NULL OR phone IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS outside_guests_sponsor_idx ON outside_guests(sponsor_id);

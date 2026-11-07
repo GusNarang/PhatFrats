@@ -88,6 +88,10 @@ textarea{min-height:96px;resize:vertical}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--night-3);border:2px solid var(--cyan);border-radius:999px;padding:12px 20px;font-weight:700;box-shadow:0 8px 30px rgba(0,0,0,.45);max-width:calc(100% - 32px);text-align:center;z-index:5}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .loading{color:var(--muted);padding:40px 0;text-align:center}
+.check-row{display:flex;gap:12px;align-items:flex-start;cursor:pointer;background:var(--night);border:2px solid var(--line);border-radius:12px;padding:12px 14px}
+.check-row input{width:22px;height:22px;min-height:0;margin:2px 0 0;flex:none;accent-color:var(--gold)}
+.badge.guests{background:rgba(53,224,255,.12);color:var(--cyan);border-color:rgba(53,224,255,.4)}
+.badge.outside{background:rgba(180,140,255,.15);color:var(--violet);border-color:rgba(180,140,255,.45)}
 @media (prefers-reduced-motion:no-preference){.btn,.tabs button{transition:border-color .15s,background .15s}}
 </style>
 </head>
@@ -220,6 +224,12 @@ textarea{min-height:96px;resize:vertical}
                 <input id="pfMusic" maxlength="80" placeholder="For example: House and throwbacks">
               </div>
             </div>
+            <div class="field">
+              <label class="check-row" for="pfGuests">
+                <input id="pfGuests" type="checkbox">
+                <span>Allow outside guests<span class="hint">Each student or brother on the list can bring one person who isn't a Penn State student. You approve students' guests. Off means Penn State students only.</span></span>
+              </label>
+            </div>
             <div class="btn-row">
               <button class="btn primary" type="submit" id="partySave">Post party</button>
               <button class="btn" type="button" id="partyCancel">Cancel</button>
@@ -247,9 +257,32 @@ textarea{min-height:96px;resize:vertical}
             <button class="btn primary" type="submit" id="inviteSend">Send invite</button>
           </form>
         </div>
+        <div class="card" id="guestCard">
+          <h2>Bring someone from outside Penn State</h2>
+          <p class="muted" style="margin-top:0">One person per party, only at parties your leader opened to outside guests. You vouch for them, and they go straight on the list. They need a photo ID that matches the name.</p>
+          <form id="guestForm" novalidate>
+            <div id="guestMsg" role="alert"></div>
+            <div class="field">
+              <label for="gParty">Party</label>
+              <select id="gParty" required></select>
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <label for="gName">Their full name</label>
+                <input id="gName" maxlength="80" autocomplete="off" placeholder="First and last name" required>
+              </div>
+              <div class="field">
+                <label for="gContact">Their email or phone <span class="hint">An email gets a confirmation. With a phone, tell them yourself.</span></label>
+                <input id="gContact" maxlength="120" autocomplete="off" placeholder="name@gmail.com or (814) 555-1234" required>
+              </div>
+            </div>
+            <button class="btn primary" type="submit" id="guestSend">Add guest</button>
+          </form>
+        </div>
         <div class="card">
           <h2>Your invites</h2>
           <div id="myInvites"></div>
+          <div id="myGuests"></div>
         </div>
         <div class="card" id="allInvitesCard" hidden>
           <h2>Everyone's invites</h2>
@@ -267,6 +300,11 @@ textarea{min-height:96px;resize:vertical}
           </div>
           <p class="muted small" style="margin-top:0">Students who asked to come. Full Access members are listed first. Approve puts them on the list. Waitlist tells them they're not in yet.</p>
           <div id="reqList"></div>
+        </div>
+        <div class="card">
+          <h2>Outside guests</h2>
+          <p class="muted small" style="margin-top:0">People who aren't Penn State students, each vouched for by someone on your list. Students' guests wait for you. Brothers' guests are already on the list. Approving emails the guest if they gave an email.</p>
+          <div id="guestList"></div>
         </div>
       </div>
 
@@ -414,7 +452,8 @@ textarea{min-height:96px;resize:vertical}
 
   // ---------- chapter ----------
   function tabsFor(){
-    const waiting = (state.data.requests||[]).filter(r=>r.status==="pending" && partyById(r.partyId) && !partyById(r.partyId).past).length;
+    const upcomingPending = (r)=> r.status==="pending" && partyById(r.partyId) && !partyById(r.partyId).past;
+    const waiting = (state.data.requests||[]).filter(upcomingPending).length + (state.data.guests||[]).filter(upcomingPending).length;
     const t = [
       {k:"parties", label:"Parties"},
       {k:"invite", label:"Invite people"},
@@ -452,7 +491,7 @@ textarea{min-height:96px;resize:vertical}
       ? "You can leave even though you're the only leader. Your brothers, parties and passwords stay. A new leader can sign in later with the leader password."
       : "You'll stop seeing this page. You can rejoin with the chapter password.";
     $("#allInvitesCard").hidden = !leader();
-    renderTabs(); renderParties(); renderInvite(); renderRequests(); renderMembers();
+    renderTabs(); renderParties(); renderInvite(); renderGuests(); renderRequests(); renderGuestRequests(); renderMembers();
   }
 
   // ---------- parties ----------
@@ -472,6 +511,7 @@ textarea{min-height:96px;resize:vertical}
       + '<div class="btn-row" style="justify-content:space-between"><span class="when">'+esc(p.dayText)+' · '+esc(p.time)+'</span>'+status+'</div>'
       + '<h3 style="margin-top:6px">'+esc(p.title)+'</h3>'
       + '<p class="muted small">'+esc(v.label)+(p.dress?' · Dress: '+esc(p.dress):'')+(p.music?' · Music: '+esc(p.music):'')+'</p>'
+      + '<p class="small" style="margin:4px 0">'+(p.allowGuests ? '<span class="badge guests">Outside guests on · '+p.outside+' on the list</span>' : '<span class="badge past">Penn State students only</span>')+'</p>'
       + (p.blurb ? '<p>'+esc(p.blurb)+'</p>' : '')
       + '<div class="meter" role="img" aria-label="'+p.going+' of '+p.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
       + '<p class="small muted" style="margin-top:0">'+p.going+' of '+p.cap+' on the list ('+pct+'%)</p>'
@@ -494,6 +534,7 @@ textarea{min-height:96px;resize:vertical}
     $("#pfTime").value = p ? to24(p.time) : "21:30"; $("#pfVibe").value = p?.vibe || "neon";
     $("#pfCap").value = p?.cap || 150; $("#pfBlurb").value = p?.blurb || "";
     $("#pfDress").value = p?.dress || ""; $("#pfMusic").value = p?.music || "";
+    $("#pfGuests").checked = !!p?.allowGuests;
     say($("#partyMsg"), "");
     $("#partyFormCard").hidden = false;
     $("#partyFormCard").scrollIntoView({block:"start"});
@@ -505,7 +546,8 @@ textarea{min-height:96px;resize:vertical}
     e.preventDefault();
     const btn = $("#partySave"); btn.disabled = true; say($("#partyMsg"), "");
     const body = { title:$("#pfTitle").value, date:$("#pfDate").value, time:$("#pfTime").value, vibe:$("#pfVibe").value,
-      cap:Number($("#pfCap").value), blurb:$("#pfBlurb").value, dress:$("#pfDress").value, music:$("#pfMusic").value };
+      cap:Number($("#pfCap").value), blurb:$("#pfBlurb").value, dress:$("#pfDress").value, music:$("#pfMusic").value,
+      allowGuests:$("#pfGuests").checked };
     try{
       await api(state.editing ? "/api/chapter/parties/"+state.editing : "/api/chapter/parties", body);
       $("#partyFormCard").hidden = true;
@@ -549,6 +591,40 @@ textarea{min-height:96px;resize:vertical}
       $("#allInvites").innerHTML = all.length ? all.map(b=>inviteRow(b, true, true)).join("") : '<p class="empty">No brother invites yet.</p>';
     }
   }
+  function renderGuests(){
+    const open = openParties().filter(p=>p.allowGuests);
+    const sel = $("#gParty").value;
+    $("#gParty").innerHTML = open.length ? open.map(p=>'<option value="'+p.id+'">'+esc(p.title+" · "+p.dayText)+'</option>').join("") : '<option value="">No upcoming party allows outside guests</option>';
+    if(open.some(p=>p.id===sel)) $("#gParty").value = sel;
+    $("#guestSend").disabled = !open.length;
+    const label = {pending:"Waiting for a leader", approved:"On the list", waitlist:"Waitlisted"};
+    const mine = state.data.myGuests || [];
+    $("#myGuests").innerHTML = mine.length ? '<h3 style="margin-top:16px">Your outside guests</h3>' + mine.map(g=>{
+      const p = partyById(g.partyId);
+      return '<div class="row"><div class="who"><b>'+esc(g.name)+' <span class="badge outside">Outside guest</span></b><span>'+esc(g.contact)+' · '+esc(p ? p.title+" · "+p.dayText : "Party removed")+' · '+label[g.status]+'</span></div>'
+        + '<button class="btn slim danger" type="button" data-unguest="'+g.id+'">Remove</button></div>';
+    }).join("") : '';
+  }
+  $("#guestForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = $("#guestSend"); btn.disabled = true; say($("#guestMsg"), "");
+    try{
+      const r = await api("/api/chapter/guests", {partyId:$("#gParty").value, name:$("#gName").value, contact:$("#gContact").value});
+      const who = $("#gName").value.trim();
+      $("#gName").value = ""; $("#gContact").value = "";
+      say($("#guestMsg"), who+" is on the list."+(r.emailed ? " We emailed them a confirmation." : " Let them know they're in."), "ok");
+      await load();
+    }catch(err){ say($("#guestMsg"), err.message); }
+    finally{ btn.disabled = !openParties().some(p=>p.allowGuests); }
+  });
+  async function removeGuest(btn, id){
+    if(!confirm("Take this guest off the list?")) return;
+    btn.disabled = true;
+    try{ await api("/api/chapter/guests/"+id+"/delete", {}); toast("Guest removed."); await load(); }
+    catch(err){ toast(err.message); btn.disabled = false; }
+  }
+  $("#myGuests").addEventListener("click", (e)=>{ const b = e.target.closest("[data-unguest]"); if(b) removeGuest(b, b.dataset.unguest); });
+
   $("#inviteForm").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const btn = $("#inviteSend"); btn.disabled = true; say($("#inviteMsg"), "");
@@ -591,7 +667,32 @@ textarea{min-height:96px;resize:vertical}
         + '<div class="btn-row">'+btns.join("")+'</div></div>';
     }).join("") : '<p class="empty">No requests yet. When students ask to come to your parties, they show up here.</p>';
   }
-  $("#reqParty").addEventListener("change", (e)=>{ state.reqParty = e.target.value; renderRequests(); });
+  function renderGuestRequests(){
+    if(!leader()) return;
+    const label = {pending:"Waiting", approved:"On the list", waitlist:"Waitlisted"};
+    const list = (state.data.guests||[]).filter(g=>{ const p = partyById(g.partyId); return p && !p.past && (state.reqParty==="all" || g.partyId===state.reqParty); });
+    $("#guestList").innerHTML = list.length ? list.map(g=>{
+      const p = partyById(g.partyId);
+      const btns = [];
+      if(g.status!=="approved") btns.push('<button class="btn slim good" type="button" data-g="'+g.id+'" data-gst="approved">Approve</button>');
+      if(g.status!=="waitlist") btns.push('<button class="btn slim" type="button" data-g="'+g.id+'" data-gst="waitlist">Waitlist</button>');
+      btns.push('<button class="btn slim danger" type="button" data-unguest="'+g.id+'">Remove</button>');
+      return '<div class="row"><div class="who"><b>'+esc(g.name)+' <span class="badge outside">Outside guest</span></b>'
+        + '<span>'+esc(g.contact)+' · '+esc(p.title)+' · vouched for by '+esc(g.sponsor)+' ('+(g.byBrother?'brother':'student')+', '+esc(g.sponsorEmail)+') · <b>'+label[g.status]+'</b></span></div>'
+        + '<div class="btn-row">'+btns.join("")+'</div></div>';
+    }).join("") : '<p class="empty">No outside guests. Switch them on for a party by editing it.</p>';
+  }
+  $("#guestList").addEventListener("click", async (e)=>{
+    const rm = e.target.closest("[data-unguest]"); if(rm){ removeGuest(rm, rm.dataset.unguest); return; }
+    const b = e.target.closest("[data-g]"); if(!b) return;
+    b.disabled = true;
+    try{
+      const r = await api("/api/chapter/guests/"+b.dataset.g, {status:b.dataset.gst});
+      toast(b.dataset.gst==="approved" ? (r.emailed ? "Approved. We emailed them." : "Approved.") : "Moved to the waitlist.");
+      await load();
+    }catch(err){ toast(err.message); b.disabled = false; }
+  });
+  $("#reqParty").addEventListener("change", (e)=>{ state.reqParty = e.target.value; renderRequests(); renderGuestRequests(); });
   $("#reqList").addEventListener("click", async (e)=>{
     const b = e.target.closest("[data-req]"); if(!b) return;
     b.disabled = true;

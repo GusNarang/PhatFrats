@@ -112,3 +112,14 @@ The control room has two pages: **Overview** and **Frats** (`/admin#frats`). The
 - **A chapters table** with each chapter's numbers and its password and leader controls.
 
 Practice chapters like Test Frat are listed but left out of the totals, the trend and the leaderboard.
+
+### Outside guests
+
+Leaders can switch on **Allow outside guests** for each party (off by default). At those parties:
+
+- Every student or brother on the list can bring **one** person who isn't a Penn State student, named in advance with an email or phone number. Penn State emails are refused, because students need their own invite.
+- A student adds their guest in the request box or later from **My invites**. The leader approves or waitlists the guest in the portal's **Requests** tab.
+- A brother adds their guest from **Invite people**. Brothers vouch for their guests, so those go straight on the list.
+- Approved guests with an email get a confirmation. Guests show a photo ID that matches their name.
+- Approved outside guests count toward the party's capacity. Banning a sponsor removes their guests.
+- Guests' details are deleted two days after the party.

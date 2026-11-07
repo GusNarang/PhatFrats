@@ -175,6 +175,8 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
       }
       // Logs them out everywhere, right now.
       await client.query('DELETE FROM sessions WHERE user_id = $1', [id]);
+      // Anyone they vouched for comes off the list too.
+      await client.query('DELETE FROM outside_guests WHERE sponsor_id = $1', [id]);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
@@ -216,6 +218,7 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
   // Practice chapters are listed but left out of the totals, the trend and the leaderboard.
   app.get('/api/admin/frats', requireAdmin, wrap(async (req, res) => {
     const testIds = CHAPTERS.filter((c) => c.test).map((c) => c.id);
+    const testIdSet = new Set(testIds);
     const [accts, members, parties, requests, invites, upcoming, series, brothers] = await Promise.all([
       pool.query('SELECT chapter_id, updated_at, password_hash IS NOT NULL AS brother, leader_password_hash IS NOT NULL AS leader FROM chapter_accounts'),
       pool.query(`SELECT m.chapter_id, m.role, m.joined_at, u.name, u.email FROM chapter_members m JOIN users u ON u.id = m.user_id
@@ -239,7 +242,10 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
                     hp.created_at, creator.name AS created_by, ${partyList.GOING_SQL} AS going,
                     (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL AND r.status = 'pending')::int AS pending,
                     (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL)::int AS requests,
-                    (SELECT count(*) FROM brother_invites b WHERE b.party_id = hp.id)::int AS invites
+                    (SELECT count(*) FROM brother_invites b WHERE b.party_id = hp.id)::int AS invites,
+                    hp.allow_outside_guests,
+                    (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved')::int AS outside,
+                    (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'pending')::int AS outside_pending
                   FROM hosted_parties hp LEFT JOIN users creator ON creator.id = hp.created_by
                   WHERE hp.party_date >= ${TODAY_SQL} ORDER BY hp.party_date, hp.start_time, hp.id`),
       pool.query(`WITH days AS (SELECT generate_series(${TODAY_SQL} - ${DAYS - 1}, ${TODAY_SQL}, interval '1 day')::date AS day)
@@ -266,6 +272,7 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
       id: 'h' + p.id, ch: p.chapter_id, title: p.title, day: p.day, time: p.start_time, vibe: p.vibe, cap: p.cap,
       status: p.status, going: Math.min(p.going, p.cap), pending: p.pending, requests: p.requests, invites: p.invites,
       createdBy: p.created_by || 'A former leader', posted: p.created_at,
+      allowGuests: p.allow_outside_guests, outside: p.outside, outsidePending: p.outside_pending,
     }));
     const chapters = CHAPTERS.map((c) => {
       const mine = members.rows.filter((m) => m.chapter_id === c.id);
@@ -312,6 +319,9 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
         approvalRate: answered ? sum('approved') / answered : null,
         invitesSent: sum('invitesSent'),
         invitesClaimed: sum('invitesClaimed'),
+        outsideGuests: up.filter((p) => !testIdSet.has(p.ch)).reduce((s, p) => s + p.outside, 0),
+        outsidePending: up.filter((p) => !testIdSet.has(p.ch)).reduce((s, p) => s + p.outsidePending, 0),
+        partiesWithGuests: up.filter((p) => !testIdSet.has(p.ch) && p.status === 'live' && p.allowGuests).length,
       },
       series: series.rows,
       chapters,

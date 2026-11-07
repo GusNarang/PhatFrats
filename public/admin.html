@@ -224,7 +224,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       </div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Party</th><th>When</th><th>Chapter</th><th>Fill</th><th class="num">Requests</th><th class="num">Waiting</th><th class="num">Brother invites</th><th class="num" style="text-align:right">Actions</th></tr></thead>
+          <thead><tr><th>Party</th><th>When</th><th>Chapter</th><th>Fill</th><th class="num">Requests</th><th class="num">Waiting</th><th class="num">Brother invites</th><th class="num">Outside guests</th><th class="num" style="text-align:right">Actions</th></tr></thead>
           <tbody id="fratParties"></tbody>
         </table>
       </div>
@@ -533,6 +533,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       {label:"Student requests", value:int(t.requests), sub:int(t.pending)+" waiting for an answer"},
       {label:"Approval rate", value:pct(t.approvalRate), sub:int(t.approved)+" approved · "+int(t.waitlist)+" waitlisted"},
       {label:"Brother invites", value:int(t.invitesSent), sub:int(t.invitesClaimed)+" signed up to claim it"},
+      {label:"Outside guests", value:int(t.outsideGuests), sub:int(t.outsidePending)+" waiting · "+int(t.partiesWithGuests)+" parties allow them"},
     ];
     $("#fratTiles").innerHTML = tiles.map(x=>'<div class="card tile"><div class="label">'+esc(x.label)+'</div><div class="value">'+x.value+'</div><div class="sub">'+esc(x.sub)+'</div></div>').join("");
     renderFratChart();
@@ -577,10 +578,11 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
         + '<td>'+esc((c.gl?c.gl+"  ":"")+(c.name||""))+(c.test?' <span class="tag">Practice</span>':'')+'</td>'
         + '<td>'+fillBar(p.going/p.cap)+'<span class="reason" style="color:var(--muted)">'+int(p.going)+' of '+int(p.cap)+'</span></td>'
         + '<td class="num">'+int(p.requests)+'</td><td class="num">'+int(p.pending)+'</td><td class="num">'+int(p.invites)+'</td>'
+        + '<td class="num">'+(p.allowGuests ? int(p.outside)+(p.outsidePending?'<span class="reason" style="color:var(--muted)">'+int(p.outsidePending)+' waiting</span>':'') : '<span class="updated">Off</span>')+'</td>'
         + '<td><div class="actions">'+(p.status==="live"
             ? '<button class="btn small danger" data-pstatus="cancelled" data-pid="'+p.id+'">Take down</button>'
             : '<span class="tag banned">Off the map</span><button class="btn small good" data-pstatus="live" data-pid="'+p.id+'">Put back</button>')+'</div></td></tr>';
-    }).join("") : '<tr><td colspan="8" class="empty">No frat parties coming up.</td></tr>';
+    }).join("") : '<tr><td colspan="9" class="empty">No frat parties coming up.</td></tr>';
 
     renderChapters();
   }

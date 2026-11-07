@@ -6,6 +6,7 @@ const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const partyList = require('./party-list.js');
+const guests = require('./guests.js');
 const phatbot = require('./ai.js');
 const PRICING = require('./public/pricing.js');
 
@@ -212,6 +213,12 @@ async function listRequests(user) {
      WHERE r.user_id = $1 ORDER BY r.created_at DESC`,
     [user.id]
   );
+  // The outside guest this person is bringing to each party, if any.
+  const { rows: guestRows } = await pool.query(
+    `SELECT 'h' || party_id AS party_id, name, status FROM outside_guests WHERE sponsor_id = $1`,
+    [user.id]
+  );
+  const guestFor = new Map(guestRows.map((g) => [g.party_id, { name: g.name, status: g.status }]));
   return rows.map((r) => ({
     pid: r.party_id,
     note: r.note,
@@ -221,6 +228,7 @@ async function listRequests(user) {
     // A brother's invite doesn't use the weekly free invite.
     thisWeek: r.this_week,
     invitedBy: r.invited ? r.invited_by_name || 'a brother' : null,
+    guest: guestFor.get(r.party_id) || null,
   }));
 }
 
@@ -437,6 +445,33 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   res.status(201).json({ requests: await listRequests(req.user) });
 }));
 
+// A student adds one outside guest (not a Penn State student) to a party they've asked to go to.
+// Only at parties whose chapter allows it. The chapter leader approves the guest separately.
+app.post('/api/requests/guest', requireVerified, wrap(async (req, res) => {
+  const partyId = req.body?.partyId;
+  const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId) : null;
+  if (!party || !party.hosted) return fail(res, 400, 'That party is not on the schedule.');
+  if (!party.allowGuests) return fail(res, 403, "This party isn't taking outside guests.", 'GUESTS_OFF');
+  const guest = guests.readGuest(req.body);
+  if (typeof guest === 'string') return fail(res, 400, guest);
+  const { rows: [mine] } = await pool.query('SELECT 1 FROM invite_requests WHERE user_id = $1 AND party_id = $2', [req.user.id, partyId]);
+  if (!mine) return fail(res, 400, 'Request your own invite to this party first.', 'NO_REQUEST');
+  const { rows: [made] } = await pool.query(
+    `INSERT INTO outside_guests (party_id, sponsor_id, name, email, phone) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (party_id, sponsor_id) DO NOTHING RETURNING id`,
+    [partyId.slice(1), req.user.id, guest.name, guest.email, guest.phone]
+  );
+  if (!made) return fail(res, 409, "You've already added an outside guest to this party. Each person can bring one.", 'GUEST_TAKEN');
+  res.status(201).json({ requests: await listRequests(req.user) });
+}));
+
+app.post('/api/requests/guest/remove', requireVerified, wrap(async (req, res) => {
+  const partyId = req.body?.partyId;
+  if (!partyList.isHostedId(partyId)) return fail(res, 400, 'That party is not on the schedule.');
+  await pool.query('DELETE FROM outside_guests WHERE party_id = $1 AND sponsor_id = $2', [partyId.slice(1), req.user.id]);
+  res.json({ requests: await listRequests(req.user) });
+}));
+
 const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 10,
@@ -505,7 +540,7 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
 }));
 
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
-require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD });
+require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));

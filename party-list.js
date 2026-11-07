@@ -38,7 +38,8 @@ const isHostedId = (id) => typeof id === 'string' && /^h\d{1,18}$/.test(id);
 const GOING_SQL = `(
   coalesce((SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.status = 'approved'), 0) +
   coalesce((SELECT count(*) FROM brother_invites b WHERE b.party_id = hp.id AND NOT EXISTS (
-    SELECT 1 FROM invite_requests r JOIN users u ON u.id = r.user_id WHERE r.party_id = 'h' || hp.id AND u.email = b.email)), 0)
+    SELECT 1 FROM invite_requests r JOIN users u ON u.id = r.user_id WHERE r.party_id = 'h' || hp.id AND u.email = b.email)), 0) +
+  coalesce((SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved'), 0)
 )::int`;
 
 const hostedRow = (r) => ({
@@ -54,6 +55,7 @@ const hostedRow = (r) => ({
   cap: r.cap,
   going: Math.min(r.going, r.cap),
   hosted: true,
+  allowGuests: !!r.allow_outside_guests,
 });
 
 async function hostedParties(pool, { today = todayISO() } = {}) {
@@ -69,8 +71,20 @@ async function hostedParties(pool, { today = todayISO() } = {}) {
 }
 
 // Everything the main page needs: the parties and the nights to filter by.
+// Outside guests' details are only kept until two days after their party.
+let lastCleanup = 0;
+function forgetOldGuests(pool) {
+  if (Date.now() - lastCleanup < 60 * 60 * 1000) return;
+  lastCleanup = Date.now();
+  pool.query(
+    `DELETE FROM outside_guests g USING hosted_parties hp WHERE hp.id = g.party_id AND hp.party_date < $1::date - 2`,
+    [todayISO()]
+  ).catch((err) => console.error('Could not clear old outside guests:', err.message));
+}
+
 async function partiesForSite(pool) {
   const today = todayISO();
+  forgetOldGuests(pool);
   const demo = DEMO.map((p) => ({ ...p, day: demoDate(p.day, today) }));
   const parties = [...demo, ...(await hostedParties(pool, { today }))];
   const days = [...new Set(parties.map((p) => p.day))].sort().map(dayLabel);
