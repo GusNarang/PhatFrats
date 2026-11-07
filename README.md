@@ -6,14 +6,14 @@ Create an account with a Penn State email and get a map of every Interfraternity
 
 ## Passes
 
-| | Free | Full Access ($0.75 per month) |
+| | Free | Full Access ($4.99 per semester) |
 |---|---|---|
 | See the map and party details | Yes | Yes |
 | Invite requests | One party per week | Unlimited |
 | Place in the host's line | Normal | Front of the line |
 | PhatBot, the AI party guide | No | Yes |
 
-The free invite resets every Monday at midnight Eastern. Checkout isn't built yet, so every account is currently Free. Only a confirmed payment should ever set `plan = 'full'`.
+The free invite resets every Monday at midnight Eastern. Full Access is one payment per semester with no auto-renew. The price and an optional launch deal live in `public/pricing.js`; set `launch.ends` to a date to switch the deal on. Checkout isn't built yet, so accounts are Free unless set by hand. Only a confirmed payment should ever set `plan = 'full'`.
 
 ## Email confirmation
 

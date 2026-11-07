@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const PARTIES = require('./data/parties.js');
 const phatbot = require('./ai.js');
+const PRICING = require('./public/pricing.js');
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Copy .env.example to .env and add your Neon connection string.');
@@ -401,7 +402,7 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
     }
     if (user.plan !== 'full' && existing.filter((r) => r.this_week).length >= FREE_INVITES_PER_WEEK) {
       await client.query('ROLLBACK');
-      return fail(res, 403, 'Free accounts get one party invite per week. Yours resets Monday at midnight, or Full Access removes the limit.', 'FREE_LIMIT');
+      return fail(res, 403, `That's your free invite for this week. It resets Monday at midnight, or go unlimited with Full Access for ${PRICING.money(PRICING.current())} a ${PRICING.term}.`, 'FREE_LIMIT');
     }
     await client.query(
       'INSERT INTO invite_requests (user_id, party_id, guests, note, priority) VALUES ($1, $2, $3, $4, $5)',

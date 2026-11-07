@@ -2,8 +2,9 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const CHAPTERS = require('./public/chapters.js');
 const PARTIES = require('./data/parties.js');
+const PRICING = require('./public/pricing.js');
 
-// Claude Haiku 5.5 by default: fast and low cost, so the chat stays affordable on a $0.75 plan.
+// Claude Haiku 5.5 by default: fast and low cost, so the chat stays affordable on a low-priced pass.
 // Set PHATBOT_MODEL in Vercel to try another model, such as claude-opus-5-5.
 const MODEL = process.env.PHATBOT_MODEL || 'claude-haiku-5-5';
 // The server-side safety fallback exists only for these models. Haiku has none, so a declined reply just ends.
@@ -39,7 +40,7 @@ Two kinds of people chat with you:
 How PhatFrats works:
 - Members see a map of every IFC house with this week's parties. To go to one, they click it and press "Request invite"; the house then puts them on the list or the waitlist.
 - You can't send, approve or check invites yourself yet. Point people to the Request invite button.
-- Free accounts get one invite request per week, which resets Monday at midnight Eastern. Full Access is $0.75 per month for unlimited requests and a spot at the front of the host's line. Checkout isn't open yet, so everyone is on Free for now.
+- Free accounts get one invite request per week, which resets Monday at midnight Eastern. Full Access is ${PRICING.summary()}. It gives unlimited requests, a spot at the front of the host's line, and chats with you. Checkout isn't open yet, so most people are on Free for now.
 
 Facts you can rely on:
 - The party schedule and chapter directory below are everything you know about specific parties and houses. Never invent a party, time, address, guest list, price or chapter detail. If something isn't listed, say so and suggest the chapter's Instagram or pennstateifc.org.

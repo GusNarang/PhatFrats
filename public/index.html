@@ -418,7 +418,13 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 .plan-card h3{font-family:var(--display);font-weight:400;font-size:1.35rem}
 .plan-price{font-family:var(--display);font-size:2.6rem;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
 .plan-card.full .plan-price{color:var(--gold)}
-.plan-price small{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-left:8px}
+.plan-price small{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-left:8px;white-space:nowrap;display:inline-block}
+.plan-price s{font-size:1.3rem;color:var(--muted);margin-right:10px;text-decoration-thickness:3px;text-decoration-color:var(--pink)}
+.plan-fine{font-size:.85rem;color:var(--muted);margin-top:-6px}
+.plan-deal{align-self:flex-start;background:var(--lime);color:#122200;font-weight:800;font-size:.8rem;padding:.3em .8em;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
+.upsell{display:flex;flex-direction:column;gap:10px;background:rgba(255,210,63,.1);border:2px solid var(--gold);border-radius:14px;padding:12px 14px;color:var(--ink);font-size:.9rem}
+.upsell .btn{align-self:flex-start}
+.plan-note .btn{white-space:nowrap}
 .plan-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:.95rem}
 .plan-list li{display:flex;gap:10px}
 .plan-list li::before{content:"✦";color:var(--pink);flex:none}
@@ -472,7 +478,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <p class="lede">
         PhatFrats is a party finder for Penn State students. Create an account, confirm your Penn State email with a code, and you get a live map of every
         Interfraternity Council house around State College, with this week's parties lit up on it. Tap a glowing house to see the
-        theme, start time, dress code and how full it's getting, then request an invite straight from the page. Free accounts can see the whole map and request an invite to one party per week. Full Access is $0.75 per month, which removes the limit and moves your requests up the line. The full directory of all 34 chapters is open to everyone.
+        theme, start time, dress code and how full it's getting, then request an invite straight from the page. Free accounts can see the whole map and request an invite to one party per week. Full Access is <span class="js-price">$4.99</span> a semester, one payment with no auto-renew, which removes the limit, moves your requests up the line and unlocks PhatBot, the AI party guide. The full directory of all 34 chapters is open to everyone.
       </p>
       <div class="cta-row">
         <button class="btn" id="heroLogin" type="button">Log in to see the map</button>
@@ -523,7 +529,9 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       </article>
       <article class="plan-card full">
         <h3>Full Access</h3>
-        <p class="plan-price">$0.75<small>per month</small></p>
+        <p class="plan-deal" id="fullDeal" hidden></p>
+        <p class="plan-price" id="fullPrice">$4.99<small>per semester</small></p>
+        <p class="plan-fine">One payment. No auto-renew. Less than a drink downtown.</p>
         <ul class="plan-list">
           <li>Everything in Free</li>
           <li>Request invites to as many parties as you want</li>
@@ -660,7 +668,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     <fieldset class="pass-choice" id="passChoice">
       <legend>Your pass</legend>
       <label class="pass-opt"><input type="radio" name="pass" id="passFree" checked><span><b>Free</b><small>See the map and request an invite to one party per week.</small></span></label>
-      <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · $0.75 per month</b><small>Checkout coming soon. Start free and upgrade later.</small></span></label>
+      <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · <span class="js-price">$4.99</span> a semester</b><small>Checkout coming soon. Start free and upgrade later.</small></span></label>
     </fieldset>
     <button class="btn ghost small verify-resend" type="button" id="forgotBtn">Forgot password?</button>
     <p class="err" id="loginErr" role="alert"></p>
@@ -746,6 +754,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   <div class="bot-foot"><span class="bot-err" id="botErr" role="alert"></span><span id="botLeft">AI can make mistakes.</span></div>
 </section>
 
+<script src="/pricing.js"></script>
 <script src="/chapters.js"></script>
 <script src="/map-data.js"></script>
 <script>
@@ -832,10 +841,27 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     toast("Logged out. See you next weekend.");
   }
 
-  function toast(msg){
+  function toast(msg, ms){
     const t = $("#toast"); t.textContent = msg; t.hidden = false;
-    clearTimeout(toast._t); toast._t = setTimeout(()=>{ t.hidden = true; }, 3200);
+    clearTimeout(toast._t); toast._t = setTimeout(()=>{ t.hidden = true; }, ms || 3200);
   }
+
+  // ---------- pricing ----------
+  const PRICING = window.PF_PRICING;
+  const priceNow = () => PRICING.money(PRICING.current());
+  function renderPricing(){
+    document.querySelectorAll(".js-price").forEach(el=>{ el.textContent = priceNow(); });
+    const deal = PRICING.dealActive();
+    $("#fullDeal").hidden = !deal;
+    if(deal) $("#fullDeal").textContent = "Launch deal · ends " + PRICING.dealEndLabel();
+    $("#fullPrice").innerHTML = (deal ? "<s>" + PRICING.money(PRICING.price) + "</s>" : "") + priceNow() + "<small>per " + PRICING.term + "</small>";
+  }
+  const upgradeLabel = () => "Go unlimited · " + priceNow();
+  function goToPlans(){
+    document.querySelectorAll("dialog[open]").forEach(d=>d.close());
+    document.getElementById("plans").scrollIntoView({behavior: reducedMotionPref() ? "auto" : "smooth"});
+  }
+  const reducedMotionPref = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Pending requests are answered by the server; check back until they settle.
   async function refreshRequests(){
@@ -1073,7 +1099,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }
   function reqButton(p, cls){
     const r = requestFor(p.id);
-    if(!r && freeInviteUsed()) return '<a class="status-pill st-locked" href="#plans" style="text-decoration:none">Weekly invite used</a>';
+    if(!r && freeInviteUsed()) return '<a class="status-pill st-locked" href="#plans" style="text-decoration:none" data-plans>Weekly invite used · Go unlimited</a>';
     if(!r) return '<button class="btn '+(cls||"")+'" type="button" data-request="'+p.id+'">Request invite</button>';
     const map = {pending:["Requested · pending","st-pending"], approved:["You're on the list","st-approved"], waitlist:["Waitlisted","st-waitlist"]};
     return '<span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span>';
@@ -1134,7 +1160,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     if(!state.user){ el.innerHTML = ""; return; }
     const note = state.user.plan === "full"
       ? '<div class="plan-note"><span><b>Full Access:</b> request as many parties as you want. Your requests go to the front of the line.</span></div>'
-      : '<div class="plan-note"><span><b>Free pass:</b> '+Math.min(invitesThisWeek(), state.user.freeLimit)+' of '+state.user.freeLimit+' invite used this week. Resets Monday at midnight.</span><a href="#plans">See Full Access</a></div>';
+      : '<div class="plan-note"><span><b>Free pass:</b> '+Math.min(invitesThisWeek(), state.user.freeLimit)+' of '+state.user.freeLimit+' invite used this week. Resets Monday at midnight.</span>' +
+        (freeInviteUsed() ? '<a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a>' : '<a href="#plans" data-plans>See Full Access</a>') + '</div>';
     if(!state.requests.length){ el.innerHTML = note + '<div class="no-results" style="text-align:left">No requests yet. Pick a party and hit <b>Request invite</b>. Hosts usually answer in seconds here.</div>'; return; }
     const map = {pending:["Pending","st-pending"], approved:["On the list","st-approved"], waitlist:["Waitlist","st-waitlist"]};
     el.innerHTML = note + [...state.requests].sort((a,b)=>b.ts-a.ts).map(r=>{
@@ -1441,9 +1468,13 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       const data = await api("/api/requests", {partyId:pendingParty, guests:guestCount, note:$("#invMsg").value});
       state.requests = data.requests;
       inviteDlg.close(); renderAll();
-      toast("Request sent to " + byId[partyById[pendingParty].ch].gl + ". Waiting on the house…");
+      const host = byId[partyById[pendingParty].ch].gl;
+      if(freeInviteUsed()) toast("Request sent to " + host + "! That was your free invite this week. Want more? Full Access is " + priceNow() + " a " + PRICING.term + ".", 6500);
+      else toast("Request sent to " + host + ". Waiting on the house…");
     } catch(err){
-      $("#invErr").textContent = err.message;
+      // At the weekly limit, offer the upgrade right where they hit it.
+      if(err.code === "FREE_LIMIT") $("#invErr").innerHTML = '<div class="upsell"><span>' + esc(err.message) + '</span><a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a></div>';
+      else $("#invErr").textContent = err.message;
     } finally { btn.disabled = false; }
   });
 
@@ -1459,6 +1490,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const t = e.target;
     const mode = t.closest("[data-auth-mode]"); if(mode){ setAuthMode(mode.dataset.authMode); return; }
     if(t.closest("[data-signup]")){ openLogin("signup"); return; }
+    if(t.closest("[data-plans]")){ e.preventDefault(); goToPlans(); return; }
     if(t.closest('a[href="#plans"]')) return;
     if(t.closest("[data-login]") || t.closest("#heroLogin")){
       if(state.user && t.closest("#heroLogin")) document.getElementById("map").scrollIntoView(); else openLogin();
@@ -1483,6 +1515,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   $("#dirSearch").addEventListener("input", renderDirectory);
   $("#dirSort").addEventListener("change", renderDirectory);
 
+  renderPricing();
   renderAll();
   api("/api/me").then(data=>{
     if(!data.user) return;
