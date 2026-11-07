@@ -5,7 +5,7 @@ const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
-const PARTIES = require('./public/parties.js');
+const PARTIES = require('./data/parties.js');
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Copy .env.example to .env and add your Neon connection string.');
@@ -87,8 +87,10 @@ const publicUser = (u) => ({
   verified: !!u.email_verified_at,
   freeLimit: FREE_INVITES_PER_WEEK,
 });
+// Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
-  return { user: publicUser(user), requests: user.email_verified_at ? await listRequests(user) : [] };
+  if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [] };
+  return { user: publicUser(user), requests: await listRequests(user), parties: PARTIES };
 }
 
 // ---------- email confirmation codes ----------
@@ -288,7 +290,7 @@ app.post('/api/logout', wrap(async (req, res) => {
 
 app.get('/api/me', wrap(async (req, res) => {
   const user = await currentUser(req);
-  if (!user) return res.json({ user: null, requests: [] });
+  if (!user) return res.json({ user: null, requests: [], parties: [] });
   res.json(await accountPayload(user));
 }));
 

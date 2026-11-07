@@ -45,7 +45,8 @@ You need Node.js 22 or newer and a [Neon](https://neon.tech) database.
 
 - `server.js`: the Express server, with sign-up, log-in, log-out, sessions and invite requests
 - `db/schema.sql`: the `users`, `email_codes`, `sessions` and `invite_requests` tables
-- `public/`: the site itself (`index.html`, party data and map data)
+- `data/parties.js`: the party list, sent only to logged-in accounts with a confirmed email
+- `public/`: the site itself (`index.html` and map data)
 - `tools/map/`: the scripts that generated the map data
 - `archive/`: the earlier single-file demo, which has no accounts
 
