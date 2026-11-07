@@ -319,6 +319,34 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   background:var(--lime);color:#122200;font-weight:800;padding:12px 20px;border-radius:999px;
   box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 32px);text-align:center;
 }
+/* ---------- PhatBot ---------- */
+.bot-fab{
+  position:fixed;right:max(16px, env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;
+  display:flex;align-items:center;gap:8px;
+}
+.bot-fab .dot{width:10px;height:10px;border-radius:50%;background:var(--lime);box-shadow:0 0 10px var(--lime)}
+.bot{
+  position:fixed;right:max(16px, env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:45;
+  width:min(390px, calc(100vw - 32px));height:min(580px, calc(100dvh - 96px));
+  display:flex;flex-direction:column;background:var(--night-2);border-radius:22px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 2px var(--cyan);
+}
+.bot-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.bot-head h3{font-family:var(--display);font-weight:400;font-size:1.3rem;line-height:1}
+.bot-log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
+.bot-msg{max-width:88%;padding:10px 14px;border-radius:16px;font-size:.93rem;line-height:1.45;overflow-wrap:anywhere}
+.bot-msg.me{align-self:flex-end;background:var(--pink);color:#1a0010;border-bottom-right-radius:4px}
+.bot-msg.ai{align-self:flex-start;background:var(--night-3);color:var(--ink);border-bottom-left-radius:4px}
+.bot-msg.typing{color:var(--muted);font-style:italic}
+.bot-hello{display:flex;flex-direction:column;gap:10px}
+.bot-hello p{color:var(--muted);font-size:.93rem}
+.bot-ideas{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.bot-ideas .chip{text-align:left;white-space:normal}
+.bot-form{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.bot-form .input{flex:1;min-width:0}
+.bot-foot{padding:0 14px 10px;font-size:.75rem;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
+.bot-err{color:var(--orange)}
+
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
 .plan-card{background:var(--night-2);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:14px;border:2px dashed var(--line);min-width:0}
 .plan-card.full{border-color:var(--gold);box-shadow:0 0 34px rgba(255,210,63,.14)}
@@ -633,47 +661,28 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 
 <div class="toast" id="toast" hidden role="status"></div>
 
+<!-- PHATBOT -->
+<button class="btn bot-fab" type="button" id="botOpen" hidden><span class="dot" aria-hidden="true"></span>Ask PhatBot</button>
+<section class="bot" id="bot" hidden aria-labelledby="botTitle">
+  <div class="bot-head">
+    <div><span class="eyebrow">AI party guide</span><h3 id="botTitle">PhatBot</h3></div>
+    <button class="btn ghost small" type="button" id="botClose" aria-label="Close PhatBot">Close</button>
+  </div>
+  <div class="bot-log" id="botLog" aria-live="polite"></div>
+  <form class="bot-form" id="botForm" novalidate>
+    <input class="input" id="botInput" maxlength="1000" autocomplete="off" placeholder="Ask about parties, houses, plans…" aria-label="Message PhatBot">
+    <button class="btn small" type="submit" id="botSend">Send</button>
+  </form>
+  <div class="bot-foot"><span class="bot-err" id="botErr" role="alert"></span><span id="botLeft">AI can make mistakes.</span></div>
+</section>
+
+<script src="/chapters.js"></script>
 <script src="/map-data.js"></script>
 <script>
 (function(){
   // ---------- data ----------
-  // Chapters from pennstateifc.org/chapters. x/y place each house on the stylized grid (null = no address listed).
-  const CHAPTERS = [
-    {id:1, name:"Alpha Chi Rho", gl:"ΑΧΡ", addr:"425 Locust Lane", street:"Locust Lane", ig:"axp.psu"},
-    {id:2, name:"Alpha Delta Phi", gl:"ΑΔΦ", addr:"225 E Foster Ave", street:"Foster Ave", ig:"psualphadelt"},
-    {id:3, name:"Alpha Epsilon Pi", gl:"ΑΕΠ", addr:"240 E Prospect Ave", street:"Prospect Ave", ig:"aepi_pennstate"},
-    {id:4, name:"Alpha Gamma Rho", gl:"ΑΓΡ", addr:"322 Fraternity Row", street:"Fraternity Row", ig:"agrpsu"},
-    {id:5, name:"Alpha Kappa Lambda", gl:"ΑΚΛ", addr:"339 Fraternity Row", street:"Fraternity Row", ig:"akl_psu"},
-    {id:6, name:"Alpha Phi Delta", gl:"ΑΦΔ", addr:"329 E Prospect Ave", street:"Prospect Ave", ig:"apdpsu"},
-    {id:7, name:"Alpha Rho Chi", gl:"ΑΡΧ", addr:"320 S Frasier St", street:"Frasier St", ig:"apxvitruvius"},
-    {id:8, name:"Alpha Sigma Phi", gl:"ΑΣΦ", addr:"420 E Prospect Ave", street:"Prospect Ave", ig:"alphasig_psu"},
-    {id:9, name:"Alpha Tau Omega", gl:"ΑΤΩ", addr:"321 E Fairmount Ave", street:"Fairmount Ave", ig:"atopennstate"},
-    {id:10, name:"Alpha Zeta", gl:"ΑΖ", addr:"360 N Burrowes St", street:"Burrowes St", ig:"alphazeta.psu"},
-    {id:11, name:"Beta Sigma Beta", gl:"ΒΣΒ", addr:"255 E Fairmount Ave", street:"Fairmount Ave", ig:"betasigmabeta_psu"},
-    {id:12, name:"Chi Phi", gl:"ΧΦ", addr:"360 E Hamilton Ave", street:"Hamilton Ave", ig:"chiphipsu"},
-    {id:13, name:"Delta Sigma Phi", gl:"ΔΣΦ", addr:"508 Locust Lane", street:"Locust Lane", ig:"deltasigmaphipsu"},
-    {id:14, name:"Sigma Nu", gl:"ΣΝ", addr:null, street:"", ig:"psu_sigmanu"},
-    {id:15, name:"Delta Upsilon", gl:"ΔΥ", addr:"229 Locust Lane", street:"Locust Lane", ig:"psudeltaupsilon"},
-    {id:16, name:"Delta Theta Sigma", gl:"ΔΘΣ", nick:"DTS", addr:"101 N Patterson St", street:"Patterson St", ig:"dtsbeta"},
-    {id:17, name:"Theta Delta Chi", gl:"ΘΔΧ", nick:"TDX", addr:"305 E Prospect Ave", street:"Prospect Ave", ig:"tdxpsu"},
-    {id:18, name:"Tau Epsilon Phi", gl:"ΤΕΦ", addr:"328 E Foster Ave", street:"Foster Ave", ig:"psu_tep"},
-    {id:19, name:"Phi Gamma Delta", gl:"ΦΓΔ", nick:"FIJI", addr:"319 N Burrowes Rd", street:"Burrowes St", ig:"fijipsu"},
-    {id:20, name:"Phi Kappa Psi", gl:"ΦΚΨ", addr:"403 Locust Lane", street:"Locust Lane", ig:"phipsipsu"},
-    {id:21, name:"Zeta Beta Tau", gl:"ΖΒΤ", nick:"ZBT", addr:"429 E Hamilton Ave", street:"Hamilton Ave", ig:"zbt_psu"},
-    {id:22, name:"Phi Kappa Tau", gl:"ΦΚΤ", addr:"408 E Fairmount Ave", street:"Fairmount Ave", ig:"psu_phitau"},
-    {id:23, name:"Phi Kappa Theta", gl:"ΦΚΘ", nick:"Phi Who", addr:"338 E Fairmount Ave", street:"Fairmount Ave", ig:"phiwhopsu"},
-    {id:24, name:"Phi Sigma Kappa", gl:"ΦΣΚ", addr:"501 S Allen St", street:"Allen St", ig:"phisigpsu"},
-    {id:25, name:"Pi Kappa Phi", gl:"ΠΚΦ", nick:"Pi Kapp", addr:"409 E Fairmount Ave", street:"Fairmount Ave", ig:"pikapp_psu"},
-    {id:26, name:"Sigma Alpha Epsilon", gl:"ΣΑΕ", addr:"200 E Beaver Ave", street:"Beaver Ave", ig:"sae_psu"},
-    {id:27, name:"Sigma Phi Epsilon", gl:"ΣΦΕ", nick:"SigEp", addr:"524 Locust Lane", street:"Locust Lane", ig:"sigep_psu"},
-    {id:28, name:"Lambda Chi Alpha", gl:"ΛΧΑ", addr:"351 E Fairmount Ave", street:"Fairmount Ave", ig:"lambdachipsu"},
-    {id:29, name:"Tau Phi Delta", gl:"ΤΦΔ", addr:"427 E Fairmount Ave", street:"Fairmount Ave", ig:"tauphideltapsu"},
-    {id:30, name:"Theta Chi", gl:"ΘΧ", addr:"523 S Allen St", street:"Allen St", ig:"thetachipsu"},
-    {id:31, name:"Phi Delta Theta", gl:"ΦΔΘ", nick:"Phi Delt", addr:"328 E Fairmount Ave", street:"Fairmount Ave", ig:"psuphidelt"},
-    {id:32, name:"Triangle", gl:"Δ", addr:"226 E Beaver Ave", street:"Beaver Ave", ig:"psutriangle"},
-    {id:33, name:"Kappa Sigma", gl:"ΚΣ", addr:null, street:"", ig:"kappasigpsu"},
-    {id:34, name:"Delta Kappa Epsilon", gl:"ΔΚΕ", addr:null, street:"", ig:"dke_pennstate"}
-  ];
+  // Chapters come from chapters.js. The map pins below add x/y to each house (none for houses with no listed address).
+  const CHAPTERS = window.PF_CHAPTERS;
   const byId = Object.fromEntries(CHAPTERS.map(c=>[c.id,c]));
 
   // Real State College streets and buildings from OpenStreetMap, projected onto a 1000-unit-wide SVG.
@@ -748,6 +757,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     await api("/api/logout", {});
     state.user = null; state.pending = null; state.requests = []; state.selected = null;
     setParties([]);
+    botChat = []; $("#bot").hidden = true;
     renderAll();
     toast("Logged out. See you next weekend.");
   }
@@ -1081,8 +1091,58 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }
 
   function renderAll(){
-    renderAuth(); renderHero(); renderFilters(); renderMap(); renderDetail(); renderParties(); renderInvites(); renderDirectory();
+    renderAuth(); renderHero(); renderFilters(); renderMap(); renderDetail(); renderParties(); renderInvites(); renderDirectory(); renderBot();
   }
+
+  // ---------- PhatBot ----------
+  // The chat lives only in this tab. Earlier turns are sent back with each message so PhatBot keeps context.
+  let botChat = [], botBusy = false;
+  const BOT_IDEAS = [
+    "What's the best party for tonight?",
+    "Which parties still have room?",
+    "I like EDM. Where should I go?",
+    "Help my chapter plan a safe philanthropy event"
+  ];
+  const botHtml = t => esc(t).replace(/\n/g, "<br>");
+  function renderBot(){
+    const on = !!(state.user && state.user.chat);
+    $("#botOpen").hidden = !on || !$("#bot").hidden;
+    if(!on){ $("#bot").hidden = true; return; }
+    const log = $("#botLog");
+    if(!botChat.length){
+      log.innerHTML = '<div class="bot-hello"><p>Hey ' + esc(state.user.name.split(" ")[0]) + '! I know this week\'s parties and every IFC house. Ask me anything, or try one of these:</p><div class="bot-ideas">' +
+        BOT_IDEAS.map(q=>'<button type="button" class="chip" data-bot-idea>' + esc(q) + '</button>').join("") + '</div></div>';
+    } else {
+      log.innerHTML = botChat.map(m=>'<div class="bot-msg ' + (m.role==="user" ? "me" : "ai") + '">' + botHtml(m.content) + '</div>').join("") +
+        (botBusy ? '<div class="bot-msg ai typing">PhatBot is thinking…</div>' : "");
+    }
+    log.scrollTop = log.scrollHeight;
+    $("#botSend").disabled = botBusy;
+  }
+  function openBot(){ $("#bot").hidden = false; renderBot(); $("#botInput").focus(); }
+  async function sendBot(text){
+    text = text.trim();
+    if(!text || botBusy) return;
+    $("#botErr").textContent = "";
+    botChat.push({role:"user", content:text});
+    botBusy = true; $("#botInput").value = ""; renderBot();
+    try {
+      const data = await api("/api/chat", {messages: botChat});
+      botChat.push({role:"assistant", content:data.reply});
+      $("#botLeft").textContent = data.left + " message" + (data.left===1 ? "" : "s") + " left today · AI can make mistakes.";
+    } catch(err){
+      // Take the message back so the conversation stays in turn order, and let them resend it.
+      botChat.pop(); $("#botInput").value = text;
+      $("#botErr").textContent = err.message;
+    } finally {
+      botBusy = false; renderBot(); $("#botInput").focus();
+    }
+  }
+  $("#botOpen").addEventListener("click", openBot);
+  $("#botClose").addEventListener("click", ()=>{ $("#bot").hidden = true; renderBot(); $("#botOpen").focus(); });
+  $("#botForm").addEventListener("submit", e=>{ e.preventDefault(); sendBot($("#botInput").value); });
+  $("#botLog").addEventListener("click", e=>{ const b = e.target.closest("[data-bot-idea]"); if(b) sendBot(b.textContent); });
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !$("#bot").hidden && !document.querySelector("dialog[open]")){ $("#bot").hidden = true; renderBot(); } });
 
   // ---------- dialogs ----------
   const loginDlg = $("#loginDlg"), inviteDlg = $("#inviteDlg");

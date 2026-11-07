@@ -20,7 +20,16 @@ New accounts get a 6-digit code by email and must enter it before they can see t
 
 Forgotten passwords work the same way: **Forgot password?** on the log-in screen emails a reset code with the same limits. Setting a new password logs the account out on every other device.
 
-Set the `SMTP_*` values from `.env.example` to send email. Without `SMTP_HOST`, a local run prints the code in the terminal instead.
+Set the `SMTP_*` values from `.env.example` to send email.
+
+## PhatBot
+
+PhatBot is an AI chat for logged-in accounts with a confirmed email. It knows this week's parties, every IFC chapter in the directory, and the person's own plan and invite requests, and helps both students and chapter members planning events. It can't send or manage invites yet.
+
+- Runs on Claude through the Anthropic API (`ai.js`). Set `ANTHROPIC_API_KEY` to turn it on; without it the chat button stays hidden.
+- Uses Claude Opus 5.5 at low effort by default. `PHATBOT_MODEL` and `PHATBOT_EFFORT` change that.
+- Each account gets 20 messages a day on Free and 60 on Full Access (`chat_usage` table), plus at most 10 a minute.
+- Conversations aren't stored. The page keeps them until it's reloaded. Without `SMTP_HOST`, a local run prints the code in the terminal instead.
 
 ## Run it
 
@@ -46,7 +55,9 @@ You need Node.js 22 or newer and a [Neon](https://neon.tech) database.
 ## How it's put together
 
 - `server.js`: the Express server, with sign-up, log-in, log-out, sessions and invite requests
-- `db/schema.sql`: the `users`, `email_codes`, `password_reset_codes`, `sessions` and `invite_requests` tables
+- `ai.js`: PhatBot's instructions and the call to Claude
+- `public/chapters.js`: the 34 IFC chapters, shared by the page and PhatBot
+- `db/schema.sql`: the `users`, `email_codes`, `password_reset_codes`, `sessions`, `invite_requests` and `chat_usage` tables
 - `data/parties.js`: the party list, sent only to logged-in accounts with a confirmed email
 - `public/`: the site itself (`index.html` and map data)
 - `tools/map/`: the scripts that generated the map data

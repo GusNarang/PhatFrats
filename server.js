@@ -6,6 +6,7 @@ const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const PARTIES = require('./data/parties.js');
+const phatbot = require('./ai.js');
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Copy .env.example to .env and add your Neon connection string.');
@@ -21,6 +22,9 @@ const WEEK_START_SQL = `(date_trunc('week', now() AT TIME ZONE 'America/New_York
 const CODE_MINUTES = 15;
 const CODE_MAX_ATTEMPTS = 5;
 const CODES_PER_HOUR = 5;
+// PhatBot messages per day. Each one costs money, so the limits keep the bill predictable.
+const CHAT_LIMITS = { free: 20, full: 60 };
+const TODAY_SQL = `(now() AT TIME ZONE 'America/New_York')::date`;
 const partyById = new Map(PARTIES.map((p) => [p.id, p]));
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
@@ -86,6 +90,7 @@ const publicUser = (u) => ({
   plan: u.plan,
   verified: !!u.email_verified_at,
   freeLimit: FREE_INVITES_PER_WEEK,
+  chat: phatbot.isEnabled(),
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
@@ -410,6 +415,48 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
     client.release();
   }
   res.status(201).json({ requests: await listRequests(req.user) });
+}));
+
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: "You're sending messages too fast. Wait a moment.", code: 'RATE_LIMITED' },
+  // Per account, not per network: students on campus Wi-Fi can share one address.
+  keyGenerator: (req) => `user:${req.user.id}`,
+});
+
+app.post('/api/chat', requireVerified, chatLimiter, wrap(async (req, res) => {
+  if (!phatbot.isEnabled()) return fail(res, 503, "PhatBot isn't switched on yet. Check back soon.", 'CHAT_OFF');
+  const messages = phatbot.cleanConversation(req.body?.messages);
+  if (typeof messages === 'string') return fail(res, 400, messages);
+
+  const limit = CHAT_LIMITS[req.user.plan] || CHAT_LIMITS.free;
+  // Counts the message first, in one statement, so parallel requests can't go over the limit.
+  const { rows: [counted] } = await pool.query(
+    `INSERT INTO chat_usage (user_id, day, messages) VALUES ($1, ${TODAY_SQL}, 1)
+     ON CONFLICT (user_id, day) DO UPDATE SET messages = chat_usage.messages + 1
+     WHERE chat_usage.messages < $2
+     RETURNING messages`,
+    [req.user.id, limit]
+  );
+  if (!counted) {
+    return fail(res, 429, `That's all ${limit} PhatBot messages for today. More unlock at midnight.`, 'CHAT_LIMIT');
+  }
+  const refund = () => pool.query(
+    `UPDATE chat_usage SET messages = messages - 1 WHERE user_id = $1 AND day = ${TODAY_SQL} AND messages > 0`,
+    [req.user.id]
+  ).catch(() => {});
+
+  try {
+    const { text } = await phatbot.reply(req.user, await listRequests(req.user), messages);
+    res.json({ reply: text, left: limit - counted.messages });
+  } catch (err) {
+    await refund();
+    if (err instanceof phatbot.ChatError) return fail(res, err.status, err.message, 'CHAT_FAILED');
+    throw err;
+  }
 }));
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));

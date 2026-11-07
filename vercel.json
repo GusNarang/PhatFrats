@@ -2,5 +2,6 @@
   "framework": null,
   "buildCommand": "",
   "outputDirectory": "public",
+  "functions": { "api/index.js": { "maxDuration": 60 } },
   "rewrites": [{ "source": "/api/:path*", "destination": "/api/index" }]
 }

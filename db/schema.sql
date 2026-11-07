@@ -35,6 +35,14 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
   sent_in_window    SMALLINT NOT NULL DEFAULT 1
 );
 
+-- PhatBot messages per person per day (Eastern time), for the daily limit.
+CREATE TABLE IF NOT EXISTS chat_usage (
+  user_id  BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day      DATE NOT NULL,
+  messages INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, day)
+);
+
 -- Only a hash of each session token is stored, so a database leak can't be used to log in.
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
