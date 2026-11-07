@@ -107,7 +107,7 @@ textarea{min-height:96px;resize:vertical}
       <p class="lead">Put your parties on the PhatFrats map, answer invite requests from students and invite the people you want there.</p>
       <ol class="steps">
         <li><b>Log in</b><br><span class="muted">Use your own PhatFrats account. Sign up with your Penn State email if you don't have one.</span></li>
-        <li><b>Join your chapter</b><br><span class="muted">Pick your chapter and enter the chapter password from your chapter leader.</span></li>
+        <li><b>Sign in to your chapter</b><br><span class="muted">Brothers use the brother password from their leader. Chapter leaders use their leader sign-in.</span></li>
         <li><b>Post and invite</b><br><span class="muted">Leaders post parties. Every brother can invite their own guests.</span></li>
       </ol>
       <div class="card">
@@ -118,25 +118,45 @@ textarea{min-height:96px;resize:vertical}
 
     <!-- Logged in, not in a chapter yet -->
     <section id="viewJoin" hidden>
-      <h1>Join your chapter</h1>
+      <h1>Sign in to your chapter</h1>
       <p class="lead" id="joinHello"></p>
-      <div class="card">
-        <form id="joinForm" novalidate>
-          <div id="joinMsg" role="alert"></div>
-          <div class="field">
-            <label for="joinChapter">Your chapter</label>
-            <select id="joinChapter" required></select>
-          </div>
-          <div class="field">
-            <label for="joinPw">Chapter password <span class="hint">Your chapter leader has it.</span></label>
-            <input id="joinPw" type="password" autocomplete="off" required>
-          </div>
-          <button class="btn primary" type="submit">Join chapter</button>
-        </form>
+      <div class="grid2" style="gap:16px;align-items:start">
+        <div class="card" style="margin:0">
+          <h2>Brother sign-in</h2>
+          <p class="muted" style="margin-top:0">For brothers. Invite your own guests to your chapter's parties.</p>
+          <form id="joinForm" novalidate>
+            <div id="joinMsg" role="alert"></div>
+            <div class="field">
+              <label for="joinChapter">Your chapter</label>
+              <select id="joinChapter" required></select>
+            </div>
+            <div class="field">
+              <label for="joinPw">Brother password <span class="hint">Your chapter leader has it.</span></label>
+              <input id="joinPw" type="password" autocomplete="off" required>
+            </div>
+            <button class="btn primary" type="submit">Sign in as a brother</button>
+          </form>
+        </div>
+        <div class="card" style="margin:0;border-color:rgba(255,210,63,.45)">
+          <h2 style="color:var(--gold)">Chapter leader sign-in</h2>
+          <p class="muted" style="margin-top:0">For presidents and social chairs. Post parties, answer requests and manage your brothers.</p>
+          <form id="leadForm" novalidate>
+            <div id="leadMsg" role="alert"></div>
+            <div class="field">
+              <label for="leadChapter">Your chapter</label>
+              <select id="leadChapter" required></select>
+            </div>
+            <div class="field">
+              <label for="leadPw">Leader password <span class="hint">From PhatFrats.</span></label>
+              <input id="leadPw" type="password" autocomplete="off" required>
+            </div>
+            <button class="btn primary" type="submit">Sign in as leader</button>
+          </form>
+        </div>
       </div>
-      <div class="card">
-        <h3>Chapter leaders</h3>
-        <p class="muted" style="margin-bottom:0">If your chapter says "not set up yet", contact PhatFrats. We'll set your chapter's password and make you its leader, and then your brothers can join.</p>
+      <div class="card" style="margin-top:16px">
+        <h3>Chapter not set up yet?</h3>
+        <p class="muted" style="margin-bottom:0">Chapter leaders can contact PhatFrats to get a leader password. Once you're signed in as leader, you can set the brother password from Settings and share it with your brothers.</p>
       </div>
     </section>
 
@@ -262,15 +282,31 @@ textarea{min-height:96px;resize:vertical}
       <!-- Settings -->
       <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
         <div class="card" id="pwCard" hidden>
-          <h2>Chapter password</h2>
-          <p class="muted" style="margin-top:0">Brothers use this to join. Changing it doesn't remove anyone, so also remove people who left from the Members tab.</p>
+          <h2>Chapter passwords</h2>
+          <p class="muted" style="margin-top:0">The brother password lets brothers join. The leader password signs someone in as a leader, so only share it with people who should run the chapter. Changing a password doesn't remove anyone, so also remove people who left from the Members tab.</p>
           <form id="pwForm" novalidate>
             <div id="pwMsg" role="alert"></div>
             <div class="field">
-              <label for="newPw">New chapter password <span class="hint">At least 8 characters.</span></label>
+              <label for="pwKind">Which password</label>
+              <select id="pwKind"><option value="brother">Brother password</option><option value="leader">Leader password</option></select>
+            </div>
+            <div class="field">
+              <label for="newPw">New password <span class="hint">At least 8 characters.</span></label>
               <input id="newPw" type="text" autocomplete="off" minlength="8" required>
             </div>
             <button class="btn primary" type="submit">Change password</button>
+          </form>
+        </div>
+        <div class="card" id="upgradeCard" hidden>
+          <h2>Chapter leader sign-in</h2>
+          <p class="muted" style="margin-top:0">Running the chapter? Enter the leader password to become a leader.</p>
+          <form id="upgradeForm" novalidate>
+            <div id="upgradeMsg" role="alert"></div>
+            <div class="field">
+              <label for="upgradePw">Leader password</label>
+              <input id="upgradePw" type="password" autocomplete="off" required>
+            </div>
+            <button class="btn primary" type="submit">Sign in as leader</button>
           </form>
         </div>
         <div class="card">
@@ -331,10 +367,37 @@ textarea{min-height:96px;resize:vertical}
   // ---------- joining ----------
   function renderJoin(){
     const d = state.data;
-    $("#joinHello").textContent = "Hi "+d.me.name.split(" ")[0]+". Pick your chapter and enter the password your chapter leader gave you.";
-    $("#joinChapter").innerHTML = '<option value="">Choose your chapter</option>' + d.chapters
-      .map(c=>'<option value="'+c.id+'"'+(c.ready?'':' disabled')+'>'+esc(c.gl+"  "+c.name)+(c.ready?'':' (not set up yet)')+'</option>').join("");
+    $("#joinHello").textContent = "Hi "+d.me.name.split(" ")[0]+". Brothers and chapter leaders sign in separately. Pick the one that's you.";
+    const options = (key)=> '<option value="">Choose your chapter</option>' + [...d.chapters].sort((a,b)=>(b.test-a.test))
+      .map(c=>'<option value="'+c.id+'"'+(c[key]?'':' disabled')+'>'+esc(c.gl+"  "+c.name)+(c[key]?'':' (not set up yet)')+'</option>').join("");
+    $("#joinChapter").innerHTML = options("ready");
+    $("#leadChapter").innerHTML = options("leaderReady");
   }
+  $("#leadForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = $("#leadForm button"); btn.disabled = true; say($("#leadMsg"), "");
+    try{
+      if(!$("#leadChapter").value) throw new Error("Pick your chapter.");
+      if(!$("#leadPw").value) throw new Error("Enter the leader password.");
+      await api("/api/chapter/leader-login", {chapterId:Number($("#leadChapter").value), password:$("#leadPw").value});
+      $("#leadPw").value = "";
+      toast("Signed in as chapter leader.");
+      await load();
+    }catch(err){ say($("#leadMsg"), err.message); }
+    finally{ btn.disabled = false; }
+  });
+  $("#upgradeForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = $("#upgradeForm button"); btn.disabled = true; say($("#upgradeMsg"), "");
+    try{
+      if(!$("#upgradePw").value) throw new Error("Enter the leader password.");
+      await api("/api/chapter/leader-login", {chapterId:state.data.membership.chapter.id, password:$("#upgradePw").value});
+      $("#upgradePw").value = "";
+      toast("You're now a chapter leader.");
+      await load();
+    }catch(err){ say($("#upgradeMsg"), err.message); }
+    finally{ btn.disabled = false; }
+  });
   $("#joinForm").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const btn = e.submitter || $("#joinForm button"); btn.disabled = true; say($("#joinMsg"), "");
@@ -383,6 +446,7 @@ textarea{min-height:96px;resize:vertical}
     $("#chRole").className = "badge" + (leader() ? " leader" : "");
     $("#newPartyBtn").hidden = !leader();
     $("#pwCard").hidden = !leader();
+    $("#upgradeCard").hidden = leader();
     $("#allInvitesCard").hidden = !leader();
     renderTabs(); renderParties(); renderInvite(); renderRequests(); renderMembers();
   }
@@ -390,7 +454,7 @@ textarea{min-height:96px;resize:vertical}
   // ---------- parties ----------
   function partyCard(p){
     const v = VIBES[p.vibe], pct = Math.min(100, Math.round(p.going/p.cap*100));
-    const status = p.status==="cancelled" ? '<span class="badge cancelled">Cancelled</span>' : p.past ? '<span class="badge past">Over</span>' : '<span class="badge live">On the map</span>';
+    const status = p.status==="cancelled" ? '<span class="badge cancelled">Cancelled</span>' : p.past ? '<span class="badge past">Over</span>' : state.data.membership.chapter.test ? '<span class="badge past">Practice: not on the public map</span>' : '<span class="badge live">On the map</span>';
     const btns = [];
     if(p.status==="live" && !p.past) btns.push('<button class="btn slim primary" type="button" data-invite="'+p.id+'">Invite people</button>');
     if(leader()){
@@ -567,9 +631,10 @@ textarea{min-height:96px;resize:vertical}
   $("#pwForm").addEventListener("submit", async (e)=>{
     e.preventDefault(); say($("#pwMsg"), "");
     try{
-      await api("/api/chapter/password", {password:$("#newPw").value});
+      const kind = $("#pwKind").value;
+      await api("/api/chapter/password", {password:$("#newPw").value, kind});
       $("#newPw").value = "";
-      say($("#pwMsg"), "Chapter password changed. Share the new one with your brothers.", "ok");
+      say($("#pwMsg"), kind==="leader" ? "Leader password changed. Only share it with people who should run the chapter." : "Brother password changed. Share the new one with your brothers.", "ok");
     }catch(err){ say($("#pwMsg"), err.message); }
   });
   $("#leaveBtn").addEventListener("click", async ()=>{

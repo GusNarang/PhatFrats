@@ -90,10 +90,12 @@ The control room is hidden. A logged-in admin opens it by pressing Shift, Caps L
 
 Chapters manage their own parties at `/frats` (linked as **For frats** on the main site).
 
-1. In the control room, under **Chapters**, set a chapter's password. That switches the chapter on. Then use **Add leader** with the leader's PhatFrats email.
-2. Brothers log in with their own accounts, open `/frats`, pick their chapter and enter the chapter password.
+1. Each chapter has two passwords, set in the control room under **Chapters**: a **leader password** for the chapter leader sign-in, and a **brother password** that brothers join with. A leader can also change both from the portal's Settings. **Add leader** in the control room still works for making someone a leader by email.
+2. Everyone logs in with their own PhatFrats account and opens `/frats`. Brothers use **Brother sign-in**; leaders use **Chapter leader sign-in**.
 3. Leaders post, edit and cancel parties (up to two weeks ahead), approve or waitlist students' invite requests (Full Access first), manage members and change the chapter password.
 4. There are no plus-ones: everyone who comes needs their own invite request or brother invite.
 5. Every brother can invite people by Penn State email, up to 20 per party. Invited people go straight on the list, get an email, and don't use their weekly free invite. Someone without an account joins the list when they sign up with that email.
+
+**Test Frat** (`data/test-chapters.js`) is a practice chapter. It works like a real one in the portal, but its parties never appear on the public map, in the party list or to PhatBot, and students can't request them.
 
 Live chapter parties show on the map and in the party list next to the demo parties, marked "Posted by the house". Requests to them wait for the chapter instead of getting the demo's instant answer. PhatBot knows about them too.

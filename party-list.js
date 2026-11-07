@@ -1,5 +1,6 @@
 // Builds the party list the site shows: the demo parties plus every live party a chapter has posted.
 const DEMO = require('./data/parties.js');
+const TEST_CHAPTER_IDS = require('./data/test-chapters.js').map((c) => c.id);
 
 const DEMO_BY_ID = new Map(DEMO.map((p) => [p.id, p]));
 const DEMO_WEEKDAY = { thu: 3, fri: 4, sat: 5, sun: 6 }; // days after Monday
@@ -60,8 +61,9 @@ async function hostedParties(pool, { today = todayISO() } = {}) {
     `SELECT hp.*, to_char(hp.party_date, 'YYYY-MM-DD') AS day, ${GOING_SQL} AS going
      FROM hosted_parties hp
      WHERE hp.status = 'live' AND hp.party_date BETWEEN $1::date AND $1::date + $2::int
+       AND hp.chapter_id <> ALL($3::int[])
      ORDER BY hp.party_date, hp.id`,
-    [today, DAYS_AHEAD]
+    [today, DAYS_AHEAD, TEST_CHAPTER_IDS]
   );
   return rows.map(hostedRow);
 }
@@ -75,15 +77,16 @@ async function partiesForSite(pool) {
   return { parties, days };
 }
 
-// A party someone can still ask to go to, or null.
-async function findParty(pool, id) {
+// A party someone can still ask to go to, or null. Practice chapters' parties only count for their own brothers' invites.
+async function findParty(pool, id, { includeTest = false } = {}) {
   if (DEMO_BY_ID.has(id)) return DEMO_BY_ID.get(id);
   if (!isHostedId(id)) return null;
   const today = todayISO();
   const { rows: [r] } = await pool.query(
     `SELECT hp.*, to_char(hp.party_date, 'YYYY-MM-DD') AS day, ${GOING_SQL} AS going FROM hosted_parties hp
-     WHERE hp.id = $1 AND hp.status = 'live' AND hp.party_date BETWEEN $2::date AND $2::date + $3::int`,
-    [id.slice(1), today, DAYS_AHEAD]
+     WHERE hp.id = $1 AND hp.status = 'live' AND hp.party_date BETWEEN $2::date AND $2::date + $3::int
+       AND ($4 OR hp.chapter_id <> ALL($5::int[]))`,
+    [id.slice(1), today, DAYS_AHEAD, includeTest, TEST_CHAPTER_IDS]
   );
   return r ? hostedRow(r) : null;
 }

@@ -391,27 +391,34 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   }
 
   function renderChapters(){
-    const list = [...state.chapters].sort((a,b)=> (b.ready-a.ready) || a.name.localeCompare(b.name));
-    const on = list.filter(c=>c.ready).length;
+    const live = (c)=> c.ready || c.leaderReady;
+    const list = [...state.chapters].sort((a,b)=> (b.test-a.test) || (live(b)-live(a)) || a.name.localeCompare(b.name));
+    const on = list.filter(live).length;
     $("#chapterCount").textContent = on+" of "+list.length+" set up";
     $("#chapters").innerHTML = list.map(c=>'<tr>'
-      + '<td class="who"><b>'+esc(c.gl+"  "+c.name)+'</b></td>'
-      + '<td>'+(c.ready ? '<span class="tag full">Set up</span><span class="reason" style="color:var(--muted)">Password set '+dateFmt(c.passwordSet)+'</span>' : '<span class="tag">Not set up</span>')+'</td>'
+      + '<td class="who"><b>'+esc(c.gl+"  "+c.name)+'</b>'+(c.test?'<span>Practice chapter, never on the public map</span>':'')+'</td>'
+      + '<td>'+(c.ready ? '<span class="tag full">Brothers can join</span>' : '<span class="tag">No brother password</span>')
+      + (c.leaderReady ? '<span class="tag admin">Leader sign-in on</span>' : '<span class="tag">No leader password</span>')
+      + (c.passwordSet ? '<span class="reason" style="color:var(--muted)">Changed '+dateFmt(c.passwordSet)+'</span>' : '')+'</td>'
       + '<td>'+(c.leaders.length ? c.leaders.map(l=>'<div>'+esc(l.name)+' <span class="updated">'+esc(l.email)+'</span></div>').join("") : '<span class="updated">None</span>')+'</td>'
       + '<td class="num">'+int(c.members)+'</td><td class="num">'+int(c.upcoming)+'</td>'
-      + '<td><div class="actions"><button class="btn small" data-chpw="'+c.id+'">'+(c.ready?'Change password':'Set password')+'</button>'
+      + '<td><div class="actions"><button class="btn small" data-chpw="'+c.id+'">Brother password</button>'
+      + '<button class="btn small" data-chlpw="'+c.id+'">Leader password</button>'
       + '<button class="btn small good" data-chlead="'+c.id+'">Add leader</button></div></td></tr>').join("");
   }
   $("#chapters").addEventListener("click", async (e)=>{
-    const pw = e.target.closest("[data-chpw]"), ld = e.target.closest("[data-chlead]");
-    if(!pw && !ld) return;
-    const c = state.chapters.find(x=>String(x.id)===(pw||ld).dataset[pw?"chpw":"chlead"]);
+    const pw = e.target.closest("[data-chpw]"), lpw = e.target.closest("[data-chlpw]"), ld = e.target.closest("[data-chlead]");
+    const btn = pw || lpw || ld;
+    if(!btn) return;
+    const c = state.chapters.find(x=>String(x.id)===(btn.dataset.chpw || btn.dataset.chlpw || btn.dataset.chlead));
     try{
-      if(pw){
-        const v = prompt("New join password for "+c.name+" (at least 8 characters). Brothers type this to join, so share it with the chapter leader.");
+      if(pw || lpw){
+        const v = prompt(pw
+          ? "New brother password for "+c.name+" (at least 8 characters). Brothers type this to join."
+          : "New leader password for "+c.name+" (at least 8 characters). Whoever signs in with it under Chapter leader sign-in becomes a leader.");
         if(v===null) return;
-        await api("/api/admin/chapters/"+c.id+"/password", {password:v});
-        toast(c.name+" is set up.");
+        await api("/api/admin/chapters/"+c.id+"/password", {password:v, kind: lpw ? "leader" : "brother"});
+        toast(lpw ? "Leader password set for "+c.name+"." : "Brother password set for "+c.name+".");
       } else {
         const v = prompt("Email of the PhatFrats account to make a leader of "+c.name+". They need an account with a confirmed email. Anyone in another chapter gets moved.");
         if(v===null) return;

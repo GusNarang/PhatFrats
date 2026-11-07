@@ -206,25 +206,25 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
   }));
 
   // ---------- chapters (the frat portal) ----------
-  const CHAPTERS = require('./public/chapters.js');
+  const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
   const chapterIds = new Set(CHAPTERS.map((c) => c.id));
   const chapterParam = (req) => (chapterIds.has(Number(req.params.id)) ? Number(req.params.id) : null);
 
   app.get('/api/admin/chapters', requireAdmin, wrap(async (req, res) => {
     const [accts, members, parties] = await Promise.all([
-      pool.query('SELECT chapter_id, updated_at FROM chapter_accounts'),
+      pool.query('SELECT chapter_id, updated_at, password_hash IS NOT NULL AS brother, leader_password_hash IS NOT NULL AS leader FROM chapter_accounts'),
       pool.query(`SELECT m.chapter_id, m.role, u.name, u.email FROM chapter_members m JOIN users u ON u.id = m.user_id ORDER BY u.name`),
       pool.query(`SELECT chapter_id, count(*) FILTER (WHERE status = 'live' AND party_date >= ${TODAY_SQL})::int AS upcoming, count(*)::int AS total
                   FROM hosted_parties GROUP BY chapter_id`),
     ]);
-    const acct = new Map(accts.rows.map((r) => [r.chapter_id, r.updated_at]));
+    const acct = new Map(accts.rows.map((r) => [r.chapter_id, r]));
     const partyCounts = new Map(parties.rows.map((r) => [r.chapter_id, r]));
     res.json({
       chapters: CHAPTERS.map((c) => {
         const mine = members.rows.filter((m) => m.chapter_id === c.id);
         return {
-          id: c.id, name: c.name, gl: c.gl,
-          ready: acct.has(c.id), passwordSet: acct.get(c.id) || null,
+          id: c.id, name: c.name, gl: c.gl, test: !!c.test,
+          ready: !!acct.get(c.id)?.brother, leaderReady: !!acct.get(c.id)?.leader, passwordSet: acct.get(c.id)?.updated_at || null,
           members: mine.length,
           leaders: mine.filter((m) => m.role === 'leader').map((m) => ({ name: m.name, email: m.email })),
           upcoming: partyCounts.get(c.id)?.upcoming || 0,
@@ -234,15 +234,16 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     });
   }));
 
-  // Sets or replaces a chapter's join password. Setting one is what switches the chapter on.
+  // Sets or replaces a chapter's brother (join) password, or with kind 'leader', its leader sign-in password.
   app.post('/api/admin/chapters/:id/password', requireAdmin, wrap(async (req, res) => {
     const id = chapterParam(req);
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const column = req.body?.kind === 'leader' ? 'leader_password_hash' : 'password_hash';
     if (!id) return fail(res, 400, 'That chapter is not on the list.');
-    if (password.length < 8 || password.length > 200) return fail(res, 400, 'Use a chapter password with at least 8 characters.');
+    if (password.length < 8 || password.length > 200) return fail(res, 400, 'Use a password with at least 8 characters.');
     await pool.query(
-      `INSERT INTO chapter_accounts (chapter_id, password_hash) VALUES ($1, $2)
-       ON CONFLICT (chapter_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`,
+      `INSERT INTO chapter_accounts (chapter_id, ${column}) VALUES ($1, $2)
+       ON CONFLICT (chapter_id) DO UPDATE SET ${column} = EXCLUDED.${column}, updated_at = now()`,
       [id, await hashPassword(password)]
     );
     res.json({ ok: true });

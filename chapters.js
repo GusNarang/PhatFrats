@@ -2,7 +2,8 @@
 // - leaders post and edit parties, answer students' invite requests, and manage the member list;
 // - every brother can personally invite people to the chapter's parties by Penn State email.
 const { rateLimit } = require('express-rate-limit');
-const CHAPTERS = require('./public/chapters.js');
+// The IFC chapters, plus practice chapters for trying the portal.
+const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
 const partyList = require('./party-list.js');
 
 const chapterById = new Map(CHAPTERS.map((c) => [c.id, c]));
@@ -83,9 +84,15 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   // ---------- what the portal shows ----------
   app.get('/api/chapter/me', ...requireVerified, wrap(async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    const { rows: setUp } = await pool.query('SELECT chapter_id FROM chapter_accounts');
-    const ready = new Set(setUp.map((r) => r.chapter_id));
-    const chapters = CHAPTERS.map((c) => ({ id: c.id, name: c.name, gl: c.gl, ready: ready.has(c.id) }));
+    const { rows: setUp } = await pool.query(
+      'SELECT chapter_id, password_hash IS NOT NULL AS brother, leader_password_hash IS NOT NULL AS leader FROM chapter_accounts'
+    );
+    const ready = new Map(setUp.map((r) => [r.chapter_id, r]));
+    // ready: brothers can join. leaderReady: the leader sign-in works.
+    const chapters = CHAPTERS.map((c) => ({
+      id: c.id, name: c.name, gl: c.gl, test: !!c.test,
+      ready: !!ready.get(c.id)?.brother, leaderReady: !!ready.get(c.id)?.leader,
+    }));
     const member = await memberOf(req.user.id);
     const me = { name: req.user.name, email: req.user.email };
     if (!member) return res.json({ me, chapters, membership: null });
@@ -173,11 +180,35 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     if (!chapterById.has(chapterId)) return fail(res, 400, 'Pick your chapter.');
     if (await memberOf(req.user.id)) return fail(res, 409, "You're already in a chapter. Leave it first to join another.", 'ALREADY_MEMBER');
     const { rows: [acct] } = await pool.query('SELECT password_hash FROM chapter_accounts WHERE chapter_id = $1', [chapterId]);
-    if (!acct) return fail(res, 400, "Your chapter isn't set up on PhatFrats yet. Ask your chapter leader to contact PhatFrats.", 'CHAPTER_NOT_READY');
+    if (!acct?.password_hash) return fail(res, 400, "Your chapter isn't set up on PhatFrats yet. Ask your chapter leader to contact PhatFrats.", 'CHAPTER_NOT_READY');
     if (!password || !(await verifyPassword(password, acct.password_hash))) {
       return fail(res, 401, "That chapter password isn't right. Ask your chapter leader for it.", 'BAD_CHAPTER_PASSWORD');
     }
     await pool.query(`INSERT INTO chapter_members (user_id, chapter_id) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING`, [req.user.id, chapterId]);
+    res.json({ ok: true });
+  }));
+
+  // Chapter leader sign-in: the leader password makes this account a leader of the chapter.
+  app.post('/api/chapter/leader-login', authLimiter, ...requireVerified, wrap(async (req, res) => {
+    const chapterId = Number(req.body?.chapterId);
+    const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
+    if (!chapterById.has(chapterId)) return fail(res, 400, 'Pick your chapter.');
+    const { rows: [acct] } = await pool.query('SELECT leader_password_hash FROM chapter_accounts WHERE chapter_id = $1', [chapterId]);
+    if (!acct?.leader_password_hash) {
+      return fail(res, 400, "Leader sign-in isn't set up for this chapter yet. Contact PhatFrats to get your leader password.", 'LEADER_NOT_READY');
+    }
+    if (!password || !(await verifyPassword(password, acct.leader_password_hash))) {
+      return fail(res, 401, "That leader password isn't right.", 'BAD_LEADER_PASSWORD');
+    }
+    const current = await memberOf(req.user.id);
+    if (current && current.chapter_id !== chapterId) {
+      return fail(res, 409, "You're in a different chapter. Leave it first, then sign in as this chapter's leader.", 'ALREADY_MEMBER');
+    }
+    await pool.query(
+      `INSERT INTO chapter_members (user_id, chapter_id, role) VALUES ($1, $2, 'leader')
+       ON CONFLICT (user_id) DO UPDATE SET role = 'leader'`,
+      [req.user.id, chapterId]
+    );
     res.json({ ok: true });
   }));
 
@@ -249,7 +280,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     if (!partyId) return fail(res, 400, 'Pick a party.');
     if (!PSU_EMAIL.test(email)) return fail(res, 400, 'Use their Penn State email, like abc1234@psu.edu.');
-    const party = await partyList.findParty(pool, 'h' + partyId);
+    const party = await partyList.findParty(pool, 'h' + partyId, { includeTest: true });
     const { rows: [own] } = await pool.query('SELECT chapter_id FROM hosted_parties WHERE id = $1', [partyId]);
     if (!party || !own || own.chapter_id !== req.member.chapter_id) return fail(res, 400, "That party isn't open for invites. It may be cancelled or already over.");
     const { rows: [sent] } = await pool.query(
@@ -324,12 +355,15 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     res.json({ ok: true });
   }));
 
-  // Changing the password doesn't remove anyone. Remove members who left the chapter separately.
+  // Changes the brother password, or with kind 'leader', the leader password.
+  // Changing a password doesn't remove anyone. Remove members who left the chapter separately.
   app.post('/api/chapter/password', ...requireLeader, wrap(async (req, res) => {
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
-    if (password.length < 8 || password.length > 200) return fail(res, 400, 'Use a chapter password with at least 8 characters.');
+    const column = req.body?.kind === 'leader' ? 'leader_password_hash' : 'password_hash';
+    if (password.length < 8 || password.length > 200) return fail(res, 400, 'Use a password with at least 8 characters.');
     await pool.query(
-      'UPDATE chapter_accounts SET password_hash = $2, updated_at = now() WHERE chapter_id = $1',
+      `INSERT INTO chapter_accounts (chapter_id, ${column}) VALUES ($1, $2)
+       ON CONFLICT (chapter_id) DO UPDATE SET ${column} = EXCLUDED.${column}, updated_at = now()`,
       [req.member.chapter_id, await hashPassword(password)]
     );
     res.json({ ok: true });

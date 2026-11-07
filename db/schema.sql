@@ -149,3 +149,8 @@ ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS invited_by BIGINT REFERENCE
 -- and this clears any plus-ones saved before the change.
 UPDATE invite_requests SET guests = 0 WHERE guests <> 0;
 UPDATE brother_invites SET guests = 0 WHERE guests <> 0;
+
+-- A second password per chapter that signs someone in as a chapter leader. A chapter can have
+-- just one of the two passwords, so the brother password may be empty.
+ALTER TABLE chapter_accounts ADD COLUMN IF NOT EXISTS leader_password_hash TEXT;
+ALTER TABLE chapter_accounts ALTER COLUMN password_hash DROP NOT NULL;
