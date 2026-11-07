@@ -614,7 +614,6 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 
 <div class="toast" id="toast" hidden role="status"></div>
 
-<script src="/parties.js"></script>
 <script src="/map-data.js"></script>
 <script>
 (function(){
@@ -678,8 +677,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     charity:{label:"Philanthropy", c:"var(--lime)"}
   };
 
-  const PARTIES = window.PF_PARTIES;
-  const partyById = Object.fromEntries(PARTIES.map(p=>[p.id,p]));
+  // Filled in by the server once an account is logged in and confirmed.
+  let PARTIES = [], partyById = {};
+  function setParties(list){
+    PARTIES = list;
+    partyById = Object.fromEntries(PARTIES.map(p=>[p.id,p]));
+  }
 
   // ---------- state ----------
   const state = {
@@ -720,10 +723,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     state.user = verified ? data.user : null;
     state.pending = verified ? null : data.user;
     state.requests = verified ? data.requests : [];
+    setParties(verified ? data.parties : []);
   }
   async function logOut(){
     await api("/api/logout", {});
     state.user = null; state.pending = null; state.requests = []; state.selected = null;
+    setParties([]);
     renderAll();
     toast("Logged out. See you next weekend.");
   }
@@ -775,7 +780,13 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   function renderHero(){
     $("#statChapters").textContent = CHAPTERS.length;
     $("#statMapped").textContent = CHAPTERS.filter(c=>c.x!=null).length;
-    $("#statParties").textContent = PARTIES.length;
+    $("#statParties").textContent = state.user ? PARTIES.length : "?";
+    if(!state.user){
+      $("#nextList").innerHTML = '<li style="border:0;padding:0"><span class="eyebrow" style="color:var(--muted)">Filling up fastest</span><span></span></li><li><span>Log in to see this week\'s parties</span><span></span></li>';
+      const teaser = ["34 chapters","Every house mapped","One free invite every week","Students only","Log in to see the parties"].map(t=>'<span>'+t+'</span>').join("");
+      $("#marquee").innerHTML = teaser + teaser;
+      return;
+    }
     const top = [...PARTIES].sort((a,b)=>b.going/b.cap - a.going/a.cap).slice(0,4);
     $("#nextList").innerHTML = '<li style="border:0;padding:0"><span class="eyebrow" style="color:var(--muted)">Filling up fastest</span><span></span></li>' +
       top.map(p=>'<li><span><b>'+esc(p.title)+'</b> · '+esc(byId[p.ch].gl)+'</span><span>'+Math.round(p.going/p.cap*100)+'% full</span></li>').join("");
@@ -1046,12 +1057,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       return '<tr><td class="gl">'+esc(c.gl)+'</td><td class="nm">'+esc(c.name)+(c.nick?'<small>'+esc(c.nick)+'</small>':'')+'</td>' +
         '<td class="addr">'+(c.addr?'<a href="'+mapsUrl(c.addr)+'" target="_blank" rel="noopener">'+esc(c.addr)+'</a>':'<span class="muted">Not listed</span>')+'</td>' +
         '<td class="ig"><a href="'+igUrl(c.ig)+'" target="_blank" rel="noopener">@'+esc(c.ig)+'</a></td>' +
-        '<td>'+(ps.length?'<button type="button" class="party-flag" data-goto="'+ps[0].id+'">'+ps.length+' part'+(ps.length>1?'ies':'y')+'</button>':'<span class="muted">—</span>')+'</td></tr>';
+        '<td>'+(!state.user?'<button type="button" class="party-flag" data-login>Log in</button>':ps.length?'<button type="button" class="party-flag" data-goto="'+ps[0].id+'">'+ps.length+' part'+(ps.length>1?'ies':'y')+'</button>':'<span class="muted">—</span>')+'</td></tr>';
     }).join("") : '<tr><td colspan="5" class="muted" style="text-align:center;padding:24px">No chapter matches "'+esc(q)+'".</td></tr>';
   }
 
   function renderAll(){
-    renderAuth(); renderFilters(); renderMap(); renderDetail(); renderParties(); renderInvites(); renderDirectory();
+    renderAuth(); renderHero(); renderFilters(); renderMap(); renderDetail(); renderParties(); renderInvites(); renderDirectory();
   }
 
   // ---------- dialogs ----------
@@ -1206,7 +1217,6 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   $("#dirSearch").addEventListener("input", renderDirectory);
   $("#dirSort").addEventListener("change", renderDirectory);
 
-  renderHero();
   renderAll();
   api("/api/me").then(data=>{
     if(!data.user) return;

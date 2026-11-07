@@ -1,6 +1,5 @@
-// Demo parties (fictional). Shared by the page and the server so both agree on what exists.
-(function () {
-  const PARTIES = [
+// Demo parties (fictional). Kept outside public/ so only the server can read this file.
+module.exports = [
     {id:"p1", ch:15, title:"Totally Rad '80s Prom", day:"thu", time:"9:30 PM", vibe:"theme", blurb:"Teased hair, neon windbreakers and a slow-dance set at midnight. Prom king and queen get crowned on the stairs.", dress:"Thrift-store '80s", music:"'80s synth-pop into throwbacks", cap:180, going:131},
     {id:"p2", ch:17, title:"TDX Karaoke Cage Match", day:"thu", time:"9:00 PM", vibe:"chill", blurb:"Bracket-style karaoke. Bring a duet partner and your most unhinged song pick. Winner's name goes on the house trophy.", dress:"Whatever you sing best in", music:"You, live", cap:120, going:74},
     {id:"p3", ch:30, title:"Leftover Costume Bash", day:"thu", time:"10:00 PM", vibe:"theme", blurb:"Halloween was last weekend, but the costumes aren't done. Wear it one more time. Best repeat costume wins.", dress:"Your Halloween costume, round two", music:"Top 40 & mashups", cap:200, going:188},
@@ -15,7 +14,4 @@
     {id:"p12", ch:21, title:"Basement Rave", day:"sat", time:"11:00 PM", vibe:"neon", blurb:"Fog machine, lasers and two student DJs going back to back until close.", dress:"Black & neon", music:"Techno & drum and bass", cap:150, going:149},
     {id:"p13", ch:25, title:"Pancakes for a Purpose", day:"sun", time:"10:00 AM", vibe:"charity", blurb:"All-you-can-eat pancakes. Every plate supports The Ability Experience, Pi Kappa Phi's national philanthropy.", dress:"Pajamas encouraged", music:"Sunday morning acoustic", cap:250, going:86},
     {id:"p14", ch:6, title:"Sunday Sauce Night", day:"sun", time:"6:00 PM", vibe:"chill", blurb:"Homemade pasta dinner, family style. Bring a friend and an appetite.", dress:"Comfy", music:"Sinatra on vinyl", cap:90, going:51}
-  ];
-  if (typeof module !== 'undefined' && module.exports) module.exports = PARTIES;
-  else globalThis.PF_PARTIES = PARTIES;
-})();
+];
