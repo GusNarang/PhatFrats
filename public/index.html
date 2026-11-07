@@ -320,24 +320,89 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 32px);text-align:center;
 }
 /* ---------- PhatBot ---------- */
+/* The face: a pink robot head with glowing cyan eyes, a smile, blush and a lime antenna light. */
+.bot-face{display:block;overflow:visible}
+.bot-face .bf-head{fill:var(--pink)}
+.bot-face .bf-shine{fill:#fff;opacity:.22}
+.bot-face .bf-plate{fill:#0b1026}
+.bot-face .bf-eye{fill:var(--cyan)}
+.bot-face .bf-glint{fill:#fff}
+.bot-face .bf-happy,.bot-face .bf-mouth{fill:none;stroke:var(--cyan);stroke-width:3.2;stroke-linecap:round}
+.bot-face .bf-happy{opacity:0}
+.bot-face .bf-cheek{fill:#ff9ccf;opacity:.75}
+.bot-face .bf-stalk{stroke:#0b1026;stroke-width:3;stroke-linecap:round}
+.bot-face .bf-bulb{fill:var(--lime);filter:drop-shadow(0 0 4px var(--lime))}
+.bot-face .bf-eyes,.bot-face .bf-happy{transform-box:fill-box;transform-origin:center}
+.bot-face .bf-eyes{animation:bf-blink 4.6s infinite}
+.bot-face .bf-bulb{animation:bf-glow 2.4s ease-in-out infinite}
+@keyframes bf-blink{0%,91%,100%{transform:scaleY(1)}94%{transform:scaleY(.12)}}
+@keyframes bf-glow{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes bf-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes bf-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-9deg)}75%{transform:rotate(9deg)}}
+@keyframes bf-boop{
+  0%{transform:scale(1)}25%{transform:scale(1.2,.8)}50%{transform:scale(.88,1.14) translateY(-8px)}
+  75%{transform:scale(1.05,.96)}100%{transform:scale(1)}
+}
+@keyframes bf-cheer{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-5px) rotate(-8deg)}60%{transform:translateY(-2px) rotate(6deg)}}
+@keyframes bot-spark{from{transform:rotate(var(--a)) translateY(0) scale(1);opacity:1}to{transform:rotate(var(--a)) translateY(-44px) scale(.3);opacity:0}}
+@keyframes bot-pop{from{opacity:0;transform:translateY(24px) scale(.7)}to{opacity:1;transform:none}}
+@keyframes bot-bubble-in{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes bot-dot{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-5px);opacity:1}}
+
 .bot-fab{
   position:fixed;right:max(16px, env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;
-  display:flex;align-items:center;gap:8px;
+  font:inherit;font-weight:800;font-size:.95rem;color:var(--ink);cursor:pointer;border:0;
+  display:flex;align-items:center;gap:10px;padding:6px 18px 6px 6px;border-radius:999px;background:var(--night-2);
+  box-shadow:0 12px 32px rgba(0,0,0,.5), 0 0 0 2px var(--pink), 0 0 26px rgba(255,63,164,.35);
+  transition:transform .15s, box-shadow .15s;
 }
-.bot-fab .dot{width:10px;height:10px;border-radius:50%;background:var(--lime);box-shadow:0 0 10px var(--lime)}
+.bot-fab:hover{transform:translateY(-3px);box-shadow:0 16px 36px rgba(0,0,0,.5), 0 0 0 2px var(--cyan), 0 0 30px rgba(53,224,255,.4)}
+.bot-fab:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.bot-fab-face{position:relative;width:54px;height:54px;flex:none}
+.bot-fab-face .bot-face{width:54px;height:54px;animation:bf-bob 3.2s ease-in-out infinite}
+.bot-fab:hover .bot-fab-face .bot-face{animation:bf-wiggle .5s ease-in-out}
+.bot-fab-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.1}
+.bot-fab-text small{font-family:var(--mono);font-size:.68rem;font-weight:400;color:var(--lime);letter-spacing:.06em;text-transform:uppercase}
+.bot-fab.boop .bot-fab-face .bot-face{animation:bf-boop .55s cubic-bezier(.3,1.6,.5,1)}
+.bot-fab.boop .bf-eyes{opacity:0}
+.bot-fab.boop .bf-happy{opacity:1}
+.bot-spark{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;border-radius:50%;pointer-events:none;animation:bot-spark .6s ease-out forwards}
+.bot-bubble{
+  position:absolute;right:6px;bottom:calc(100% + 12px);width:max-content;max-width:220px;
+  background:var(--gold);color:#241a00;font-weight:800;font-size:.85rem;padding:9px 14px;border-radius:16px 16px 4px 16px;
+  box-shadow:0 10px 24px rgba(0,0,0,.4);animation:bot-bubble-in .3s ease-out;text-align:left;
+}
+@media (max-width:520px){.bot-fab{padding:5px}.bot-fab-text{display:none}}
+
 .bot{
   position:fixed;right:max(16px, env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:45;
   width:min(390px, calc(100vw - 32px));height:min(580px, calc(100dvh - 96px));
   display:flex;flex-direction:column;background:var(--night-2);border-radius:22px;overflow:hidden;
   box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 2px var(--cyan);
+  transform-origin:bottom right;
 }
-.bot-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.bot.opening{animation:bot-pop .32s cubic-bezier(.3,1.4,.5,1)}
+.bot-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(90deg, rgba(255,63,164,.16), transparent 70%)}
+.bot-who{display:flex;align-items:center;gap:10px}
+.bot-who .bot-face{width:42px;height:42px;flex:none}
+.bot-who .bot-face.cheer{animation:bf-cheer .6s ease-in-out}
+.bot.thinking .bot-who .bf-eyes{transform:translateY(-2px)}
+.bot.thinking .bot-who .bf-bulb{animation-duration:.5s}
 .bot-head h3{font-family:var(--display);font-weight:400;font-size:1.3rem;line-height:1}
+.bot-status{font-size:.75rem;color:var(--lime);font-family:var(--mono)}
 .bot-log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
 .bot-msg{max-width:88%;padding:10px 14px;border-radius:16px;font-size:.93rem;line-height:1.45;overflow-wrap:anywhere}
 .bot-msg.me{align-self:flex-end;background:var(--pink);color:#1a0010;border-bottom-right-radius:4px}
 .bot-msg.ai{align-self:flex-start;background:var(--night-3);color:var(--ink);border-bottom-left-radius:4px}
-.bot-msg.typing{color:var(--muted);font-style:italic}
+.bot-dots{display:inline-flex;gap:5px;padding:4px 2px}
+.bot-dots i{width:8px;height:8px;border-radius:50%;background:var(--cyan);animation:bot-dot 1s infinite}
+.bot-dots i:nth-child(2){animation-delay:.15s}
+.bot-dots i:nth-child(3){animation-delay:.3s}
+@media (prefers-reduced-motion: reduce){
+  .bot-face,.bot-face .bf-eyes,.bot-face .bf-bulb,.bot-spark,.bot.opening,.bot-bubble,.bot-dots i,
+  .bot-fab-face .bot-face,.bot-fab:hover .bot-fab-face .bot-face,.bot-fab.boop .bot-fab-face .bot-face,.bot-who .bot-face.cheer{animation:none!important}
+  .bot-fab,.bot-fab:hover{transition:none;transform:none}
+}
 .bot-hello{display:flex;flex-direction:column;gap:10px}
 .bot-hello p{color:var(--muted);font-size:.93rem}
 .bot-ideas{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
@@ -663,10 +728,14 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <div class="toast" id="toast" hidden role="status"></div>
 
 <!-- PHATBOT -->
-<button class="btn bot-fab" type="button" id="botOpen" hidden><span class="dot" aria-hidden="true"></span>Ask PhatBot</button>
+<button class="bot-fab" type="button" id="botOpen" hidden aria-label="Chat with PhatBot, your AI party sidekick">
+  <span class="bot-bubble" id="botBubble" hidden aria-hidden="true"></span>
+  <span class="bot-fab-face" data-bot-face aria-hidden="true"></span>
+  <span class="bot-fab-text">Ask PhatBot<small>Party sidekick</small></span>
+</button>
 <section class="bot" id="bot" hidden aria-labelledby="botTitle">
   <div class="bot-head">
-    <div><span class="eyebrow">AI party guide</span><h3 id="botTitle">PhatBot</h3></div>
+    <div class="bot-who"><span data-bot-face aria-hidden="true"></span><div><h3 id="botTitle">PhatBot</h3><span class="bot-status" id="botStatus">Online · your party sidekick</span></div></div>
     <button class="btn ghost small" type="button" id="botClose" aria-label="Close PhatBot">Close</button>
   </div>
   <div class="bot-log" id="botLog" aria-live="polite"></div>
@@ -1105,22 +1174,88 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     "Help my chapter plan a safe philanthropy event"
   ];
   const botHtml = t => esc(t).replace(/\n/g, "<br>");
+  const reducedMotion = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // PhatBot's face: pink head, glowing cyan eyes that blink, happy eyes for a boop, a smile and an antenna light.
+  const BOT_FACE = '<svg class="bot-face" viewBox="0 0 64 64">' +
+    '<line class="bf-stalk" x1="32" y1="14" x2="32" y2="6"/><circle class="bf-bulb" cx="32" cy="5" r="4"/>' +
+    '<rect class="bf-head" x="5" y="13" width="54" height="46" rx="19"/>' +
+    '<ellipse class="bf-shine" cx="21" cy="20" rx="10" ry="3.5"/>' +
+    '<rect class="bf-plate" x="12" y="22" width="40" height="30" rx="13"/>' +
+    '<g class="bf-eyes"><ellipse class="bf-eye" cx="24" cy="34" rx="4.2" ry="5.2"/><ellipse class="bf-eye" cx="40" cy="34" rx="4.2" ry="5.2"/>' +
+    '<circle class="bf-glint" cx="25.6" cy="32" r="1.4"/><circle class="bf-glint" cx="41.6" cy="32" r="1.4"/></g>' +
+    '<path class="bf-happy" d="M19.5 35 Q24 29.5 28.5 35 M35.5 35 Q40 29.5 44.5 35"/>' +
+    '<circle class="bf-cheek" cx="16.5" cy="44" r="3"/><circle class="bf-cheek" cx="47.5" cy="44" r="3"/>' +
+    '<path class="bf-mouth" d="M26 43 Q32 48.5 38 43"/></svg>';
+  document.querySelectorAll("[data-bot-face]").forEach(el=>{ el.insertAdjacentHTML("afterbegin", BOT_FACE); });
+
+  // A friendly hello bubble, once per visit.
+  let botGreeted = false;
+  try { botGreeted = sessionStorage.getItem("pfBotHi") === "1"; } catch(e){}
+  function greetBot(){
+    if(botGreeted) return;
+    botGreeted = true;
+    try { sessionStorage.setItem("pfBotHi", "1"); } catch(e){}
+    setTimeout(()=>{
+      if($("#botOpen").hidden) return;
+      const b = $("#botBubble");
+      b.textContent = "Hey " + state.user.name.split(" ")[0] + "! Need a party pick?";
+      b.hidden = false;
+      setTimeout(()=>{ b.hidden = true; }, 7000);
+    }, 1200);
+  }
+  function cheerBot(){
+    const f = document.querySelector(".bot-who .bot-face");
+    if(!f) return;
+    f.classList.remove("cheer"); void f.getBoundingClientRect(); f.classList.add("cheer");
+  }
+
   function renderBot(){
     const on = !!(state.user && state.user.chat);
     $("#botOpen").hidden = !on || !$("#bot").hidden;
-    if(!on){ $("#bot").hidden = true; return; }
+    if(!on){ $("#bot").hidden = true; $("#botBubble").hidden = true; return; }
+    if(!$("#botOpen").hidden) greetBot();
+    $("#bot").classList.toggle("thinking", botBusy);
+    $("#botStatus").textContent = botBusy ? "Thinking…" : "Online · your party sidekick";
     const log = $("#botLog");
     if(!botChat.length){
-      log.innerHTML = '<div class="bot-hello"><p>Hey ' + esc(state.user.name.split(" ")[0]) + '! I know this week\'s parties and every IFC house. Ask me anything, or try one of these:</p><div class="bot-ideas">' +
+      log.innerHTML = '<div class="bot-hello"><p>Hey ' + esc(state.user.name.split(" ")[0]) + '! I\'m PhatBot, your party sidekick. I know this week\'s parties and every IFC house. Ask me anything, or tap one of these:</p><div class="bot-ideas">' +
         BOT_IDEAS.map(q=>'<button type="button" class="chip" data-bot-idea>' + esc(q) + '</button>').join("") + '</div></div>';
     } else {
       log.innerHTML = botChat.map(m=>'<div class="bot-msg ' + (m.role==="user" ? "me" : "ai") + '">' + botHtml(m.content) + '</div>').join("") +
-        (botBusy ? '<div class="bot-msg ai typing">PhatBot is thinking…</div>' : "");
+        (botBusy ? '<div class="bot-msg ai typing" role="status" aria-label="PhatBot is typing"><span class="bot-dots"><i></i><i></i><i></i></span></div>' : "");
     }
     log.scrollTop = log.scrollHeight;
     $("#botSend").disabled = botBusy;
   }
-  function openBot(){ $("#bot").hidden = false; renderBot(); $("#botInput").focus(); }
+
+  // Click: he squishes with happy eyes and a burst of sparkles, then the chat pops open.
+  let botOpening = false;
+  function openBot(){
+    if(botOpening) return;
+    $("#botBubble").hidden = true;
+    const show = ()=>{
+      botOpening = false;
+      const panel = $("#bot");
+      panel.hidden = false;
+      panel.classList.remove("opening"); void panel.getBoundingClientRect(); panel.classList.add("opening");
+      renderBot(); $("#botInput").focus();
+    };
+    if(reducedMotion()){ show(); return; }
+    botOpening = true;
+    const fab = $("#botOpen"), spot = fab.querySelector(".bot-fab-face");
+    fab.classList.remove("boop"); void fab.getBoundingClientRect(); fab.classList.add("boop");
+    const colors = ["var(--gold)", "var(--lime)", "var(--cyan)", "var(--pink)", "var(--violet)"];
+    for(let i = 0; i < 10; i++){
+      const s = document.createElement("span");
+      s.className = "bot-spark";
+      s.style.setProperty("--a", (i * 36) + "deg");
+      s.style.background = colors[i % colors.length];
+      spot.appendChild(s);
+      setTimeout(()=>s.remove(), 650);
+    }
+    setTimeout(()=>{ fab.classList.remove("boop"); show(); }, 420);
+  }
   async function sendBot(text){
     text = text.trim();
     if(!text || botBusy) return;
@@ -1131,6 +1266,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       const data = await api("/api/chat", {messages: botChat});
       botChat.push({role:"assistant", content:data.reply});
       $("#botLeft").textContent = data.left + " message" + (data.left===1 ? "" : "s") + " left today · AI can make mistakes.";
+      setTimeout(cheerBot, 0);
     } catch(err){
       // Take the message back so the conversation stays in turn order, and let them resend it.
       botChat.pop(); $("#botInput").value = text;
