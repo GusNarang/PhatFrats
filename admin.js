@@ -12,6 +12,7 @@ const STRIPE_FIXED = 0.30;
 const AI_CREDIT = Number(process.env.AI_CREDIT_DOLLARS) || 5;
 const DAYS = 30;
 const PARTY_TITLES = new Map(require('./data/parties.js').map((p) => [p.id, p.title]));
+const partyList = require('./party-list.js');
 
 // Entering the admin password opens the control room for one visit. Leaving it, or opening the main
 // site, locks it again. This limit only matters if the tab is left open or the lock message gets lost.
@@ -210,28 +211,126 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
   const chapterIds = new Set(CHAPTERS.map((c) => c.id));
   const chapterParam = (req) => (chapterIds.has(Number(req.params.id)) ? Number(req.params.id) : null);
 
-  app.get('/api/admin/chapters', requireAdmin, wrap(async (req, res) => {
-    const [accts, members, parties] = await Promise.all([
+  // Everything for the control room's Frats page: every chapter with its numbers, the totals,
+  // a 30-day trend, the upcoming parties and the brothers sending the most invites.
+  // Practice chapters are listed but left out of the totals, the trend and the leaderboard.
+  app.get('/api/admin/frats', requireAdmin, wrap(async (req, res) => {
+    const testIds = CHAPTERS.filter((c) => c.test).map((c) => c.id);
+    const [accts, members, parties, requests, invites, upcoming, series, brothers] = await Promise.all([
       pool.query('SELECT chapter_id, updated_at, password_hash IS NOT NULL AS brother, leader_password_hash IS NOT NULL AS leader FROM chapter_accounts'),
-      pool.query(`SELECT m.chapter_id, m.role, u.name, u.email FROM chapter_members m JOIN users u ON u.id = m.user_id ORDER BY u.name`),
-      pool.query(`SELECT chapter_id, count(*) FILTER (WHERE status = 'live' AND party_date >= ${TODAY_SQL})::int AS upcoming, count(*)::int AS total
+      pool.query(`SELECT m.chapter_id, m.role, m.joined_at, u.name, u.email FROM chapter_members m JOIN users u ON u.id = m.user_id
+                  WHERE u.banned_at IS NULL ORDER BY u.name`),
+      pool.query(`SELECT chapter_id,
+                    count(*) FILTER (WHERE status = 'live' AND party_date >= ${TODAY_SQL})::int AS upcoming,
+                    count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+                    count(*)::int AS total, max(created_at) AS last_posted
                   FROM hosted_parties GROUP BY chapter_id`),
+      pool.query(`SELECT hp.chapter_id,
+                    count(*) FILTER (WHERE r.status = 'pending')::int AS pending,
+                    count(*) FILTER (WHERE r.status = 'approved')::int AS approved,
+                    count(*) FILTER (WHERE r.status = 'waitlist')::int AS waitlist,
+                    count(*) FILTER (WHERE u.plan = 'full')::int AS full
+                  FROM invite_requests r JOIN hosted_parties hp ON 'h' || hp.id = r.party_id JOIN users u ON u.id = r.user_id
+                  WHERE r.invited_by IS NULL GROUP BY hp.chapter_id`),
+      pool.query(`SELECT hp.chapter_id, count(*)::int AS sent,
+                    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM users u WHERE u.email = b.email))::int AS claimed
+                  FROM brother_invites b JOIN hosted_parties hp ON hp.id = b.party_id GROUP BY hp.chapter_id`),
+      pool.query(`SELECT hp.id, hp.chapter_id, hp.title, to_char(hp.party_date, 'YYYY-MM-DD') AS day, hp.start_time, hp.vibe, hp.cap, hp.status,
+                    hp.created_at, creator.name AS created_by, ${partyList.GOING_SQL} AS going,
+                    (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL AND r.status = 'pending')::int AS pending,
+                    (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL)::int AS requests,
+                    (SELECT count(*) FROM brother_invites b WHERE b.party_id = hp.id)::int AS invites
+                  FROM hosted_parties hp LEFT JOIN users creator ON creator.id = hp.created_by
+                  WHERE hp.party_date >= ${TODAY_SQL} ORDER BY hp.party_date, hp.start_time, hp.id`),
+      pool.query(`WITH days AS (SELECT generate_series(${TODAY_SQL} - ${DAYS - 1}, ${TODAY_SQL}, interval '1 day')::date AS day)
+        SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+          (SELECT count(*) FROM hosted_parties hp WHERE (hp.created_at AT TIME ZONE 'America/New_York')::date = d.day
+             AND hp.chapter_id <> ALL($1::int[]))::int AS parties,
+          (SELECT count(*) FROM invite_requests r JOIN hosted_parties hp ON 'h' || hp.id = r.party_id
+             WHERE r.invited_by IS NULL AND (r.created_at AT TIME ZONE 'America/New_York')::date = d.day AND hp.chapter_id <> ALL($1::int[]))::int AS requests,
+          (SELECT count(*) FROM brother_invites b JOIN hosted_parties hp ON hp.id = b.party_id
+             WHERE (b.created_at AT TIME ZONE 'America/New_York')::date = d.day AND hp.chapter_id <> ALL($1::int[]))::int AS invites,
+          (SELECT count(*) FROM chapter_members m WHERE (m.joined_at AT TIME ZONE 'America/New_York')::date = d.day
+             AND m.chapter_id <> ALL($1::int[]))::int AS brothers
+        FROM days d ORDER BY d.day`, [testIds]),
+      pool.query(`SELECT u.name, u.email, m.chapter_id, m.role, count(b.id)::int AS invites,
+                    count(b.id) FILTER (WHERE EXISTS (SELECT 1 FROM users x WHERE x.email = b.email))::int AS claimed
+                  FROM brother_invites b JOIN users u ON u.id = b.invited_by JOIN chapter_members m ON m.user_id = u.id
+                  WHERE m.chapter_id <> ALL($1::int[])
+                  GROUP BY u.id, u.name, u.email, m.chapter_id, m.role ORDER BY invites DESC, u.name LIMIT 10`, [testIds]),
     ]);
-    const acct = new Map(accts.rows.map((r) => [r.chapter_id, r]));
-    const partyCounts = new Map(parties.rows.map((r) => [r.chapter_id, r]));
-    res.json({
-      chapters: CHAPTERS.map((c) => {
-        const mine = members.rows.filter((m) => m.chapter_id === c.id);
-        return {
-          id: c.id, name: c.name, gl: c.gl, test: !!c.test,
-          ready: !!acct.get(c.id)?.brother, leaderReady: !!acct.get(c.id)?.leader, passwordSet: acct.get(c.id)?.updated_at || null,
-          members: mine.length,
-          leaders: mine.filter((m) => m.role === 'leader').map((m) => ({ name: m.name, email: m.email })),
-          upcoming: partyCounts.get(c.id)?.upcoming || 0,
-          parties: partyCounts.get(c.id)?.total || 0,
-        };
-      }),
+
+    const byChapter = (rows) => new Map(rows.map((r) => [r.chapter_id, r]));
+    const acct = byChapter(accts.rows), pc = byChapter(parties.rows), rq = byChapter(requests.rows), iv = byChapter(invites.rows);
+    const up = upcoming.rows.map((p) => ({
+      id: 'h' + p.id, ch: p.chapter_id, title: p.title, day: p.day, time: p.start_time, vibe: p.vibe, cap: p.cap,
+      status: p.status, going: Math.min(p.going, p.cap), pending: p.pending, requests: p.requests, invites: p.invites,
+      createdBy: p.created_by || 'A former leader', posted: p.created_at,
+    }));
+    const chapters = CHAPTERS.map((c) => {
+      const mine = members.rows.filter((m) => m.chapter_id === c.id);
+      const live = up.filter((p) => p.ch === c.id && p.status === 'live');
+      const cap = live.reduce((s, p) => s + p.cap, 0);
+      return {
+        id: c.id, name: c.name, gl: c.gl, test: !!c.test,
+        ready: !!acct.get(c.id)?.brother, leaderReady: !!acct.get(c.id)?.leader, passwordSet: acct.get(c.id)?.updated_at || null,
+        members: mine.length,
+        leaders: mine.filter((m) => m.role === 'leader').map((m) => ({ name: m.name, email: m.email })),
+        upcoming: pc.get(c.id)?.upcoming || 0,
+        parties: pc.get(c.id)?.total || 0,
+        cancelled: pc.get(c.id)?.cancelled || 0,
+        lastPosted: pc.get(c.id)?.last_posted || null,
+        pending: rq.get(c.id)?.pending || 0,
+        approved: rq.get(c.id)?.approved || 0,
+        waitlist: rq.get(c.id)?.waitlist || 0,
+        fullRequests: rq.get(c.id)?.full || 0,
+        invitesSent: iv.get(c.id)?.sent || 0,
+        invitesClaimed: iv.get(c.id)?.claimed || 0,
+        // How full this chapter's upcoming parties are, from 0 to 1.
+        fill: cap ? live.reduce((s, p) => s + p.going, 0) / cap : null,
+      };
     });
+
+    const real = chapters.filter((c) => !c.test);
+    const sum = (k) => real.reduce((s, c) => s + c[k], 0);
+    const answered = sum('approved') + sum('waitlist');
+    res.json({
+      generatedAt: new Date().toISOString(),
+      totals: {
+        chapters: real.length,
+        live: real.filter((c) => c.ready || c.leaderReady).length,
+        withLeader: real.filter((c) => c.leaders.length).length,
+        brothers: sum('members'),
+        leaders: real.reduce((s, c) => s + c.leaders.length, 0),
+        upcoming: sum('upcoming'),
+        parties: sum('parties'),
+        cancelled: sum('cancelled'),
+        pending: sum('pending'),
+        approved: sum('approved'),
+        waitlist: sum('waitlist'),
+        requests: sum('pending') + answered,
+        approvalRate: answered ? sum('approved') / answered : null,
+        invitesSent: sum('invitesSent'),
+        invitesClaimed: sum('invitesClaimed'),
+      },
+      series: series.rows,
+      chapters,
+      upcoming: up,
+      topBrothers: brothers.rows.map((b) => ({
+        name: b.name, email: b.email, chapter: CHAPTERS.find((c) => c.id === b.chapter_id)?.name || '', leader: b.role === 'leader',
+        invites: b.invites, claimed: b.claimed,
+      })),
+    });
+  }));
+
+  // Takes a chapter's party off the map, or puts it back, if something about it isn't right.
+  app.post('/api/admin/parties/:id/status', requireAdmin, wrap(async (req, res) => {
+    const id = partyList.isHostedId(req.params.id) ? req.params.id.slice(1) : null;
+    const status = req.body?.status;
+    if (!id || (status !== 'live' && status !== 'cancelled')) return fail(res, 400, 'Choose live or cancelled.');
+    const { rowCount } = await pool.query('UPDATE hosted_parties SET status = $2, updated_at = now() WHERE id = $1', [id, status]);
+    if (!rowCount) return fail(res, 404, 'That party is gone.');
+    res.json({ ok: true });
   }));
 
   // Sets or replaces a chapter's brother (join) password, or with kind 'leader', its leader sign-in password.

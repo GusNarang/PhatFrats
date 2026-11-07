@@ -99,6 +99,18 @@ dialog textarea{width:100%;min-height:80px;resize:vertical}
 dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--night-3);border:1px solid var(--line);border-radius:999px;padding:10px 18px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.4)}
 .skeleton{color:var(--muted)}
+.pages{display:flex;gap:6px;margin:-4px 0 20px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap}
+.pages button{font:400 14px var(--display);letter-spacing:.03em;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:999px;padding:8px 16px;cursor:pointer}
+.pages button[aria-selected="true"]{background:var(--night-3);border-color:var(--gold);color:var(--gold)}
+.pages button:hover{color:var(--ink)}
+.stack{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--night-3);margin:8px 0 10px}
+.stack i{display:block;height:100%}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.fill{display:inline-block;width:60px;height:6px;border-radius:999px;background:var(--night-3);vertical-align:middle;margin-right:6px;overflow:hidden}
+.fill i{display:block;height:100%;background:var(--cyan)}
+.alert-row{padding:10px 12px;border-radius:10px;background:rgba(255,210,63,.07);border:1px solid rgba(255,210,63,.25);font-size:14px}
+.alert-row b{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -119,6 +131,12 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     </div>
   </header>
 
+  <nav class="pages" role="tablist" aria-label="Control room pages">
+    <button type="button" role="tab" id="tab-overview" aria-controls="pageOverview" aria-selected="true" data-page="overview">Overview</button>
+    <button type="button" role="tab" id="tab-frats" aria-controls="pageFrats" aria-selected="false" data-page="frats">Frats</button>
+  </nav>
+
+  <div id="pageOverview" role="tabpanel" aria-labelledby="tab-overview">
   <section class="tiles" id="tiles" aria-label="Key numbers"></section>
 
   <div class="grid">
@@ -150,19 +168,6 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     </section>
   </div>
 
-  <section class="card" aria-labelledby="chaptersTitle" style="margin-bottom:16px">
-    <div class="table-head">
-      <h2 id="chaptersTitle" style="margin:0">Chapters <span class="updated" id="chapterCount"></span></h2>
-      <span class="updated">Set a chapter's password to switch it on, then share it with their leader. Brothers join at /frats.</span>
-    </div>
-    <div class="table-scroll">
-      <table>
-        <thead><tr><th>Chapter</th><th>Status</th><th>Leaders</th><th class="num">Brothers</th><th class="num">Upcoming parties</th><th class="num" style="text-align:right">Actions</th></tr></thead>
-        <tbody id="chapters"><tr><td colspan="6" class="skeleton">Loading chapters…</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-
   <section class="card" aria-labelledby="usersTitle">
     <div class="table-head">
       <h2 id="usersTitle" style="margin:0">Accounts <span class="updated" id="userCount"></span></h2>
@@ -181,6 +186,66 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       </table>
     </div>
   </section>
+  </div>
+
+  <div id="pageFrats" role="tabpanel" aria-labelledby="tab-frats" hidden>
+    <section class="tiles" id="fratTiles" aria-label="Frat numbers"></section>
+
+    <div class="grid">
+      <section class="card" aria-labelledby="fratChartTitle">
+        <div class="chart-head">
+          <h2 id="fratChartTitle">Frat activity, last 30 days</h2>
+          <div class="seg" id="fratMetricSeg" role="group" aria-label="What to chart"></div>
+        </div>
+        <div class="chart-total" id="fratChartTotal"></div>
+        <div class="chart" id="fratChart"></div>
+      </section>
+      <section class="card" aria-labelledby="fratReqTitle">
+        <h2 id="fratReqTitle">Student requests</h2>
+        <div id="fratRequests"></div>
+      </section>
+    </div>
+
+    <div class="grid even">
+      <section class="card" aria-labelledby="attnTitle">
+        <h2 id="attnTitle">Needs attention</h2>
+        <div class="rows" id="fratAttention"></div>
+      </section>
+      <section class="card" aria-labelledby="topBroTitle">
+        <h2 id="topBroTitle">Top inviting brothers</h2>
+        <div class="bars" id="topBrothers"></div>
+      </section>
+    </div>
+
+    <section class="card" aria-labelledby="fratPartiesTitle" style="margin-bottom:16px">
+      <div class="table-head">
+        <h2 id="fratPartiesTitle" style="margin:0">Upcoming frat parties <span class="updated" id="fratPartyCount"></span></h2>
+        <span class="updated">Take a party down if something about it isn't right. The chapter can't see who did it.</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Party</th><th>When</th><th>Chapter</th><th>Fill</th><th class="num">Requests</th><th class="num">Waiting</th><th class="num">Brother invites</th><th class="num" style="text-align:right">Actions</th></tr></thead>
+          <tbody id="fratParties"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="chaptersTitle">
+      <div class="table-head">
+        <h2 id="chaptersTitle" style="margin:0">Chapters <span class="updated" id="chapterCount"></span></h2>
+        <div class="filters">
+          <input type="search" id="chapterSearch" placeholder="Search chapters" aria-label="Search chapters">
+          <div class="seg" id="chapterFilterSeg" role="group" aria-label="Filter chapters"></div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Chapter</th><th>Status</th><th>Leaders</th><th class="num">Brothers</th><th class="num">Parties</th><th>Requests</th><th class="num">Brother invites</th><th>Fill</th><th>Last party posted</th><th class="num" style="text-align:right">Actions</th></tr></thead>
+          <tbody id="chapters"><tr><td colspan="10" class="skeleton">Loading chapters…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 </div>
 
 <dialog id="banDialog">
@@ -225,7 +290,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     return data;
   }
 
-  const state = { overview:null, users:[], chapters:[], metric:"visitors", filter:"all", q:"" };
+  const state = { overview:null, users:[], chapters:[], frats:null, metric:"visitors", fratMetric:"requests", filter:"all", q:"", chFilter:"all", chQ:"", page:"overview" };
 
   const METRICS = [
     {key:"visitors", label:"Visitors", color:"var(--cyan)", unit:"visitors"},
@@ -260,9 +325,12 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     const o = state.overview; if(!o) return;
     const metric = METRICS.find(m=>m.key===state.metric);
     segButtons($("#metricSeg"), METRICS, state.metric, (k)=>{ state.metric=k; renderChart(); });
-    const data = o.series.map(d=>({day:d.day, n:d[metric.key]}));
+    drawBars($("#chart"), $("#chartTotal"), o.series, metric);
+  }
+  function drawBars(el, totalEl, series, metric){
+    const data = series.map(d=>({day:d.day, n:d[metric.key]}));
     const total = data.reduce((s,d)=>s+d.n,0);
-    $("#chartTotal").textContent = int(total)+" "+metric.unit+" in the last 30 days";
+    totalEl.textContent = int(total)+" "+metric.unit+" in the last 30 days";
     const W=600, H=220, padL=28, padB=22, padT=8;
     const max = Math.max(1, ...data.map(d=>d.n));
     const nice = max<=4 ? max : Math.ceil(max/4)*4;
@@ -285,7 +353,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       }
     });
     svg += '</svg><div class="tip" hidden></div>';
-    const el = $("#chart"); el.innerHTML = svg;
+    el.innerHTML = svg;
     const tip = el.querySelector(".tip");
     el.onmousemove = (e)=>{
       const r = e.target.closest("[data-i]"); if(!r){ tip.hidden=true; return; }
@@ -374,9 +442,9 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   async function load(){
     $("#refresh").disabled = true;
     try{
-      const [overview, users, chapters] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/chapters")]);
-      state.overview = overview; state.users = users.users; state.chapters = chapters.chapters;
-      renderChapters();
+      const [overview, users, frats] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/frats")]);
+      state.overview = overview; state.users = users.users; state.frats = frats; state.chapters = frats.chapters;
+      renderFrats();
       $("#gate").hidden = true; $("#app").hidden = false;
       document.title = "PhatFrats Control Room";
       renderTiles(overview); renderChart(); renderMoney(overview.money, overview.chat);
@@ -392,16 +460,31 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 
   function renderChapters(){
     const live = (c)=> c.ready || c.leaderReady;
-    const list = [...state.chapters].sort((a,b)=> (b.test-a.test) || (live(b)-live(a)) || a.name.localeCompare(b.name));
-    const on = list.filter(live).length;
-    $("#chapterCount").textContent = on+" of "+list.length+" set up";
+    segButtons($("#chapterFilterSeg"), CH_FILTERS, state.chFilter, (k)=>{ state.chFilter=k; renderChapters(); });
+    const q = state.chQ.trim().toLowerCase();
+    const all = state.chapters;
+    const list = all.filter(c=>{
+      if(q && !(c.name.toLowerCase().includes(q) || c.gl.toLowerCase().includes(q))) return false;
+      if(state.chFilter==="live") return live(c);
+      if(state.chFilter==="off") return !live(c);
+      if(state.chFilter==="waiting") return c.pending>0;
+      return true;
+    }).sort((a,b)=> (b.test-a.test) || (live(b)-live(a)) || (b.upcoming-a.upcoming) || (b.members-a.members) || a.name.localeCompare(b.name));
+    const on = all.filter(c=>live(c) && !c.test).length;
+    $("#chapterCount").textContent = on+" of "+all.filter(c=>!c.test).length+" set up";
+    if(!list.length){ $("#chapters").innerHTML = '<tr><td colspan="10" class="empty">No chapters match.</td></tr>'; return; }
     $("#chapters").innerHTML = list.map(c=>'<tr>'
       + '<td class="who"><b>'+esc(c.gl+"  "+c.name)+'</b>'+(c.test?'<span>Practice chapter, never on the public map</span>':'')+'</td>'
       + '<td>'+(c.ready ? '<span class="tag full">Brothers can join</span>' : '<span class="tag">No brother password</span>')
       + (c.leaderReady ? '<span class="tag admin">Leader sign-in on</span>' : '<span class="tag">No leader password</span>')
       + (c.passwordSet ? '<span class="reason" style="color:var(--muted)">Changed '+dateFmt(c.passwordSet)+'</span>' : '')+'</td>'
       + '<td>'+(c.leaders.length ? c.leaders.map(l=>'<div>'+esc(l.name)+' <span class="updated">'+esc(l.email)+'</span></div>').join("") : '<span class="updated">None</span>')+'</td>'
-      + '<td class="num">'+int(c.members)+'</td><td class="num">'+int(c.upcoming)+'</td>'
+      + '<td class="num">'+int(c.members)+'</td>'
+      + '<td class="num">'+int(c.upcoming)+' upcoming<span class="reason" style="color:var(--muted)">'+int(c.parties)+' posted'+(c.cancelled?' · '+int(c.cancelled)+' cancelled':'')+'</span></td>'
+      + '<td>'+(c.pending+c.approved+c.waitlist ? '<span class="tag">'+int(c.pending)+' waiting</span><span class="tag">'+int(c.approved)+' in</span><span class="tag">'+int(c.waitlist)+' waitlist</span>' : '<span class="updated">None</span>')+'</td>'
+      + '<td class="num">'+int(c.invitesSent)+(c.invitesSent?'<span class="reason" style="color:var(--muted)">'+int(c.invitesClaimed)+' signed up</span>':'')+'</td>'
+      + '<td>'+fillBar(c.fill)+'</td>'
+      + '<td>'+(c.lastPosted ? ago(c.lastPosted) : '<span class="updated">Never</span>')+'</td>'
       + '<td><div class="actions"><button class="btn small" data-chpw="'+c.id+'">Brother password</button>'
       + '<button class="btn small" data-chlpw="'+c.id+'">Leader password</button>'
       + '<button class="btn small good" data-chlead="'+c.id+'">Add leader</button></div></td></tr>').join("");
@@ -428,6 +511,109 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       await load();
     }catch(err){ toast(err.message); }
   });
+
+  const FRAT_METRICS = [
+    {key:"parties", label:"Parties posted", color:"var(--gold)", unit:"parties posted"},
+    {key:"requests", label:"Requests", color:"var(--pink)", unit:"student requests"},
+    {key:"invites", label:"Brother invites", color:"var(--cyan)", unit:"brother invites"},
+    {key:"brothers", label:"New brothers", color:"var(--lime)", unit:"brothers joined"},
+  ];
+  const CH_FILTERS = [{key:"all",label:"All"},{key:"live",label:"Set up"},{key:"off",label:"Not set up"},{key:"waiting",label:"Has waiting requests"}];
+  const pct = (x)=> x==null ? "n/a" : Math.round(x*100)+"%";
+  const fillBar = (f)=> f==null ? '<span class="updated">No parties</span>' : '<span class="fill" aria-hidden="true"><i style="width:'+Math.min(100,Math.round(f*100))+'%"></i></span>'+pct(f);
+  const chapterName = (id)=> (state.chapters.find(c=>c.id===id)||{}).name || "";
+  function partyWhen(p){ return new Date(p.day+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"})+" · "+p.time; }
+
+  function renderFrats(){
+    const f = state.frats, t = f.totals;
+    const tiles = [
+      {label:"Chapters set up", value:int(t.live)+" / "+int(t.chapters), sub:int(t.withLeader)+" with a leader"},
+      {label:"Brothers on PhatFrats", value:int(t.brothers), sub:int(t.leaders)+" leader"+(t.leaders===1?"":"s")},
+      {label:"Upcoming frat parties", value:int(t.upcoming), sub:int(t.parties)+" posted all time"},
+      {label:"Student requests", value:int(t.requests), sub:int(t.pending)+" waiting for an answer"},
+      {label:"Approval rate", value:pct(t.approvalRate), sub:int(t.approved)+" approved · "+int(t.waitlist)+" waitlisted"},
+      {label:"Brother invites", value:int(t.invitesSent), sub:int(t.invitesClaimed)+" signed up to claim it"},
+    ];
+    $("#fratTiles").innerHTML = tiles.map(x=>'<div class="card tile"><div class="label">'+esc(x.label)+'</div><div class="value">'+x.value+'</div><div class="sub">'+esc(x.sub)+'</div></div>').join("");
+    renderFratChart();
+
+    // Request breakdown.
+    const total = t.pending+t.approved+t.waitlist;
+    const seg = (n,c)=> total ? '<i style="width:'+(n/total*100)+'%;background:'+c+'"></i>' : '';
+    const fullShare = f.chapters.filter(c=>!c.test).reduce((s,c)=>s+c.fullRequests,0);
+    $("#fratRequests").innerHTML = total
+      ? '<div class="stack" role="img" aria-label="'+t.approved+' approved, '+t.waitlist+' waitlisted, '+t.pending+' waiting">'+seg(t.approved,"var(--lime)")+seg(t.waitlist,"var(--gold)")+seg(t.pending,"var(--pink)")+'</div>'
+        + '<div class="legend"><span><b style="background:var(--lime)"></b>'+int(t.approved)+' approved</span><span><b style="background:var(--gold)"></b>'+int(t.waitlist)+' waitlisted</span><span><b style="background:var(--pink)"></b>'+int(t.pending)+' waiting</span></div>'
+        + '<div class="rows" style="margin-top:14px">'
+        + '<div class="row"><span>From Full Access members</span><span>'+int(fullShare)+' ('+pct(fullShare/total)+')</span></div>'
+        + '<div class="row"><span>Brother invites claimed</span><span>'+(t.invitesSent ? pct(t.invitesClaimed/t.invitesSent) : "n/a")+'</span></div>'
+        + '<div class="row"><span>Cancelled parties</span><span>'+int(t.cancelled)+'</span></div></div>'
+      : '<p class="empty">No student has asked to join a frat party yet.</p>';
+
+    // Things worth a look.
+    const attn = [];
+    f.chapters.filter(c=>!c.test && c.pending>0).sort((a,b)=>b.pending-a.pending)
+      .forEach(c=>attn.push('<div class="alert-row"><b>'+esc(c.name)+'</b> has '+int(c.pending)+' request'+(c.pending===1?'':'s')+' waiting for an answer.</div>'));
+    f.chapters.filter(c=>!c.test && (c.ready||c.leaderReady) && !c.leaders.length)
+      .forEach(c=>attn.push('<div class="alert-row"><b>'+esc(c.name)+'</b> is set up but has no leader yet.</div>'));
+    f.upcoming.filter(p=>p.status==="live" && p.going>=p.cap)
+      .forEach(p=>attn.push('<div class="alert-row"><b>'+esc(p.title)+'</b> ('+esc(chapterName(p.ch))+') is full.</div>'));
+    $("#fratAttention").innerHTML = attn.length ? attn.join("") : '<p class="empty">Nothing needs attention right now.</p>';
+
+    // Leaderboard.
+    const top = f.topBrothers;
+    $("#topBrothers").innerHTML = top.length
+      ? top.map(b=>'<div class="bar-row"><span>'+esc(b.name)+(b.leader?' <span class="tag admin">Leader</span>':'')+' <span class="updated">'+esc(b.chapter)+'</span></span><span>'+int(b.invites)+'</span><div class="track"><i style="width:'+(b.invites/top[0].invites*100)+'%;background:var(--cyan)"></i></div></div>').join("")
+      : '<p class="empty">No brother has sent an invite yet.</p>';
+
+    // Upcoming parties.
+    const ups = f.upcoming;
+    $("#fratPartyCount").textContent = ups.filter(p=>p.status==="live").length+" live"+(ups.some(p=>p.status!=="live")?" · "+ups.filter(p=>p.status!=="live").length+" taken down or cancelled":"");
+    $("#fratParties").innerHTML = ups.length ? ups.map(p=>{
+      const c = state.chapters.find(x=>x.id===p.ch) || {};
+      return '<tr class="'+(p.status!=="live"?'is-banned':'')+'">'
+        + '<td class="who"><b>'+esc(p.title)+'</b><span>Posted by '+esc(p.createdBy)+'</span></td>'
+        + '<td>'+esc(partyWhen(p))+'</td>'
+        + '<td>'+esc((c.gl?c.gl+"  ":"")+(c.name||""))+(c.test?' <span class="tag">Practice</span>':'')+'</td>'
+        + '<td>'+fillBar(p.going/p.cap)+'<span class="reason" style="color:var(--muted)">'+int(p.going)+' of '+int(p.cap)+'</span></td>'
+        + '<td class="num">'+int(p.requests)+'</td><td class="num">'+int(p.pending)+'</td><td class="num">'+int(p.invites)+'</td>'
+        + '<td><div class="actions">'+(p.status==="live"
+            ? '<button class="btn small danger" data-pstatus="cancelled" data-pid="'+p.id+'">Take down</button>'
+            : '<span class="tag banned">Off the map</span><button class="btn small good" data-pstatus="live" data-pid="'+p.id+'">Put back</button>')+'</div></td></tr>';
+    }).join("") : '<tr><td colspan="8" class="empty">No frat parties coming up.</td></tr>';
+
+    renderChapters();
+  }
+  function renderFratChart(){
+    const metric = FRAT_METRICS.find(m=>m.key===state.fratMetric);
+    segButtons($("#fratMetricSeg"), FRAT_METRICS, state.fratMetric, (k)=>{ state.fratMetric=k; renderFratChart(); });
+    drawBars($("#fratChart"), $("#fratChartTotal"), state.frats.series, metric);
+  }
+  $("#fratParties").addEventListener("click", async (e)=>{
+    const b = e.target.closest("[data-pstatus]"); if(!b) return;
+    const p = state.frats.upcoming.find(x=>x.id===b.dataset.pid);
+    if(b.dataset.pstatus==="cancelled" && !confirm('Take "'+p.title+'" off the map? Students stop seeing it, and the chapter sees it as cancelled. You can put it back.')) return;
+    b.disabled = true;
+    try{ await api("/api/admin/parties/"+p.id+"/status", {status:b.dataset.pstatus}); toast(b.dataset.pstatus==="cancelled" ? "Party taken down." : "Party is back on the map."); await load(); }
+    catch(err){ toast(err.message); b.disabled = false; }
+  });
+  $("#chapterSearch").addEventListener("input", (e)=>{ state.chQ = e.target.value; renderChapters(); });
+
+  // Switching pages. The choice stays in the address (#frats), so Refresh keeps you where you were.
+  function showPage(page){
+    state.page = page === "frats" ? "frats" : "overview";
+    for(const b of document.querySelectorAll(".pages [data-page]")){ b.setAttribute("aria-selected", String(b.dataset.page===state.page)); b.tabIndex = b.dataset.page===state.page ? 0 : -1; }
+    $("#pageOverview").hidden = state.page!=="overview";
+    $("#pageFrats").hidden = state.page!=="frats";
+    history.replaceState(null, "", state.page==="frats" ? "#frats" : location.pathname);
+  }
+  document.querySelector(".pages").addEventListener("click", (e)=>{ const b = e.target.closest("[data-page]"); if(b) showPage(b.dataset.page); });
+  document.querySelector(".pages").addEventListener("keydown", (e)=>{
+    if(e.key!=="ArrowRight" && e.key!=="ArrowLeft") return;
+    showPage(state.page==="frats" ? "overview" : "frats");
+    document.querySelector('.pages [data-page="'+state.page+'"]').focus();
+  });
+  showPage(location.hash==="#frats" ? "frats" : "overview");
 
   let banTarget = null;
   $("#users").addEventListener("click", async (e)=>{

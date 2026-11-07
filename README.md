@@ -99,3 +99,16 @@ Chapters manage their own parties at `/frats` (linked as **For frats** on the ma
 **Test Frat** (`data/test-chapters.js`) is a practice chapter. It works like a real one in the portal, but its parties never appear on the public map, in the party list or to PhatBot, and students can't request them.
 
 Live chapter parties show on the map and in the party list next to the demo parties, marked "Posted by the house". Requests to them wait for the chapter instead of getting the demo's instant answer. PhatBot knows about them too.
+
+### Frats page in the control room
+
+The control room has two pages: **Overview** and **Frats** (`/admin#frats`). The Frats page shows:
+
+- **Totals:** chapters set up, brothers and leaders, upcoming and total parties, student requests (waiting, approved, waitlisted), approval rate, and brother invites and how many were claimed.
+- **A 30-day trend** of parties posted, requests, brother invites and new brothers.
+- **Needs attention:** chapters with requests waiting, chapters set up without a leader, and full parties.
+- **Top inviting brothers.**
+- **Every upcoming frat party,** with how full it is. **Take down** removes a party from the map, and **Put back** restores it.
+- **A chapters table** with each chapter's numbers and its password and leader controls.
+
+Practice chapters like Test Frat are listed but left out of the totals, the trend and the leaderboard.
