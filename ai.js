@@ -64,17 +64,29 @@ ${PARTIES.map(partyLine).join('\n')}
 Chapter directory (all IFC chapters):
 ${CHAPTERS.map(chapterLine).join('\n')}`;
 
+// Parties chapters posted themselves. They change all the time, so they go after the cached part.
+const hostedLine = (p) => {
+  const c = chapterById.get(p.ch);
+  const when = new Date(p.day + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+  return `- [${p.id}] "${p.title}" at ${c ? c.name : 'a chapter house'} (${(c && c.addr) || 'address not listed'}), ${when} at ${p.time}. ` +
+    `Vibe: ${VIBE_NAMES[p.vibe]}. Dress: ${p.dress}. Music: ${p.music}. ${p.going} of ${p.cap} spots taken. ${p.blurb}`;
+};
+
 // Changes per person, so it goes after the cached part.
-function personContext(user, requests) {
+function personContext(user, requests, hosted = []) {
   const plan = user.plan === 'full' ? 'Full Access (unlimited invite requests)' : 'Free (one invite request per week)';
   const lines = requests.map((r) => {
-    const p = PARTIES.find((x) => x.id === r.pid);
-    return p ? `- "${p.title}" (${r.status}${r.thisWeek ? ', this week' : ', an earlier week'})` : null;
+    const p = PARTIES.find((x) => x.id === r.pid) || hosted.find((x) => x.id === r.pid);
+    const how = r.invitedBy ? `, invited by ${r.invitedBy}` : r.thisWeek ? ', this week' : ', an earlier week';
+    return p ? `- "${p.title}" (${r.status}${how})` : null;
   }).filter(Boolean);
   const used = requests.filter((r) => r.thisWeek).length;
   return `About the person you're chatting with:
 - Plan: ${plan}${user.plan === 'full' ? '' : `. Weekly free invite ${used >= 1 ? 'already used' : 'still available'}.`}
-- Their invite requests: ${lines.length ? `\n${lines.join('\n')}` : 'none yet'}`;
+- Their invite requests: ${lines.length ? `\n${lines.join('\n')}` : 'none yet'}
+
+Real parties posted by chapters on PhatFrats (unlike the demo list, these are real, and each chapter answers its own requests):
+${hosted.length ? hosted.map(hostedLine).join('\n') : 'None posted right now.'}`;
 }
 
 const MAX_TURNS = 20;
@@ -104,7 +116,7 @@ class ChatError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
-async function reply(user, requests, messages) {
+async function reply(user, requests, messages, hosted = []) {
   if (!client) throw new ChatError(503, "PhatBot isn't switched on yet. Check back soon.");
   let response;
   try {
@@ -116,7 +128,7 @@ async function reply(user, requests, messages) {
       ...(HAS_FALLBACKS ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' } : {}),
       system: [
         { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: personContext(user, requests) },
+        { type: 'text', text: personContext(user, requests, hosted) },
       ],
       messages,
     });

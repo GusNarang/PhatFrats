@@ -92,3 +92,55 @@ CREATE TABLE IF NOT EXISTS site_visits (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_password_hash TEXT;
 -- Set when a login is unlocked with the admin password. Logging out deletes the session, which locks it again.
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS admin_until TIMESTAMPTZ;
+
+-- ---------- Frat portal ----------
+-- One row per chapter that has been set up. chapter_id matches the ids in public/chapters.js.
+-- Brothers join with this password. Only its hash is stored.
+CREATE TABLE IF NOT EXISTS chapter_accounts (
+  chapter_id    INTEGER PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Each student account can belong to one chapter.
+CREATE TABLE IF NOT EXISTS chapter_members (
+  user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  chapter_id INTEGER NOT NULL,
+  role       TEXT NOT NULL DEFAULT 'brother' CHECK (role IN ('leader', 'brother')),
+  joined_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chapter_members_chapter_idx ON chapter_members(chapter_id);
+
+-- Parties a chapter posts. On the site their id is 'h' followed by this id.
+CREATE TABLE IF NOT EXISTS hosted_parties (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  chapter_id INTEGER NOT NULL,
+  title      TEXT NOT NULL,
+  party_date DATE NOT NULL,
+  start_time TEXT NOT NULL,
+  vibe       TEXT NOT NULL CHECK (vibe IN ('neon', 'theme', 'day', 'chill', 'formal', 'charity')),
+  blurb      TEXT NOT NULL DEFAULT '',
+  dress      TEXT NOT NULL DEFAULT '',
+  music      TEXT NOT NULL DEFAULT '',
+  cap        INTEGER NOT NULL CHECK (cap BETWEEN 1 AND 5000),
+  status     TEXT NOT NULL DEFAULT 'live' CHECK (status IN ('live', 'cancelled')),
+  created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS hosted_parties_chapter_idx ON hosted_parties(chapter_id, party_date);
+
+-- A brother's personal invite, by email. It turns into an approved invite when that person logs in.
+CREATE TABLE IF NOT EXISTS brother_invites (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  party_id   BIGINT NOT NULL REFERENCES hosted_parties(id) ON DELETE CASCADE,
+  email      TEXT NOT NULL,
+  guests     SMALLINT NOT NULL DEFAULT 0 CHECK (guests BETWEEN 0 AND 3),
+  invited_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (party_id, email)
+);
+CREATE INDEX IF NOT EXISTS brother_invites_email_idx ON brother_invites(email);
+
+-- Set when the invite came from a brother rather than the student asking. These don't use the weekly free invite.
+ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS invited_by BIGINT REFERENCES users(id) ON DELETE SET NULL;

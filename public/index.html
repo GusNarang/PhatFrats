@@ -469,6 +469,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <a href="#parties">This week</a>
       <a href="#directory">All houses</a>
       <a href="#safety">Party smart</a>
+      <a href="/frats">For frats</a>
     </nav>
     <div id="authArea"></div>
   </div>
@@ -652,9 +653,10 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     <div style="display:flex;flex-direction:column;gap:10px">
       <span class="fl"><span>Phat</span>Frats</span>
       <p class="made">Designed and built by <strong class="builder">Agastya Narang</strong></p>
+      <p><a href="/frats" style="color:var(--gold);font-weight:700">In a fraternity? Post your parties on PhatFrats</a></p>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <p>Concept prototype. Chapter names and addresses come from the Penn State IFC chapter list; every party and approval on this page is fictional demo data. Accounts and invite requests are stored in a Neon database.</p>
+      <p>Concept prototype. Chapter names and addresses come from the Penn State IFC chapter list; the sample parties are fictional demo data, while parties marked "Posted by the house" come from the chapters themselves. Accounts and invite requests are stored in a Neon database.</p>
       <p>PhatFrats is not affiliated with Penn State University or the Interfraternity Council. Street map from OpenStreetMap; house pins placed from the IFC-listed addresses.</p>
     </div>
   </div>
@@ -775,12 +777,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   const MAP = window.PF_MAP;
   MAP.pins.forEach(p=>{ const c = byId[p.id]; if(c){ c.x = p.x; c.y = p.y; } });
 
-  const DAYS = [
-    {k:"thu", label:"Thu", date:"Nov 5"},
-    {k:"fri", label:"Fri", date:"Nov 6"},
-    {k:"sat", label:"Sat", date:"Nov 7"},
-    {k:"sun", label:"Sun", date:"Nov 8"}
-  ];
+  // The nights that have parties, sent by the server with the party list.
+  let DAYS = [];
   const VIBES = {
     neon:   {label:"Neon / EDM", c:"var(--pink)"},
     theme:  {label:"Costume theme", c:"var(--violet)"},
@@ -792,8 +790,9 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 
   // Filled in by the server once an account is logged in and confirmed.
   let PARTIES = [], partyById = {};
-  function setParties(list){
+  function setParties(list, days){
     PARTIES = list;
+    DAYS = days || [];
     partyById = Object.fromEntries(PARTIES.map(p=>[p.id,p]));
   }
 
@@ -811,7 +810,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   const esc = s => String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   const mapsUrl = a => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(a + ", State College, PA 16801");
   const igUrl = h => "https://www.instagram.com/" + encodeURIComponent(h) + "/";
-  const dayOf = k => DAYS.find(d=>d.k===k);
+  const dayOf = k => DAYS.find(d=>d.k===k) || {k, label:"", date:""};
   const whenText = p => { const d = dayOf(p.day); return d.label + " " + d.date + " · " + p.time; };
   const partiesFor = chId => PARTIES.filter(p=>p.ch===chId);
   const visibleParties = () => PARTIES.filter(p => (state.day==="all"||p.day===state.day) && (state.vibe==="all"||p.vibe===state.vibe));
@@ -836,7 +835,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     state.user = verified ? data.user : null;
     state.pending = verified ? null : data.user;
     state.requests = verified ? data.requests : [];
-    setParties(verified ? data.parties : []);
+    setParties(verified ? data.parties : [], verified ? data.days : []);
   }
   async function logOut(){
     await api("/api/logout", {});
@@ -1148,12 +1147,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   function renderParties(){
     const vis = visibleParties();
     $("#partyCount").textContent = vis.length + " of " + PARTIES.length + " shown";
-    const order = {thu:0,fri:1,sat:2,sun:3};
+    const order = Object.fromEntries(DAYS.map((d,i)=>[d.k,i]));
     const sel = state.selected;
     $("#partyGrid").innerHTML = vis.length ? vis.sort((a,b)=>order[a.day]-order[b.day]).map(p=>{
       const c = byId[p.ch], v = VIBES[p.vibe];
       return '<article class="party'+(sel&&sel.type==="party"&&sel.id===p.id?' selected':'')+'" style="--c:'+v.c+'" data-party="'+p.id+'" tabindex="0" aria-label="'+esc(p.title)+'">' +
-        '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
+        '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+(p.hosted ? ' · Posted by the house' : '')+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
         '<h3>'+esc(p.title)+'</h3><span class="host">'+esc(c.gl)+' · '+esc(c.name)+'</span>' +
         '<p class="blurb">'+esc(p.blurb)+'</p>' +
         '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span>'+reqButton(p,"small")+'</div></article>';
@@ -1172,7 +1171,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const map = {pending:["Pending","st-pending"], approved:["On the list","st-approved"], waitlist:["Waitlist","st-waitlist"]};
     el.innerHTML = note + [...state.requests].sort((a,b)=>b.ts-a.ts).map(r=>{
       const p = partyById[r.pid]; if(!p) return ""; const c = byId[p.ch];
-      return '<div class="invite-row" style="--c:'+VIBES[p.vibe].c+'"><span class="lt">'+esc(c.gl)+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(whenText(p))+' · '+(r.guests? '+'+r.guests+' guest'+(r.guests>1?'s':'') : 'just you')+'</small></div><span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span></div>';
+      return '<div class="invite-row" style="--c:'+VIBES[p.vibe].c+'"><span class="lt">'+esc(c.gl)+'</span><div><b>'+esc(p.title)+'</b><small>'+esc(whenText(p))+' · '+(r.guests? '+'+r.guests+' guest'+(r.guests>1?'s':'') : 'just you')+(r.invitedBy ? ' · Invited by '+esc(r.invitedBy) : '')+'</small></div><span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span></div>';
     }).join("");
   }
 

@@ -5,7 +5,7 @@ const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
-const PARTIES = require('./data/parties.js');
+const partyList = require('./party-list.js');
 const phatbot = require('./ai.js');
 const PRICING = require('./public/pricing.js');
 
@@ -26,7 +26,6 @@ const CODES_PER_HOUR = 5;
 // PhatBot is a Full Access perk. Each message costs money, so a daily limit keeps the bill predictable.
 const CHAT_DAILY_LIMIT = 60;
 const TODAY_SQL = `(now() AT TIME ZONE 'America/New_York')::date`;
-const partyById = new Map(PARTIES.map((p) => [p.id, p]));
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 // Neon suspends idle databases, which drops idle connections. That shouldn't crash the server.
@@ -96,8 +95,9 @@ const publicUser = (u) => ({
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
-  if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [] };
-  return { user: publicUser(user), requests: await listRequests(user), parties: PARTIES };
+  if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [] };
+  const requests = await listRequests(user);
+  return { user: publicUser(user), requests, ...(await partyList.partiesForSite(pool)) };
 }
 
 // ---------- email confirmation codes ----------
@@ -176,17 +176,27 @@ async function issueCode(user, kind = CODE_KINDS.verify) {
 }
 
 // ---------- invite requests ----------
-// Demo stand-in for a host's reply until hosts have real accounts. Full Access is approved at
-// parties where a free account would be waitlisted, which is the "higher preference" it pays for.
+// The demo parties have no real hosts, so their requests get an automatic reply. Full Access is approved
+// at parties where a free account would be waitlisted, which is the "higher preference" it pays for.
+// Requests to parties a chapter posted wait for that chapter's leader instead.
 function demoDecision(partyId, plan) {
-  const party = partyById.get(partyId);
+  const party = partyList.DEMO_BY_ID.get(partyId);
   if (plan === 'full') return 'approved';
   return party && party.going / party.cap >= 0.9 ? 'waitlist' : 'approved';
 }
 async function listRequests(user) {
+  // A brother's invite to this email becomes an approved spot the first time its owner shows up.
+  await pool.query(
+    `INSERT INTO invite_requests (user_id, party_id, guests, note, status, priority, invited_by)
+     SELECT $1, 'h' || b.party_id, b.guests, '', 'approved', $3, b.invited_by
+     FROM brother_invites b WHERE b.email = $2
+     ON CONFLICT (user_id, party_id) DO UPDATE SET status = 'approved', invited_by = EXCLUDED.invited_by
+       WHERE invite_requests.status <> 'approved'`,
+    [user.id, user.email, user.plan === 'full']
+  );
   const pending = await pool.query(
     `SELECT id, party_id FROM invite_requests
-     WHERE user_id = $1 AND status = 'pending' AND created_at < now() - interval '4 seconds'`,
+     WHERE user_id = $1 AND status = 'pending' AND party_id NOT LIKE 'h%' AND created_at < now() - interval '4 seconds'`,
     [user.id]
   );
   for (const r of pending.rows) {
@@ -196,8 +206,10 @@ async function listRequests(user) {
     ]);
   }
   const { rows } = await pool.query(
-    `SELECT party_id, guests, note, status, priority, created_at, created_at >= ${WEEK_START_SQL} AS this_week
-     FROM invite_requests WHERE user_id = $1 ORDER BY created_at DESC`,
+    `SELECT r.party_id, r.guests, r.note, r.status, r.priority, r.created_at, r.invited_by IS NOT NULL AS invited,
+       inviter.name AS invited_by_name, r.created_at >= ${WEEK_START_SQL} AND r.invited_by IS NULL AS this_week
+     FROM invite_requests r LEFT JOIN users inviter ON inviter.id = r.invited_by
+     WHERE r.user_id = $1 ORDER BY r.created_at DESC`,
     [user.id]
   );
   return rows.map((r) => ({
@@ -207,7 +219,9 @@ async function listRequests(user) {
     status: r.status,
     priority: r.priority,
     ts: new Date(r.created_at).getTime(),
+    // A brother's invite doesn't use the weekly free invite.
     thisWeek: r.this_week,
+    invitedBy: r.invited ? r.invited_by_name || 'a brother' : null,
   }));
 }
 
@@ -389,7 +403,7 @@ app.get('/api/requests', requireVerified, wrap(async (req, res) => {
 
 app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   const partyId = req.body?.partyId;
-  if (typeof partyId !== 'string' || !partyById.has(partyId)) return fail(res, 400, 'That party is not on the schedule.');
+  if (typeof partyId !== 'string' || !(await partyList.findParty(pool, partyId))) return fail(res, 400, 'That party is not on the schedule.');
   const guests = Number.isInteger(req.body?.guests) ? req.body.guests : 0;
   if (guests < 0 || guests > 3) return fail(res, 400, 'You can bring up to 3 plus-ones.');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
@@ -400,7 +414,7 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
     // Locks this user's row so two requests sent at once can't both use the weekly free invite.
     const { rows: [user] } = await client.query('SELECT plan FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
     const { rows: existing } = await client.query(
-      `SELECT party_id, created_at >= ${WEEK_START_SQL} AS this_week FROM invite_requests WHERE user_id = $1`,
+      `SELECT party_id, created_at >= ${WEEK_START_SQL} AND invited_by IS NULL AS this_week FROM invite_requests WHERE user_id = $1`,
       [req.user.id]
     );
     if (existing.some((r) => r.party_id === partyId)) {
@@ -459,7 +473,7 @@ app.post('/api/chat', requireVerified, chatLimiter, wrap(async (req, res) => {
   ).catch(() => {});
 
   try {
-    const { text, tokens } = await phatbot.reply(req.user, await listRequests(req.user), messages);
+    const { text, tokens } = await phatbot.reply(req.user, await listRequests(req.user), messages, await partyList.hostedParties(pool));
     if (tokens) {
       // Kept for the control room's AI bill. A failure here shouldn't cost the person their reply.
       await pool.query(
@@ -492,11 +506,13 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
   res.status(204).end();
 }));
 
-require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, verifyPassword, hashToken, readSessionToken });
+require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
+require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/frats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'frats.html')));
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') return fail(res, 400, 'That request could not be read.');

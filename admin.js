@@ -17,7 +17,7 @@ const PARTY_TITLES = new Map(require('./data/parties.js').map((p) => [p.id, p.ti
 // site, locks it again. This limit only matters if the tab is left open or the lock message gets lost.
 const UNLOCK_MINUTES = 120;
 
-module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, verifyPassword, hashToken, readSessionToken }) {
+module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken }) {
   // Being an admin isn't enough on its own: this login must also have been unlocked with the admin password.
   const requireAdmin = [requireUser, (req, res, next) => {
     if (req.user.role !== 'admin' || !req.user.admin_unlocked) return fail(res, 404, 'Not found.');
@@ -82,7 +82,8 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
           count(*) FILTER (WHERE status = 'waitlist') AS waitlist,
           count(*) FILTER (WHERE created_at >= now() - interval '7 days') AS week
         FROM invite_requests`),
-      pool.query(`SELECT party_id, count(*) AS requests FROM invite_requests GROUP BY party_id ORDER BY requests DESC, party_id LIMIT 6`),
+      pool.query(`SELECT r.party_id, count(*) AS requests, (SELECT hp.title FROM hosted_parties hp WHERE 'h' || hp.id = r.party_id) AS hosted_title
+                  FROM invite_requests r GROUP BY r.party_id ORDER BY requests DESC, r.party_id LIMIT 6`),
       pool.query(`SELECT coalesce(sum(messages), 0) AS messages,
           coalesce(sum(messages) FILTER (WHERE day = ${TODAY_SQL}), 0) AS today,
           coalesce(sum(input_tokens), 0) AS input, coalesce(sum(output_tokens), 0) AS output,
@@ -110,7 +111,7 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
       visits: num(visits.rows[0]),
       series: series.rows.map((r) => ({ day: r.day, ...num({ visitors: r.visitors, views: r.views, signups: r.signups, invites: r.invites, chats: r.chats }) })),
       invites: num(invites.rows[0]),
-      topParties: topParties.rows.map((r) => ({ id: r.party_id, title: PARTY_TITLES.get(r.party_id) || r.party_id, requests: Number(r.requests) })),
+      topParties: topParties.rows.map((r) => ({ id: r.party_id, title: r.hosted_title || PARTY_TITLES.get(r.party_id) || r.party_id, requests: Number(r.requests) })),
       chat: { messages: Number(c.messages), today: Number(c.today), people: Number(c.people), model: phatbot.MODEL, enabled: phatbot.isEnabled() },
       money: {
         connected: false,
@@ -203,4 +204,66 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     if (!rowCount) return fail(res, 404, 'That account is gone.');
     res.json({ ok: true });
   }));
+
+  // ---------- chapters (the frat portal) ----------
+  const CHAPTERS = require('./public/chapters.js');
+  const chapterIds = new Set(CHAPTERS.map((c) => c.id));
+  const chapterParam = (req) => (chapterIds.has(Number(req.params.id)) ? Number(req.params.id) : null);
+
+  app.get('/api/admin/chapters', requireAdmin, wrap(async (req, res) => {
+    const [accts, members, parties] = await Promise.all([
+      pool.query('SELECT chapter_id, updated_at FROM chapter_accounts'),
+      pool.query(`SELECT m.chapter_id, m.role, u.name, u.email FROM chapter_members m JOIN users u ON u.id = m.user_id ORDER BY u.name`),
+      pool.query(`SELECT chapter_id, count(*) FILTER (WHERE status = 'live' AND party_date >= ${TODAY_SQL})::int AS upcoming, count(*)::int AS total
+                  FROM hosted_parties GROUP BY chapter_id`),
+    ]);
+    const acct = new Map(accts.rows.map((r) => [r.chapter_id, r.updated_at]));
+    const partyCounts = new Map(parties.rows.map((r) => [r.chapter_id, r]));
+    res.json({
+      chapters: CHAPTERS.map((c) => {
+        const mine = members.rows.filter((m) => m.chapter_id === c.id);
+        return {
+          id: c.id, name: c.name, gl: c.gl,
+          ready: acct.has(c.id), passwordSet: acct.get(c.id) || null,
+          members: mine.length,
+          leaders: mine.filter((m) => m.role === 'leader').map((m) => ({ name: m.name, email: m.email })),
+          upcoming: partyCounts.get(c.id)?.upcoming || 0,
+          parties: partyCounts.get(c.id)?.total || 0,
+        };
+      }),
+    });
+  }));
+
+  // Sets or replaces a chapter's join password. Setting one is what switches the chapter on.
+  app.post('/api/admin/chapters/:id/password', requireAdmin, wrap(async (req, res) => {
+    const id = chapterParam(req);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!id) return fail(res, 400, 'That chapter is not on the list.');
+    if (password.length < 8 || password.length > 200) return fail(res, 400, 'Use a chapter password with at least 8 characters.');
+    await pool.query(
+      `INSERT INTO chapter_accounts (chapter_id, password_hash) VALUES ($1, $2)
+       ON CONFLICT (chapter_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`,
+      [id, await hashPassword(password)]
+    );
+    res.json({ ok: true });
+  }));
+
+  // Makes an existing PhatFrats account a leader of this chapter, moving them from any other chapter.
+  app.post('/api/admin/chapters/:id/leader', requireAdmin, wrap(async (req, res) => {
+    const id = chapterParam(req);
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!id) return fail(res, 400, 'That chapter is not on the list.');
+    const { rows: [u] } = await pool.query('SELECT id, email_verified_at, banned_at FROM users WHERE email = $1', [email]);
+    if (!u) return fail(res, 404, "No PhatFrats account uses that email. They need to sign up first.");
+    if (!u.email_verified_at) return fail(res, 400, "That account hasn't confirmed its email yet.");
+    if (u.banned_at) return fail(res, 400, 'That account is banned.');
+    await pool.query(
+      `INSERT INTO chapter_members (user_id, chapter_id, role) VALUES ($1, $2, 'leader')
+       ON CONFLICT (user_id) DO UPDATE SET chapter_id = EXCLUDED.chapter_id, role = 'leader',
+         joined_at = CASE WHEN chapter_members.chapter_id = EXCLUDED.chapter_id THEN chapter_members.joined_at ELSE now() END`,
+      [u.id, id]
+    );
+    res.json({ ok: true });
+  }));
 };
+

@@ -85,3 +85,14 @@ The control room is hidden. A logged-in admin opens it by pressing Shift, Caps L
 - To make someone an admin, run this in the Neon SQL editor, then set their password with the command above: `UPDATE users SET role = 'admin' WHERE email = 'their@psu.edu';`
 - Sales are estimated as paying Full Access members × the price until Stripe is connected. AI spend uses the token counts PhatBot records, priced in `admin.js`.
 - `AI_CREDIT_DOLLARS` (optional, default 5) sets the Anthropic credit shown on the page.
+
+## Frat portal
+
+Chapters manage their own parties at `/frats` (linked as **For frats** on the main site).
+
+1. In the control room, under **Chapters**, set a chapter's password. That switches the chapter on. Then use **Add leader** with the leader's PhatFrats email.
+2. Brothers log in with their own accounts, open `/frats`, pick their chapter and enter the chapter password.
+3. Leaders post, edit and cancel parties (up to two weeks ahead), approve or waitlist students' invite requests (Full Access first), manage members and change the chapter password.
+4. Every brother can invite people by Penn State email, up to 20 per party. Invited people go straight on the list, get an email, and don't use their weekly free invite. Someone without an account joins the list when they sign up with that email.
+
+Live chapter parties show on the map and in the party list next to the demo parties, marked "Posted by the house". Requests to them wait for the chapter instead of getting the demo's instant answer. PhatBot knows about them too.

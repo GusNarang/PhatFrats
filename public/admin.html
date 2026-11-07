@@ -150,6 +150,19 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     </section>
   </div>
 
+  <section class="card" aria-labelledby="chaptersTitle" style="margin-bottom:16px">
+    <div class="table-head">
+      <h2 id="chaptersTitle" style="margin:0">Chapters <span class="updated" id="chapterCount"></span></h2>
+      <span class="updated">Set a chapter's password to switch it on, then share it with their leader. Brothers join at /frats.</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Chapter</th><th>Status</th><th>Leaders</th><th class="num">Brothers</th><th class="num">Upcoming parties</th><th class="num" style="text-align:right">Actions</th></tr></thead>
+        <tbody id="chapters"><tr><td colspan="6" class="skeleton">Loading chapters…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="card" aria-labelledby="usersTitle">
     <div class="table-head">
       <h2 id="usersTitle" style="margin:0">Accounts <span class="updated" id="userCount"></span></h2>
@@ -212,7 +225,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     return data;
   }
 
-  const state = { overview:null, users:[], metric:"visitors", filter:"all", q:"" };
+  const state = { overview:null, users:[], chapters:[], metric:"visitors", filter:"all", q:"" };
 
   const METRICS = [
     {key:"visitors", label:"Visitors", color:"var(--cyan)", unit:"visitors"},
@@ -361,8 +374,9 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   async function load(){
     $("#refresh").disabled = true;
     try{
-      const [overview, users] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users")]);
-      state.overview = overview; state.users = users.users;
+      const [overview, users, chapters] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/chapters")]);
+      state.overview = overview; state.users = users.users; state.chapters = chapters.chapters;
+      renderChapters();
       $("#gate").hidden = true; $("#app").hidden = false;
       document.title = "PhatFrats Control Room";
       renderTiles(overview); renderChart(); renderMoney(overview.money, overview.chat);
@@ -375,6 +389,38 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       } else toast(err.message);
     }finally{ $("#refresh").disabled = false; }
   }
+
+  function renderChapters(){
+    const list = [...state.chapters].sort((a,b)=> (b.ready-a.ready) || a.name.localeCompare(b.name));
+    const on = list.filter(c=>c.ready).length;
+    $("#chapterCount").textContent = on+" of "+list.length+" set up";
+    $("#chapters").innerHTML = list.map(c=>'<tr>'
+      + '<td class="who"><b>'+esc(c.gl+"  "+c.name)+'</b></td>'
+      + '<td>'+(c.ready ? '<span class="tag full">Set up</span><span class="reason" style="color:var(--muted)">Password set '+dateFmt(c.passwordSet)+'</span>' : '<span class="tag">Not set up</span>')+'</td>'
+      + '<td>'+(c.leaders.length ? c.leaders.map(l=>'<div>'+esc(l.name)+' <span class="updated">'+esc(l.email)+'</span></div>').join("") : '<span class="updated">None</span>')+'</td>'
+      + '<td class="num">'+int(c.members)+'</td><td class="num">'+int(c.upcoming)+'</td>'
+      + '<td><div class="actions"><button class="btn small" data-chpw="'+c.id+'">'+(c.ready?'Change password':'Set password')+'</button>'
+      + '<button class="btn small good" data-chlead="'+c.id+'">Add leader</button></div></td></tr>').join("");
+  }
+  $("#chapters").addEventListener("click", async (e)=>{
+    const pw = e.target.closest("[data-chpw]"), ld = e.target.closest("[data-chlead]");
+    if(!pw && !ld) return;
+    const c = state.chapters.find(x=>String(x.id)===(pw||ld).dataset[pw?"chpw":"chlead"]);
+    try{
+      if(pw){
+        const v = prompt("New join password for "+c.name+" (at least 8 characters). Brothers type this to join, so share it with the chapter leader.");
+        if(v===null) return;
+        await api("/api/admin/chapters/"+c.id+"/password", {password:v});
+        toast(c.name+" is set up.");
+      } else {
+        const v = prompt("Email of the PhatFrats account to make a leader of "+c.name+". They need an account with a confirmed email. Anyone in another chapter gets moved.");
+        if(v===null) return;
+        await api("/api/admin/chapters/"+c.id+"/leader", {email:v});
+        toast("Leader added to "+c.name+".");
+      }
+      await load();
+    }catch(err){ toast(err.message); }
+  });
 
   let banTarget = null;
   $("#users").addEventListener("click", async (e)=>{
