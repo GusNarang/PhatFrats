@@ -79,8 +79,8 @@ async function currentUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
   const { rows } = await pool.query(
-    `SELECT u.id, u.name, u.email, u.plan, u.email_verified_at FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.token_hash = $1 AND s.expires_at > now()`,
+    `SELECT u.id, u.name, u.email, u.plan, u.role, u.email_verified_at FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.banned_at IS NULL`,
     [hashToken(token)]
   );
   return rows[0] || null;
@@ -92,6 +92,7 @@ const publicUser = (u) => ({
   verified: !!u.email_verified_at,
   freeLimit: FREE_INVITES_PER_WEEK,
   chat: phatbot.isEnabled() && u.plan === 'full',
+  admin: u.role === 'admin',
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
@@ -235,6 +236,7 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts. Wait 15 minutes and try again.', code: 'RATE_LIMITED' },
 });
 
+const BANNED_MESSAGE = 'This account has been suspended. If you think that is a mistake, email the PhatFrats team.';
 const cleanEmail = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
 const PSU_EMAIL = /^[a-z0-9._%+-]+@psu\.edu$/;
 
@@ -251,7 +253,7 @@ app.post('/api/signup', authLimiter, wrap(async (req, res) => {
   // New accounts are always free. Only a confirmed payment may set plan = 'full'.
   const { rows } = await pool.query(
     `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
-     ON CONFLICT (email) DO NOTHING RETURNING id, name, email, plan, email_verified_at`,
+     ON CONFLICT (email) DO NOTHING RETURNING id, name, email, plan, email_verified_at, role`,
     [email, name, passwordHash]
   );
   if (!rows[0]) return fail(res, 409, 'That email already has an account. Log in instead.', 'EMAIL_TAKEN');
@@ -264,11 +266,12 @@ app.post('/api/login', authLimiter, wrap(async (req, res) => {
   const email = cleanEmail(req.body?.email);
   const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
   const { rows } = await pool.query(
-    'SELECT id, name, email, plan, password_hash, email_verified_at FROM users WHERE email = $1',
+    'SELECT id, name, email, plan, role, password_hash, email_verified_at, banned_at FROM users WHERE email = $1',
     [email]
   );
   const ok = await verifyPassword(password, rows[0] ? rows[0].password_hash : await dummyHash);
   if (!rows[0] || !ok) return fail(res, 401, 'That email and password do not match.', 'BAD_LOGIN');
+  if (rows[0].banned_at) return fail(res, 403, BANNED_MESSAGE, 'ACCOUNT_BANNED');
   await startSession(res, rows[0].id);
   const codeStatus = rows[0].email_verified_at ? undefined : await issueCode(rows[0]);
   res.json({ ...(await accountPayload(rows[0])), codeStatus });
@@ -278,7 +281,7 @@ app.post('/api/login', authLimiter, wrap(async (req, res) => {
 app.post('/api/password/forgot', authLimiter, wrap(async (req, res) => {
   const email = cleanEmail(req.body?.email);
   if (!PSU_EMAIL.test(email)) return fail(res, 400, 'Enter your Penn State email, like abc1234@psu.edu.');
-  const { rows } = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
+  const { rows } = await pool.query('SELECT id, email FROM users WHERE email = $1 AND banned_at IS NULL', [email]);
   if (rows[0]) await issueCode(rows[0], CODE_KINDS.reset);
   res.json({ ok: true });
 }));
@@ -292,7 +295,7 @@ app.post('/api/password/reset', authLimiter, wrap(async (req, res) => {
   }
   const badCode = () => fail(res, 400, 'That code is wrong or has expired. Check your email, or send yourself a new one.', 'CODE_INVALID');
   if (code.length !== 6) return badCode();
-  const { rows: [found] } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+  const { rows: [found] } = await pool.query('SELECT id FROM users WHERE email = $1 AND banned_at IS NULL', [email]);
   if (!found) return badCode();
   // Counts the try before checking it, so parallel guesses can't get past the limit.
   const { rows: [stored] } = await pool.query(
@@ -317,7 +320,7 @@ app.post('/api/password/reset', authLimiter, wrap(async (req, res) => {
     // Getting this code proves they own the mailbox, so their email counts as confirmed too.
     ({ rows: [user] } = await client.query(
       `UPDATE users SET password_hash = $1, email_verified_at = COALESCE(email_verified_at, now())
-       WHERE id = $2 RETURNING id, name, email, plan, email_verified_at`,
+       WHERE id = $2 RETURNING id, name, email, plan, email_verified_at, role`,
       [passwordHash, found.id]
     ));
     // Logs out every device, including anyone who knew the old password.
@@ -348,7 +351,7 @@ app.post('/api/verify', authLimiter, requireUser, wrap(async (req, res) => {
   const matches = crypto.timingSafeEqual(Buffer.from(rows[0].code_hash), Buffer.from(hashCode(req.user.id, code)));
   if (!matches) return fail(res, 400, "That code doesn't match. Check your email and try again.", 'CODE_WRONG');
   const { rows: [user] } = await pool.query(
-    `UPDATE users SET email_verified_at = now() WHERE id = $1 RETURNING id, name, email, plan, email_verified_at`,
+    `UPDATE users SET email_verified_at = now() WHERE id = $1 RETURNING id, name, email, plan, email_verified_at, role`,
     [req.user.id]
   );
   await pool.query('DELETE FROM email_codes WHERE user_id = $1', [req.user.id]);
@@ -452,7 +455,17 @@ app.post('/api/chat', requireVerified, chatLimiter, wrap(async (req, res) => {
   ).catch(() => {});
 
   try {
-    const { text } = await phatbot.reply(req.user, await listRequests(req.user), messages);
+    const { text, tokens } = await phatbot.reply(req.user, await listRequests(req.user), messages);
+    if (tokens) {
+      // Kept for the control room's AI bill. A failure here shouldn't cost the person their reply.
+      await pool.query(
+        `UPDATE chat_usage SET input_tokens = input_tokens + $2, output_tokens = output_tokens + $3,
+           cache_read_tokens = cache_read_tokens + $4, cache_write_tokens = cache_write_tokens + $5
+         WHERE user_id = $1 AND day = ${TODAY_SQL}`,
+        [req.user.id, tokens.input_tokens || 0, tokens.output_tokens || 0,
+          tokens.cache_read_input_tokens || 0, tokens.cache_creation_input_tokens || 0]
+      ).catch((err) => console.error('Could not record PhatBot tokens:', err.message));
+    }
     res.json({ reply: text, left: limit - counted.messages });
   } catch (err) {
     await refund();
@@ -461,8 +474,25 @@ app.post('/api/chat', requireVerified, chatLimiter, wrap(async (req, res) => {
   }
 }));
 
+// Counts visits for the control room. The id is random and made up by the browser.
+const hitLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false });
+app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
+  const visitor = typeof req.body?.v === 'string' && /^[a-z0-9]{8,40}$/.test(req.body.v) ? req.body.v : null;
+  if (visitor) {
+    await pool.query(
+      `INSERT INTO site_visits (day, visitor) VALUES (${TODAY_SQL}, $1)
+       ON CONFLICT (day, visitor) DO UPDATE SET views = site_visits.views + 1`,
+      [visitor]
+    );
+  }
+  res.status(204).end();
+}));
+
+require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL });
+
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') return fail(res, 400, 'That request could not be read.');

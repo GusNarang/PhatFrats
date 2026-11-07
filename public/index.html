@@ -893,7 +893,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const a = $("#authArea");
     if(state.user){
       const full = state.user.plan === "full";
-      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><span class="avatar" aria-hidden="true">'+esc(initials(state.user.name))+'</span><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span>'+(state.user.admin?'<a class="btn ghost small" href="/admin">Control room</a>':'')+'<span class="avatar" aria-hidden="true">'+esc(initials(state.user.name))+'</span><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
       $("#logoutBtn").onclick = ()=>logOut().catch(e=>toast(e.message));
     } else if(state.pending){
       a.innerHTML = '<button class="btn small" type="button" data-login>Enter your code</button>';
@@ -1523,6 +1523,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 
   renderPricing();
   renderAll();
+  // One count per page load for the control room's visitor stats. The id is random and stays in this browser.
+  try{
+    let v = localStorage.getItem("pf_v");
+    if(!v){ v = Array.from(crypto.getRandomValues(new Uint8Array(12)), b=>(b%36).toString(36)).join(""); localStorage.setItem("pf_v", v); }
+    fetch("/api/hit", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({v}), keepalive:true}).catch(()=>{});
+  }catch(e){}
   api("/api/me").then(data=>{
     if(!data.user) return;
     enterAccount(data); renderAll();

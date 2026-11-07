@@ -66,3 +66,24 @@ CREATE TABLE IF NOT EXISTS invite_requests (
 );
 -- A host's queue for a party: Full Access first, then oldest first.
 CREATE INDEX IF NOT EXISTS invite_requests_queue_idx ON invite_requests(party_id, priority DESC, created_at);
+
+-- Control room. Only accounts with role 'admin' can open /admin. Set it by hand in the database.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
+-- A banned account can't log in, and its sessions are deleted when the ban starts.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
+
+-- What each PhatBot message cost, so the control room can show the AI bill.
+ALTER TABLE chat_usage ADD COLUMN IF NOT EXISTS input_tokens BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE chat_usage ADD COLUMN IF NOT EXISTS output_tokens BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE chat_usage ADD COLUMN IF NOT EXISTS cache_read_tokens BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE chat_usage ADD COLUMN IF NOT EXISTS cache_write_tokens BIGINT NOT NULL DEFAULT 0;
+
+-- One row per browser per day (Eastern time). The visitor id is a random number the browser makes up,
+-- so nothing here identifies a person.
+CREATE TABLE IF NOT EXISTS site_visits (
+  day     DATE NOT NULL,
+  visitor TEXT NOT NULL,
+  views   INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (day, visitor)
+);
