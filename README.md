@@ -28,7 +28,7 @@ Set the `SMTP_*` values from `.env.example` to send email.
 PhatBot is an AI chat for Full Access accounts with a confirmed email. It knows this week's parties, every IFC chapter in the directory, and the person's own plan and invite requests, and helps both students and chapter members planning events. It can't send or manage invites yet.
 
 - Runs on Claude through the Anthropic API (`ai.js`). Set `ANTHROPIC_API_KEY` to turn it on; without it the chat button stays hidden.
-- Uses Claude Opus 5.5 at low effort by default. `PHATBOT_MODEL` and `PHATBOT_EFFORT` change that.
+- Uses Claude Haiku 5.5 at low effort by default, which keeps each message to a fraction of a cent. `PHATBOT_MODEL` and `PHATBOT_EFFORT` change that.
 - Each Full Access account gets 60 messages a day (`chat_usage` table), plus at most 10 a minute. Free accounts don't see the chat.
 - Conversations aren't stored. The page keeps them until it's reloaded. Without `SMTP_HOST`, a local run prints the code in the terminal instead.
 

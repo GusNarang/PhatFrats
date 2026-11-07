@@ -3,8 +3,11 @@ const Anthropic = require('@anthropic-ai/sdk');
 const CHAPTERS = require('./public/chapters.js');
 const PARTIES = require('./data/parties.js');
 
-// Claude Opus 5.5 by default. Set PHATBOT_MODEL in Vercel to use another model, such as a cheaper one.
-const MODEL = process.env.PHATBOT_MODEL || 'claude-opus-5-5';
+// Claude Haiku 5.5 by default: fast and low cost, so the chat stays affordable on a $0.75 plan.
+// Set PHATBOT_MODEL in Vercel to try another model, such as claude-opus-5-5.
+const MODEL = process.env.PHATBOT_MODEL || 'claude-haiku-5-5';
+// The server-side safety fallback exists only for these models. Haiku has none, so a declined reply just ends.
+const HAS_FALLBACKS = /^claude-(opus-5|sonnet-5-5|fable-5)/.test(MODEL);
 // Chat replies are short, so low effort keeps them fast and cheap.
 const EFFORT = process.env.PHATBOT_EFFORT || 'low';
 // A cost cap: replies are asked to stay short, and this stops a runaway one.
@@ -108,9 +111,8 @@ async function reply(user, requests, messages) {
       model: MODEL,
       max_tokens: MAX_TOKENS,
       output_config: { effort: EFFORT },
-      // If the model declines for a safety reason, the API retries on a suitable fallback model.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      // On models that support it, a reply declined for a safety reason is retried on a suitable fallback model.
+      ...(HAS_FALLBACKS ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' } : {}),
       system: [
         { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
         { type: 'text', text: personContext(user, requests) },
