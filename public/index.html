@@ -568,6 +568,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <label class="pass-opt"><input type="radio" name="pass" id="passFree" checked><span><b>Free</b><small>See the map and request an invite to one party per week.</small></span></label>
       <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · $0.75 per month</b><small>Checkout coming soon. Start free and upgrade later.</small></span></label>
     </fieldset>
+    <button class="btn ghost small verify-resend" type="button" id="forgotBtn">Forgot password?</button>
     <p class="err" id="loginErr" role="alert"></p>
     <div class="dlg-actions">
       <button class="btn ghost" type="button" data-close>Cancel</button>
@@ -588,6 +589,24 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     <div class="dlg-actions">
       <button class="btn ghost" type="button" id="verifyLogout">Log out</button>
       <button class="btn" type="submit" id="verifySubmit">Confirm my email</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- FORGOT PASSWORD -->
+<dialog id="resetDlg" aria-labelledby="resetTitle">
+  <form class="dlg" id="resetForm" novalidate>
+    <span class="eyebrow">Forgot password</span>
+    <h3 id="resetTitle">Let's get you back in</h3>
+    <p class="muted" id="resetMsg" role="status"></p>
+    <div class="field"><label for="resetEmail">Penn State email</label><input class="input" id="resetEmail" type="email" autocomplete="username" placeholder="abc1234@psu.edu"></div>
+    <div class="field" id="resetCodeField"><label for="resetCode">6-digit code</label><input class="input code-input" id="resetCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000"></div>
+    <div class="field" id="resetPassField"><label for="resetPassword">New password</label><input class="input" id="resetPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
+    <button class="btn ghost small verify-resend" type="button" id="resetResend">Send a new code</button>
+    <p class="err" id="resetErr" role="alert"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn" type="submit" id="resetSubmit">Email me a code</button>
     </div>
   </form>
 </dialog>
@@ -1075,6 +1094,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     $("#tabSignup").setAttribute("aria-selected", String(signup));
     $("#nameField").hidden = !signup;
     $("#passChoice").hidden = !signup;
+    $("#forgotBtn").hidden = signup;
     $("#loginTitle").textContent = signup ? "Get on the map" : "Welcome back";
     $("#loginSubmit").textContent = signup ? "Create my account" : "Log in";
     $("#loginPassword").autocomplete = signup ? "new-password" : "current-password";
@@ -1107,6 +1127,55 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     } catch(err){
       $("#loginErr").textContent = err.message;
     } finally { btn.disabled = false; }
+  });
+
+  // ---------- forgot password ----------
+  const resetDlg = $("#resetDlg");
+  let resetSent = false;
+  function showResetStep(sent){
+    resetSent = sent;
+    $("#resetEmail").readOnly = sent;
+    $("#resetCodeField").hidden = !sent;
+    $("#resetPassField").hidden = !sent;
+    $("#resetResend").hidden = !sent;
+    $("#resetSubmit").textContent = sent ? "Set new password" : "Email me a code";
+    $("#resetMsg").textContent = sent
+      ? "If " + $("#resetEmail").value.trim() + " has an account, a 6-digit code is on its way. It expires in 15 minutes. Check your spam folder too."
+      : "Enter your Penn State email and we'll send you a code to set a new password.";
+  }
+  $("#forgotBtn").addEventListener("click", ()=>{
+    $("#resetEmail").value = $("#loginEmail").value;
+    $("#resetCode").value = ""; $("#resetPassword").value = ""; $("#resetErr").textContent = "";
+    showResetStep(false);
+    loginDlg.close();
+    if(resetDlg.showModal) resetDlg.showModal(); else resetDlg.setAttribute("open","");
+    $("#resetEmail").focus();
+  });
+  async function requestResetCode(){
+    await api("/api/password/forgot", {email:$("#resetEmail").value});
+    showResetStep(true);
+  }
+  $("#resetForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const btn = $("#resetSubmit");
+    btn.disabled = true; $("#resetErr").textContent = "";
+    try {
+      if(!resetSent){ await requestResetCode(); $("#resetCode").focus(); return; }
+      const data = await api("/api/password/reset", {email:$("#resetEmail").value, code:$("#resetCode").value, password:$("#resetPassword").value});
+      enterAccount(data);
+      $("#resetPassword").value = "";
+      resetDlg.close(); renderAll();
+      toast("Password changed. You're in, " + state.user.name.split(" ")[0] + ".");
+      document.getElementById("map").scrollIntoView();
+    } catch(err){
+      $("#resetErr").textContent = err.message;
+    } finally { btn.disabled = false; }
+  });
+  $("#resetResend").addEventListener("click", async e=>{
+    const btn = e.currentTarget;
+    btn.disabled = true; $("#resetErr").textContent = "";
+    try { await requestResetCode(); } catch(err){ $("#resetErr").textContent = err.message; }
+    finally { btn.disabled = false; }
   });
 
   // ---------- confirm email ----------

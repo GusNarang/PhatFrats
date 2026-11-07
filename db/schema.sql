@@ -24,6 +24,17 @@ CREATE TABLE IF NOT EXISTS email_codes (
   sent_in_window    SMALLINT NOT NULL DEFAULT 1
 );
 
+-- Same shape as email_codes, kept apart so a reset code can't confirm an email or the reverse.
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+  user_id           BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  code_hash         TEXT NOT NULL,
+  expires_at        TIMESTAMPTZ NOT NULL,
+  attempts          SMALLINT NOT NULL DEFAULT 0,
+  last_sent_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_in_window    SMALLINT NOT NULL DEFAULT 1
+);
+
 -- Only a hash of each session token is stored, so a database leak can't be used to log in.
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,

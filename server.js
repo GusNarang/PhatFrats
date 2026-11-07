@@ -106,48 +106,64 @@ const mailer = process.env.SMTP_HOST
     })
   : null;
 
-async function sendCodeEmail(to, code) {
+const CODE_KINDS = {
+  verify: {
+    table: 'email_codes',
+    label: 'Confirmation',
+    subject: 'Your PhatFrats confirmation code',
+    text: (code) => `Your PhatFrats confirmation code is ${code}.\n\nIt expires in ${CODE_MINUTES} minutes. If you didn't sign up for PhatFrats, you can ignore this email.`,
+  },
+  reset: {
+    table: 'password_reset_codes',
+    label: 'Password reset',
+    subject: 'Your PhatFrats password reset code',
+    text: (code) => `Your PhatFrats password reset code is ${code}.\n\nIt expires in ${CODE_MINUTES} minutes. If you didn't ask to reset your password, you can ignore this email and your password stays the same.`,
+  },
+};
+
+async function sendCodeEmail(to, code, kind) {
   if (!mailer) {
-    if (IS_PROD) throw new Error('SMTP_HOST is not set, so confirmation emails cannot be sent.');
-    console.log(`[dev only] Confirmation code for ${to}: ${code}`);
+    if (IS_PROD) throw new Error('SMTP_HOST is not set, so code emails cannot be sent.');
+    console.log(`[dev only] ${kind.label} code for ${to}: ${code}`);
     return;
   }
   await mailer.sendMail({
     from: `"PhatFrats" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
     to,
-    subject: 'Your PhatFrats confirmation code',
-    text: `Your PhatFrats confirmation code is ${code}.\n\nIt expires in ${CODE_MINUTES} minutes. If you didn't sign up for PhatFrats, you can ignore this email.`,
+    subject: kind.subject,
+    text: kind.text(code),
   });
 }
 const hashCode = (userId, code) => crypto.createHash('sha256').update(`${userId}:${code}`).digest('hex');
 
 // Returns 'sent', 'throttled' (a code went out too recently) or 'failed' (the email didn't send).
-async function issueCode(user) {
+async function issueCode(user, kind = CODE_KINDS.verify) {
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  const t = kind.table;
   // The limits live in this one statement, so they hold across every server instance.
   const { rows } = await pool.query(
-    `INSERT INTO email_codes (user_id, code_hash, expires_at)
+    `INSERT INTO ${t} (user_id, code_hash, expires_at)
      VALUES ($1, $2, now() + make_interval(mins => $3))
      ON CONFLICT (user_id) DO UPDATE SET
        code_hash = EXCLUDED.code_hash,
        expires_at = EXCLUDED.expires_at,
        attempts = 0,
        last_sent_at = now(),
-       sent_in_window = CASE WHEN email_codes.window_started_at < now() - interval '1 hour' THEN 1 ELSE email_codes.sent_in_window + 1 END,
-       window_started_at = CASE WHEN email_codes.window_started_at < now() - interval '1 hour' THEN now() ELSE email_codes.window_started_at END
-     WHERE email_codes.last_sent_at < now() - interval '1 minute'
-       AND (email_codes.window_started_at < now() - interval '1 hour' OR email_codes.sent_in_window < $4)
+       sent_in_window = CASE WHEN ${t}.window_started_at < now() - interval '1 hour' THEN 1 ELSE ${t}.sent_in_window + 1 END,
+       window_started_at = CASE WHEN ${t}.window_started_at < now() - interval '1 hour' THEN now() ELSE ${t}.window_started_at END
+     WHERE ${t}.last_sent_at < now() - interval '1 minute'
+       AND (${t}.window_started_at < now() - interval '1 hour' OR ${t}.sent_in_window < $4)
      RETURNING user_id`,
     [user.id, hashCode(user.id, code), CODE_MINUTES, CODES_PER_HOUR]
   );
   if (!rows[0]) return 'throttled';
   try {
-    await sendCodeEmail(user.email, code);
+    await sendCodeEmail(user.email, code, kind);
     return 'sent';
   } catch (err) {
-    console.error('Confirmation email failed:', err.message);
+    console.error(`${kind.label} email failed:`, err.message);
     // Lets them retry right away. The hourly cap still counts this attempt.
-    await pool.query(`UPDATE email_codes SET last_sent_at = now() - interval '2 minutes' WHERE user_id = $1`, [user.id]);
+    await pool.query(`UPDATE ${t} SET last_sent_at = now() - interval '2 minutes' WHERE user_id = $1`, [user.id]);
     return 'failed';
   }
 }
@@ -250,6 +266,66 @@ app.post('/api/login', authLimiter, wrap(async (req, res) => {
   await startSession(res, rows[0].id);
   const codeStatus = rows[0].email_verified_at ? undefined : await issueCode(rows[0]);
   res.json({ ...(await accountPayload(rows[0])), codeStatus });
+}));
+
+// The reply is the same whether or not the account exists.
+app.post('/api/password/forgot', authLimiter, wrap(async (req, res) => {
+  const email = cleanEmail(req.body?.email);
+  if (!PSU_EMAIL.test(email)) return fail(res, 400, 'Enter your Penn State email, like abc1234@psu.edu.');
+  const { rows } = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
+  if (rows[0]) await issueCode(rows[0], CODE_KINDS.reset);
+  res.json({ ok: true });
+}));
+
+app.post('/api/password/reset', authLimiter, wrap(async (req, res) => {
+  const email = cleanEmail(req.body?.email);
+  const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\D/g, '') : '';
+  const password = req.body?.password;
+  if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
+    return fail(res, 400, 'Use a password with at least 8 characters.');
+  }
+  const badCode = () => fail(res, 400, 'That code is wrong or has expired. Check your email, or send yourself a new one.', 'CODE_INVALID');
+  if (code.length !== 6) return badCode();
+  const { rows: [found] } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+  if (!found) return badCode();
+  // Counts the try before checking it, so parallel guesses can't get past the limit.
+  const { rows: [stored] } = await pool.query(
+    `UPDATE password_reset_codes SET attempts = attempts + 1
+     WHERE user_id = $1 AND expires_at > now() AND attempts < $2 RETURNING code_hash`,
+    [found.id, CODE_MAX_ATTEMPTS]
+  );
+  const expected = hashCode(found.id, code);
+  if (!stored || !crypto.timingSafeEqual(Buffer.from(stored.code_hash), Buffer.from(expected))) return badCode();
+
+  const passwordHash = await hashPassword(password);
+  const client = await pool.connect();
+  let user;
+  try {
+    await client.query('BEGIN');
+    // Deleting the code claims it, so it can only ever be used once.
+    const used = await client.query('DELETE FROM password_reset_codes WHERE user_id = $1 AND code_hash = $2', [found.id, expected]);
+    if (!used.rowCount) {
+      await client.query('ROLLBACK');
+      return badCode();
+    }
+    // Getting this code proves they own the mailbox, so their email counts as confirmed too.
+    ({ rows: [user] } = await client.query(
+      `UPDATE users SET password_hash = $1, email_verified_at = COALESCE(email_verified_at, now())
+       WHERE id = $2 RETURNING id, name, email, plan, email_verified_at`,
+      [passwordHash, found.id]
+    ));
+    // Logs out every device, including anyone who knew the old password.
+    await client.query('DELETE FROM sessions WHERE user_id = $1', [found.id]);
+    await client.query('DELETE FROM email_codes WHERE user_id = $1', [found.id]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+  await startSession(res, user.id);
+  res.json(await accountPayload(user));
 }));
 
 app.post('/api/verify', authLimiter, requireUser, wrap(async (req, res) => {

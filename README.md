@@ -18,6 +18,8 @@ The free invite resets every Monday at midnight Eastern. Checkout isn't built ye
 
 New accounts get a 6-digit code by email and must enter it before they can see the map or request invites. Codes expire after 15 minutes and allow 5 tries. A new code can be sent once a minute, up to 5 per hour.
 
+Forgotten passwords work the same way: **Forgot password?** on the log-in screen emails a reset code with the same limits. Setting a new password logs the account out on every other device.
+
 Set the `SMTP_*` values from `.env.example` to send email. Without `SMTP_HOST`, a local run prints the code in the terminal instead.
 
 ## Run it
@@ -44,7 +46,7 @@ You need Node.js 22 or newer and a [Neon](https://neon.tech) database.
 ## How it's put together
 
 - `server.js`: the Express server, with sign-up, log-in, log-out, sessions and invite requests
-- `db/schema.sql`: the `users`, `email_codes`, `sessions` and `invite_requests` tables
+- `db/schema.sql`: the `users`, `email_codes`, `password_reset_codes`, `sessions` and `invite_requests` tables
 - `data/parties.js`: the party list, sent only to logged-in accounts with a confirmed email
 - `public/`: the site itself (`index.html` and map data)
 - `tools/map/`: the scripts that generated the map data
@@ -58,6 +60,5 @@ Passwords are hashed with scrypt and sessions last 30 days in an HttpOnly cookie
 
 - Chapter names and addresses come from [pennstateifc.org/chapters](https://www.pennstateifc.org/chapters).
 - Every party and host approval is fictional demo data.
-- There's no password reset yet.
 - The street map uses data from [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors). House pins come from geocoding each IFC address.
 - Not affiliated with Penn State University or the Interfraternity Council.
