@@ -176,3 +176,15 @@ CREATE TABLE IF NOT EXISTS outside_guests (
   CHECK (email IS NOT NULL OR phone IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS outside_guests_sponsor_idx ON outside_guests(sponsor_id);
+
+-- Door Rush, the Full Access game. Each row is one game, started with a one-time ticket.
+CREATE TABLE IF NOT EXISTS game_runs (
+  ticket      TEXT PRIMARY KEY,
+  user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  score       INTEGER,
+  guests      INTEGER,
+  started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS game_runs_week_idx ON game_runs(finished_at, score DESC);
+CREATE INDEX IF NOT EXISTS game_runs_user_idx ON game_runs(user_id, score DESC);

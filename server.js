@@ -540,12 +540,14 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
 }));
 
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
+require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL });
 require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/frats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'frats.html')));
+app.get('/game', (req, res) => res.sendFile(path.join(__dirname, 'public', 'game.html')));
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') return fail(res, 400, 'That request could not be read.');

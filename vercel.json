@@ -2,10 +2,11 @@
   "framework": null,
   "buildCommand": "",
   "outputDirectory": "public",
-  "functions": { "api/index.js": { "maxDuration": 60 } },
+  "functions": { "api/index.js": { "maxDuration": 60, "includeFiles": "game/**" } },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/frats", "destination": "/frats.html" }
+    { "source": "/frats", "destination": "/frats.html" },
+    { "source": "/game", "destination": "/game.html" }
   ]
 }

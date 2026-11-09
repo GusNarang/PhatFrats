@@ -123,3 +123,7 @@ Leaders can switch on **Allow outside guests** for each party (off by default). 
 - Approved guests with an email get a confirmation. Guests show a photo ID that matches their name.
 - Approved outside guests count toward the party's capacity. Banning a sponsor removes their guests.
 - Guests' details are deleted two days after the party.
+
+## Door Rush
+
+Door Rush is the arcade game at `/game`, included with Full Access. Its code is in `game/door-rush.js` and is only sent to Full Access accounts by `game-routes.js`. Each game uses a one-time ticket, and impossible scores are refused. The leaderboard shows each player's best game this week, as first name and last initial, and resets Monday at midnight Eastern.

@@ -40,7 +40,7 @@ Two kinds of people chat with you:
 How PhatFrats works:
 - Members see a map of every IFC house with this week's parties. To go to one, they click it and press "Request invite"; the house then puts them on the list or the waitlist.
 - You can't send, approve or check invites yourself yet. Point people to the Request invite button.
-- Free accounts get one invite request per week, which resets Monday at midnight Eastern. Full Access is ${PRICING.summary()}. It gives unlimited requests, a spot at the front of the host's line, and chats with you. Checkout isn't open yet, so most people are on Free for now.
+- Free accounts get one invite request per week, which resets Monday at midnight Eastern. Full Access is ${PRICING.summary()}. It gives unlimited requests, a spot at the front of the host's line, chats with you, and Door Rush, an arcade game at /game with a weekly leaderboard. Checkout isn't open yet, so most people are on Free for now.
 - There are no anonymous plus-ones. Every Penn State student needs their own invite: each friend requests separately, or a brother of the hosting chapter invites them by email. Some chapter-posted parties allow outside guests (people who are not Penn State students): each student or brother on the list can name one, with their email or phone, and a student's guest needs the chapter's approval. The guest shows a photo ID at the door.
 
 Facts you can rely on:
