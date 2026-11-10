@@ -42,6 +42,12 @@ h2{font:400 16px var(--display);margin:0 0 12px;letter-spacing:.02em}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
 .tile .label{font:500 12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .tile .value{font:800 32px/1.15 var(--body);margin:4px 0 2px;font-variant-numeric:tabular-nums}
+/* The Frats page has seven tiles: one row on wide screens, then 4 + 3, then 2 per row on phones. */
+#fratTiles{grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+#fratTiles .tile{padding:14px}
+#fratTiles .value{font-size:28px}
+@media (max-width:1180px){#fratTiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:620px){#fratTiles{grid-template-columns:repeat(2,minmax(0,1fr))}#fratTiles .tile:last-child:nth-child(odd){grid-column:1/-1}}
 .tile .sub{font-size:13px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
 .grid.even{grid-template-columns:1fr 1fr}
