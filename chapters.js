@@ -93,6 +93,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       title, date, time, vibe, cap, blurb: str(body?.blurb, 500), dress: str(body?.dress, 80), music: str(body?.music, 80),
       // Off unless the leader switches it on: lets each guest-list member bring one person from outside Penn State.
       allowGuests: body?.allowGuests === true,
+      // On means friends never see who's going to this party.
+      hideFriends: body?.hideFriends === true,
     };
   }
 
@@ -138,7 +140,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const [parties, members, myInvites, myGuests] = await Promise.all([
       pool.query(
         `SELECT hp.id, hp.title, to_char(hp.party_date, 'YYYY-MM-DD') AS day, hp.start_time, hp.vibe, hp.blurb, hp.dress,
-           hp.music, hp.cap, hp.status, hp.allow_outside_guests, ${partyList.GOING_SQL} AS going,
+           hp.music, hp.cap, hp.status, hp.allow_outside_guests, hp.hide_friends, ${partyList.GOING_SQL} AS going,
            (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL AND r.status = 'pending')::int
              + (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'pending')::int AS waiting,
            (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved')::int AS outside
@@ -181,7 +183,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       parties: parties.rows.map((p) => ({
         id: 'h' + p.id, title: p.title, day: p.day, dayText: partyList.dayLabel(p.day).long, time: p.start_time, vibe: p.vibe,
         blurb: p.blurb, dress: p.dress, music: p.music, cap: p.cap, status: p.status, going: p.going, waiting: p.waiting,
-        allowGuests: p.allow_outside_guests, outside: p.outside, past: p.day < today,
+        allowGuests: p.allow_outside_guests, hideFriends: p.hide_friends, outside: p.outside, past: p.day < today,
       })),
       members: members.rows.map((m) => ({
         id: String(m.id), name: m.name, role: m.role, joined: m.joined_at, invites: m.invites,
@@ -305,9 +307,9 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const p = readParty(req.body);
     if (typeof p === 'string') return fail(res, 400, p);
     const { rows: [row] } = await pool.query(
-      `INSERT INTO hosted_parties (chapter_id, title, party_date, start_time, vibe, blurb, dress, music, cap, created_by, allow_outside_guests)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, req.user.id, p.allowGuests]
+      `INSERT INTO hosted_parties (chapter_id, title, party_date, start_time, vibe, blurb, dress, music, cap, created_by, allow_outside_guests, hide_friends)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+      [req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, req.user.id, p.allowGuests, p.hideFriends]
     );
     res.status(201).json({ id: 'h' + row.id });
   }));
@@ -319,9 +321,9 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     if (typeof p === 'string') return fail(res, 400, p);
     const { rowCount } = await pool.query(
       `UPDATE hosted_parties SET title = $3, party_date = $4, start_time = $5, vibe = $6, blurb = $7, dress = $8, music = $9,
-         cap = $10, allow_outside_guests = $11, updated_at = now()
+         cap = $10, allow_outside_guests = $11, hide_friends = $12, updated_at = now()
        WHERE id = $1 AND chapter_id = $2`,
-      [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests]
+      [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests, p.hideFriends]
     );
     if (!rowCount) return fail(res, 404, "That party isn't one of your chapter's.");
     res.json({ ok: true });

@@ -1,7 +1,7 @@
 // Lets PhatFrats install as an app on phones. Pages and files always come fresh from the network,
 // with the last copy kept only as a fallback when there's no signal. Account data (/api) is never stored.
 const CACHE = 'phatfrats-v2';
-const SHELL = ['/', '/pricing.js', '/chapters.js', '/map-data.js', '/community.js', '/beacon.js', '/icon-192.png?v=2'];
+const SHELL = ['/', '/pricing.js', '/chapters.js', '/map-data.js', '/community.js', '/friends.js', '/beacon.js', '/icon-192.png?v=2'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

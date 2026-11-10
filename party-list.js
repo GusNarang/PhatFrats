@@ -56,6 +56,7 @@ const hostedRow = (r) => ({
   going: Math.min(r.going, r.cap),
   hosted: true,
   allowGuests: !!r.allow_outside_guests,
+  hideFriends: !!r.hide_friends,
 });
 
 async function hostedParties(pool, { today = todayISO() } = {}) {
@@ -106,4 +107,4 @@ async function findParty(pool, id, { includeTest = false } = {}) {
   return r ? hostedRow(r) : null;
 }
 
-module.exports = { DEMO_BY_ID, DAYS_AHEAD, GOING_SQL, todayISO, addDays, dayLabel, isHostedId, hostedParties, partiesForSite, findParty };
+module.exports = { DEMO_BY_ID, DAYS_AHEAD, GOING_SQL, todayISO, addDays, dayLabel, demoDate, isHostedId, hostedParties, partiesForSite, findParty };

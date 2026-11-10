@@ -267,6 +267,12 @@ textarea{min-height:96px;resize:vertical}
                 <span>Allow outside guests<span class="hint">Each student or brother on the list can bring one person who isn't a Penn State student. You approve students' guests. Off means Penn State students only.</span></span>
               </label>
             </div>
+            <div class="field">
+              <label class="check-row" for="pfHideFriends">
+                <input id="pfHideFriends" type="checkbox">
+                <span>Keep the crowd private<span class="hint">Students can show friends which parties they're going to. Switch this on and this party never shows on anyone's friends board.</span></span>
+              </label>
+            </div>
             <div class="btn-row">
               <button class="btn primary" type="submit" id="partySave">Post party</button>
               <button class="btn" type="button" id="partyCancel">Cancel</button>
@@ -682,7 +688,7 @@ textarea{min-height:96px;resize:vertical}
       + '<div class="btn-row" style="justify-content:space-between"><span class="when">'+esc(p.dayText)+' · '+esc(p.time)+'</span>'+status+'</div>'
       + '<h3 style="margin-top:6px">'+esc(p.title)+'</h3>'
       + '<p class="muted small">'+esc(v.label)+(p.dress?' · Dress: '+esc(p.dress):'')+(p.music?' · Music: '+esc(p.music):'')+'</p>'
-      + '<p class="small" style="margin:4px 0">'+(p.allowGuests ? '<span class="badge guests">Outside guests on · '+p.outside+' on the list</span>' : '<span class="badge past">Penn State students only</span>')+'</p>'
+      + '<p class="small" style="margin:4px 0">'+(p.allowGuests ? '<span class="badge guests">Outside guests on · '+p.outside+' on the list</span>' : '<span class="badge past">Penn State students only</span>')+(p.hideFriends ? ' <span class="badge past">Crowd private</span>' : '')+'</p>'
       + (p.blurb ? '<p>'+esc(p.blurb)+'</p>' : '')
       + '<div class="meter" role="img" aria-label="'+p.going+' of '+p.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
       + '<p class="small muted" style="margin-top:0">'+p.going+' of '+p.cap+' on the list ('+pct+'%)</p>'
@@ -706,6 +712,7 @@ textarea{min-height:96px;resize:vertical}
     $("#pfCap").value = p?.cap || 150; $("#pfBlurb").value = p?.blurb || "";
     $("#pfDress").value = p?.dress || ""; $("#pfMusic").value = p?.music || "";
     $("#pfGuests").checked = !!p?.allowGuests;
+    $("#pfHideFriends").checked = !!p?.hideFriends;
     say($("#partyMsg"), "");
     $("#partyFormCard").hidden = false;
     $("#partyFormCard").scrollIntoView({block:"start"});
@@ -718,7 +725,7 @@ textarea{min-height:96px;resize:vertical}
     const btn = $("#partySave"); btn.disabled = true; say($("#partyMsg"), "");
     const body = { title:$("#pfTitle").value, date:$("#pfDate").value, time:$("#pfTime").value, vibe:$("#pfVibe").value,
       cap:Number($("#pfCap").value), blurb:$("#pfBlurb").value, dress:$("#pfDress").value, music:$("#pfMusic").value,
-      allowGuests:$("#pfGuests").checked };
+      allowGuests:$("#pfGuests").checked, hideFriends:$("#pfHideFriends").checked };
     try{
       await api(state.editing ? "/api/chapter/parties/"+state.editing : "/api/chapter/parties", body);
       $("#partyFormCard").hidden = true;

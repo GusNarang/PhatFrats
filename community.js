@@ -209,6 +209,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
   }
 
   // ---------- routes ----------
+  const alertSources = [];
   function mountRoutes(app, requireVerified) {
     // Saved parties, for alerts when they start filling up.
     app.post('/api/saved', ...requireVerified, wrap(async (req, res) => {
@@ -238,6 +239,8 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
         if (p && p.going / p.cap >= .8) alerts.push({ kind: 'filling', text: `🔥 ${p.title} is ${Math.round(p.going / p.cap * 100)}% full. Request before it's gone!`, party: p.id });
       }
       if (req.user.plan !== 'full' && wk.ever > 0 && wk.this_week === 0) alerts.push({ kind: 'reset', text: '🎟️ Your free invite for this week is ready.' });
+      // Other features (like friends) add their own live alerts.
+      for (const source of alertSources) { try { alerts.push(...(await source(req.user))); } catch (err) { console.error('Alert source failed:', err.message); } }
       res.json({ alerts, notes, unread: notes.filter((n) => !n.read).length });
     }));
     app.post('/api/notifications/read', ...requireVerified, wrap(async (req, res) => {
@@ -367,7 +370,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     }));
   }
 
-  return { mountHooks, mountRoutes, mountAdmin, mountCron, awardDoorRushPrize, notify };
+  return { mountHooks, mountRoutes, mountAdmin, mountCron, awardDoorRushPrize, notify, profile, referralCode, addAlertSource: (fn) => alertSources.push(fn) };
 }
 
 module.exports = { create };

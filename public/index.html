@@ -794,6 +794,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <script src="/map-data.js"></script>
 <script src="/beacon.js" defer></script>
 <script src="/community.js"></script>
+<script src="/friends.js"></script>
 <script>
 (function(){
   // ---------- data ----------
@@ -922,7 +923,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const a = $("#authArea");
     if(state.user){
       const full = state.user.plan === "full";
-      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn" type="button" id="profileBtn" aria-label="Your profile">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><button class="fr-btn" type="button" id="friendsBtn" aria-label="Friends" title="Friends">👯<b id="friendsCount" hidden></b></button><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn" type="button" id="profileBtn" aria-label="Your profile">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
       $("#logoutBtn").onclick = ()=>logOut().catch(e=>toast(e.message));
     } else if(state.pending){
       a.innerHTML = '<button class="btn small" type="button" data-login>Enter your code</button>';
@@ -1211,6 +1212,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>Invite list + PSU ID</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
         hypeBlock(p) + chapterLinks(c) +
         '<div>'+reqButton(p)+'</div>' +
+        (window.PFFriends ? window.PFFriends.detail(p) : '') +
         (window.PFCommunity ? window.PFCommunity.detailExtras(p) : '') +
         (others.length ? '<p class="muted" style="font-size:.88rem">Also at this house: '+others.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a> ('+esc(dayOf(o.day).label)+')').join(", ")+'</p>' : '');
     } else {
@@ -1237,7 +1239,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+(p.hosted ? ' · Posted by the house' : '')+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
         '<h3>'+esc(p.title)+'</h3><span class="host">'+esc(c.gl)+' · '+esc(c.name)+'</span>' +
         '<p class="blurb">'+esc(p.blurb)+'</p>' +
-        '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span><span class="foot-right">'+(window.PFCommunity ? window.PFCommunity.saveButton(p.id) : '')+reqButton(p,"small")+'</span></div></article>';
+        '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span><span class="foot-right">'+(window.PFFriends ? window.PFFriends.chip(p.id) : '')+(window.PFCommunity ? window.PFCommunity.saveButton(p.id) : '')+reqButton(p,"small")+'</span></div></article>';
     }).join("") : '<div class="no-results">No parties match that combo. Try another night or vibe.</div>';
   }
 
@@ -1720,6 +1722,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   window.PFSite = { state, api, toast, esc, byId, VIBES, PRICING, dayOf, whenText, renderAll, openInvite, openLogin, select, requestFor,
     party: (id)=>partyById[id], parties: ()=>PARTIES };
   if(window.PFCommunity) window.PFCommunity.start();
+  if(window.PFFriends) window.PFFriends.start();
 })();
 </script>
 

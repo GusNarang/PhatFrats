@@ -172,6 +172,18 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 - **Install as an app:** the site can be added to a phone's home screen (`public/sw.js` keeps a fallback copy for weak signal; account data is never stored).
 - **Demo parties** can be hidden from the control room (Live) once real chapters are posting.
 
+## Friends mode
+
+Free for everyone (`friends.js` on the server, `public/friends.js` on the site). The 👯 button in the header opens the Friends screen:
+
+- **This weekend**: which parties your friends marked "I'm going", and your own plans. Party cards show a 👯 count, and each party's details list friends going, with an "I'm going" switch and "Invite friends" (sends your group link to the friends you pick).
+- **Friends**: requests to accept or decline, and each friend's profile: plans this weekend, streak, badges, Door Rush stats, favorite house, parties together and friends in common.
+- **Add**: your friend link (`/?friend=CODE`, the same code as your referral link), add by email, and suggestions (people you referred, group plans, friends of friends).
+- **Leaderboard**: this week's best Door Rush scores among you and your friends.
+- **Privacy**: ghost mode (this weekend, or until switched off) and blocked people.
+
+Privacy rules: friendships are mutual; friends only see parties you marked yourself, never a location; plans are deleted after the party's day; removing, declining and blocking are silent; and a chapter leader can tick "Keep the crowd private" on a party so it never shows on friends boards. The bell adds "3 friends are going to ..." alerts.
+
 ## Theme song
 
 "On The List" plays on repeat on the Door Rush page only (`public/music.js`, loaded by `public/game.html`). Browsers only allow sound after someone interacts with the page, so it starts on the first tap, click or key. A floating 🔊 button (bottom left) mutes it, separately from the game's own sound effects button; the choice is remembered in that browser. People whose device asks for reduced motion start muted. The song file lives at `public/audio/on-the-list.mp3` and only downloads when it's about to play.

@@ -86,7 +86,7 @@
     panel.className = 'pf-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Notifications');
     const items = [
       ...notes.alerts.map((a) => `<div class="pf-note unread">${esc(a.text)}${a.party ? ` <button class="btn small" type="button" data-open-party="${esc(a.party)}">See it</button>` : ''}</div>`),
-      ...notes.notes.map((n) => `<div class="pf-note${n.read ? '' : ' unread'}">${esc(n.text)}<small>${esc(when(n.created_at))}</small></div>`),
+      ...notes.notes.map((n) => `<div class="pf-note${n.read ? '' : ' unread'}">${esc(n.text)}${n.link && n.link !== '/#parties' ? ` <button class="btn small" type="button" data-note-link="${esc(n.link)}">Open</button>` : ''}<small>${esc(when(n.created_at))}</small></div>`),
     ];
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>Notifications</b><button class="btn ghost small" type="button" data-close-panel>Close</button></div>${items.join('') || '<p class="muted">Nothing new. Save parties with ♡ to get alerts when they fill up.</p>'}`;
     document.body.appendChild(panel);
@@ -319,6 +319,10 @@
         <p style="margin:6px 0 0;color:var(--muted)">Each week (Monday to Sunday), the top Door Rush score wins Full Access through <b>${esc(nextTerm)}</b>. The prize is given automatically every Monday, with a notification and a champion badge. Door Rush is free for everyone; play it from <a href="/game">Game</a> in the menu.</p>
       </div>
 
+      <div class="pf-note"><b>👯 Add your friends</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Tap 👯 at the top to add friends and see which parties they're going to this weekend. Tap "I'm going" on a party to show them yours. Only friends you both accepted can see it, plans disappear after the party, and ghost mode hides you any time.</p>
+      </div>
+
       <div class="pf-note"><b>🕹️ How Door Rush works</b>
         <ul style="margin:6px 0 0;padding-left:20px;color:var(--muted);line-height:1.5">
           <li>Guests walk up the street. Send each one to the right party before they reach the red line: <b>★ star → Neon</b>, <b>● circle → Chill</b>, <b>◆ diamond → Costume</b>.</li>
@@ -347,6 +351,14 @@
     if (t.closest('#bellBtn')) { e.preventDefault(); if (document.querySelector('.pf-panel[aria-label="Notifications"]')) closePanels(); else openBell(); return; }
     if (t.closest('#profileBtn')) { e.preventDefault(); openProfile(); return; }
     if (t.closest('[data-close-panel]')) { closePanels(); return; }
+    const nl = t.closest('[data-note-link]');
+    if (nl) {
+      closePanels();
+      const link = nl.dataset.noteLink;
+      // Friends notes open the Friends screen right here; other links go to their page.
+      if (link.startsWith('/?friends') && window.PFFriends) window.PFFriends.open(); else if (link.startsWith('/')) location.href = link;
+      return;
+    }
     const sv = t.closest('[data-save]');
     if (sv) {
       e.preventDefault(); e.stopPropagation();

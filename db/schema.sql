@@ -335,3 +335,39 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   closed_at  TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------- Friends ----------
+-- One row per pair of people. It starts as a request and becomes a friendship when the other person accepts.
+CREATE TABLE IF NOT EXISTS friendships (
+  requester_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  addressee_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted')),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  accepted_at  TIMESTAMPTZ,
+  PRIMARY KEY (requester_id, addressee_id),
+  CHECK (requester_id <> addressee_id)
+);
+-- Only one row per pair, whichever way round it was sent.
+CREATE UNIQUE INDEX IF NOT EXISTS friendships_pair_idx ON friendships (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
+CREATE INDEX IF NOT EXISTS friendships_addressee_idx ON friendships(addressee_id);
+-- Blocking is silent: the blocked person isn't told, and can't send requests or see anything.
+CREATE TABLE IF NOT EXISTS friend_blocks (
+  blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+-- "I'm going": the parties someone chose to show their friends. Deleted once the party's day has passed,
+-- so nobody has a history of where they've been.
+CREATE TABLE IF NOT EXISTS friend_going (
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  party_id   TEXT NOT NULL,
+  party_day  DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, party_id)
+);
+CREATE INDEX IF NOT EXISTS friend_going_day_idx ON friend_going(party_day);
+-- Ghost mode: hidden from friends until this time ('infinity' means until switched off).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_until TIMESTAMPTZ;
+-- A chapter can keep who's going to a party private, so it never shows on friends' boards.
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS hide_friends BOOLEAN NOT NULL DEFAULT FALSE;
