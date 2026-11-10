@@ -65,6 +65,13 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
   }
   // When a friend confirms their email, their referrer may have earned a free semester.
   async function checkReferralReward(newUserId) {
+    // Claims this friend's confirmation first, so repeating the confirm step can't earn the referrer more.
+    const { rowCount: fresh } = await pool.query(
+      `UPDATE users SET referral_counted_at = now()
+       WHERE id = $1 AND referral_counted_at IS NULL AND referred_by IS NOT NULL AND email_verified_at IS NOT NULL`,
+      [newUserId]
+    );
+    if (!fresh) return;
     const { rows: [r] } = await pool.query(
       `SELECT ref.id, ref.ref_reward_at, (SELECT count(*) FROM users f WHERE f.referred_by = ref.id AND f.email_verified_at IS NOT NULL)::int AS n
        FROM users u JOIN users ref ON ref.id = u.referred_by WHERE u.id = $1 AND ref.banned_at IS NULL`,

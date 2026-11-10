@@ -940,7 +940,15 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     });
     if(changed){ state.requests = data.requests; renderAll(); }
   }
-  setInterval(()=>{ if(state.requests.some(r=>r.status==="pending")) refreshRequests(); }, 1500);
+  // Demo parties answer in seconds, so those are checked often. A chapter's leader can take hours, so
+  // requests to real parties are checked every 30 seconds, and nothing is checked while the tab is hidden.
+  let pollTick = 0;
+  setInterval(()=>{
+    pollTick++;
+    const pending = state.requests.filter(r=>r.status==="pending");
+    if(!pending.length || document.hidden) return;
+    if(pending.some(r=>!String(r.pid).startsWith("h")) || pollTick % 20 === 0) refreshRequests();
+  }, 1500);
 
   // ---------- header / auth ----------
   function renderAuth(){

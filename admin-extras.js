@@ -2,6 +2,7 @@
 // Hall of Fame, Night Forecast, growth, global search, the admin log and Door Rush god mode.
 const PRICING = require('./public/pricing.js');
 const partyList = require('./party-list.js');
+const { FULL_SQL } = require('./plan-sql.js');
 const TEST_IDS = require('./data/test-chapters.js').map((c) => c.id);
 const ZONE = 'America/New_York';
 const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date());
@@ -43,11 +44,11 @@ module.exports = function adminExtras(app, { pool, wrap, fail, requireUser, ops,
       let who = null;
       if (token) {
         const { rows: [u] } = await pool.query(
-          `SELECT CASE WHEN u.plan = 'full' AND u.plan_paid_until < now() THEN 'free' ELSE u.plan END AS plan,
+          `SELECT CASE WHEN ${FULL_SQL('u.')} THEN 'full' ELSE 'free' END AS plan,
              EXISTS (SELECT 1 FROM chapter_members m WHERE m.user_id = u.id AND m.role = 'leader') AS leader
            FROM sessions s JOIN users u ON u.id = s.user_id
            WHERE s.token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex') AND s.expires_at > now() AND u.banned_at IS NULL`,
-          [decodeURIComponent(token[1])]
+          [(() => { try { return decodeURIComponent(token[1]); } catch (e) { return ''; } })()]
         );
         who = u || null;
       }
@@ -156,15 +157,18 @@ module.exports = function adminExtras(app, { pool, wrap, fail, requireUser, ops,
 
   app.post('/api/admin/promo', requireAdmin, wrap(async (req, res) => {
     const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
-    const pct = Number(req.body?.percentOff), maxUses = Number(req.body?.maxUses);
+    const pct = Number(req.body?.percentOff);
+    // Blank means no limit. (Number('') is 0, which would make the code used up before anyone tries it.)
+    const rawMax = req.body?.maxUses;
+    const maxUses = rawMax === '' || rawMax == null ? null : Number(rawMax);
     const ends = typeof req.body?.endsOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.endsOn) ? req.body.endsOn : null;
     if (!/^[A-Z0-9-]{3,24}$/.test(code)) return fail(res, 400, 'Codes are 3 to 24 letters, numbers or dashes.');
     if (!Number.isInteger(pct) || pct < 1 || pct > 100) return fail(res, 400, 'Pick a discount from 1% to 100%.');
-    if (req.body?.maxUses !== '' && req.body?.maxUses != null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100000)) return fail(res, 400, 'Uses must be a whole number, or leave it blank for no limit.');
+    if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100000)) return fail(res, 400, 'Uses must be a whole number, or leave it blank for no limit.');
     const { rowCount } = await pool.query(
       `INSERT INTO promo_codes (code, percent_off, max_uses, ends_at) VALUES ($1, $2, $3, CASE WHEN $4::date IS NULL THEN NULL ELSE ($4::date + 1)::timestamp AT TIME ZONE '${ZONE}' END)
        ON CONFLICT (code) DO NOTHING`,
-      [code, pct, Number.isInteger(maxUses) ? maxUses : null, ends]
+      [code, pct, maxUses, ends]
     );
     if (!rowCount) return fail(res, 409, 'That code already exists.');
     res.status(201).json({ ok: true });

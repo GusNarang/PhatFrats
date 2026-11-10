@@ -394,3 +394,11 @@ CREATE TABLE IF NOT EXISTS chapter_follows (
   PRIMARY KEY (user_id, chapter_id)
 );
 CREATE INDEX IF NOT EXISTS chapter_follows_chapter_idx ON chapter_follows(chapter_id);
+
+-- ---------- Fixes ----------
+-- Set once a referred account's confirmation has been counted for its referrer, so the referrer's extra
+-- invite and progress note can never be given twice for the same friend.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_counted_at TIMESTAMPTZ;
+-- Friends who were already counted before this column existed (every confirmed referral so far).
+UPDATE users SET referral_counted_at = email_verified_at
+  WHERE referral_counted_at IS NULL AND referred_by IS NOT NULL AND email_verified_at IS NOT NULL;

@@ -214,7 +214,9 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     const plan = req.body?.plan;
     if (!id || (plan !== 'full' && plan !== 'free')) return fail(res, 400, 'Choose free or full.');
     const { rowCount } = await pool.query(
-      `UPDATE users SET plan = $2, plan_paid_at = CASE WHEN $2 = 'full' THEN now() ELSE NULL END, plan_paid_until = NULL WHERE id = $1`,
+      `UPDATE users SET plan = $2, plan_paid_at = CASE WHEN $2 = 'full' THEN now() ELSE NULL END, plan_paid_until = NULL,
+         trial_until = CASE WHEN $2 = 'free' AND trial_until > now() THEN now() ELSE trial_until END
+       WHERE id = $1`,
       [id, plan]
     );
     if (!rowCount) return fail(res, 404, 'That account is gone.');

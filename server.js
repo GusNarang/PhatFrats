@@ -432,7 +432,7 @@ app.post('/api/password/reset', authLimiter, wrap(async (req, res) => {
     client.release();
   }
   await startSession(res, user.id);
-  res.json(await accountPayload(user));
+  res.json(await accountPayload(await loadUser(user.id)));
 }));
 
 app.post('/api/verify', authLimiter, requireUser, wrap(async (req, res) => {
@@ -673,7 +673,7 @@ premium.mountRoutes(app, requireVerified);
 require('./friends.js')(app, { pool, wrap, fail, requireVerified, community, WEEK_START_SQL, ops });
 community.mountCron(app);
 community.mountAdmin(app);
-const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload, ops });
+const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload, loadUser, ops });
 stripeWebhook = pay.webhookHandler;
 pay.mountRoutes(app);
 require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL, ops });

@@ -15,7 +15,7 @@ const enabled = () => !!client;
 // Tests swap in a stand-in for Stripe.
 const useClient = (c) => { client = c; };
 
-function create({ pool, wrap, fail, requireVerified, accountPayload, ops }) {
+function create({ pool, wrap, fail, requireVerified, accountPayload, loadUser, ops }) {
   // A promo code someone can still use, or a message saying why not.
   async function promoFor(raw) {
     const code = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
@@ -59,7 +59,7 @@ function create({ pool, wrap, fail, requireVerified, accountPayload, ops }) {
           [userId, passUntil]
         );
       }
-      if (made && session.metadata?.promo_code) {
+      if (made && session.metadata?.promo_code && !session.metadata?.promo_claimed) {
         await db.query('UPDATE promo_codes SET uses = uses + 1 WHERE code = $1', [session.metadata.promo_code]);
       }
       await db.query('COMMIT');
@@ -108,15 +108,21 @@ function create({ pool, wrap, fail, requireVerified, accountPayload, ops }) {
       const promo = await promoFor(req.body?.code);
       if (typeof promo === 'string') return fail(res, 400, promo, 'BAD_PROMO');
       let cents = Math.round(PRICING.current() * 100 * (100 - (promo?.percent_off || 0)) / 100);
-      // A 100% code needs no payment, so the pass is granted straight away.
+      // A 100% code needs no payment, so the pass is granted straight away. Its use is claimed in one
+      // statement first, so two people can't both take a code's last use.
       if (promo && cents === 0) {
+        const { rowCount: claimed } = await pool.query(
+          `UPDATE promo_codes SET uses = uses + 1
+           WHERE code = $1 AND active AND (max_uses IS NULL OR uses < max_uses) AND (ends_at IS NULL OR ends_at > now())`,
+          [promo.code]
+        );
+        if (!claimed) return fail(res, 400, 'That promo code has been used up.', 'BAD_PROMO');
         await grant({
           id: 'promo_' + crypto.randomBytes(12).toString('hex'), mode: 'payment', payment_status: 'paid', amount_total: 0, currency: 'usd',
           livemode: String(process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_'),
-          metadata: { user_id: String(req.user.id), pass_until: passUntil, promo_code: promo.code },
+          metadata: { user_id: String(req.user.id), pass_until: passUntil, promo_code: promo.code, promo_claimed: '1' },
         });
-        const { rows: [user] } = await pool.query('SELECT id, name, email, plan, role, email_verified_at, plan_paid_until FROM users WHERE id = $1', [req.user.id]);
-        return res.json({ granted: true, ...(await accountPayload(user)) });
+        return res.json({ granted: true, ...(await accountPayload(await loadUser(req.user.id))) });
       }
       // Stripe's smallest card charge is 50 cents.
       cents = Math.max(50, cents);
@@ -129,7 +135,7 @@ function create({ pool, wrap, fail, requireVerified, accountPayload, ops }) {
             unit_amount: cents,
             product_data: {
               name: 'PhatFrats Full Access',
-              description: `Unlimited invite requests, priority with hosts, PhatBot and Door Rush, through ${PRICING.passEndLabel(passUntil)}. One payment, no auto-renew.`,
+              description: `Unlimited invite requests, priority with hosts, early access to new parties and PhatBot, through ${PRICING.passEndLabel(passUntil)}. One payment, no auto-renew.`,
             },
           },
         }],
@@ -153,11 +159,7 @@ function create({ pool, wrap, fail, requireVerified, accountPayload, ops }) {
       if (String(session.client_reference_id) !== String(req.user.id)) return fail(res, 403, "That checkout belongs to another account.");
       if (session.payment_status !== 'paid') return fail(res, 402, "That payment hasn't gone through yet. If you were charged, refresh in a minute.", 'NOT_PAID');
       await grant(session);
-      const { rows: [user] } = await pool.query(
-        'SELECT id, name, email, plan, role, email_verified_at, plan_paid_until FROM users WHERE id = $1',
-        [req.user.id]
-      );
-      res.json(await accountPayload(user));
+      res.json(await accountPayload(await loadUser(req.user.id)));
     }));
   }
 

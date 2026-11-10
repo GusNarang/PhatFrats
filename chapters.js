@@ -326,6 +326,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests, p.hideFriends]
     );
     if (!rowCount) return fail(res, 404, "That party isn't one of your chapter's.");
+    await pool.query('UPDATE friend_going SET party_day = $2 WHERE party_id = $1', ['h' + id, p.date]);
     res.json({ ok: true });
   }));
 
