@@ -263,6 +263,10 @@ section{padding-block:40px}
 .invite-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--night-2);border-radius:12px;padding:12px 16px}
 .invite-row .lt{font-family:var(--display);font-size:1rem;color:var(--c)}
 .invite-row small{display:block;color:var(--muted);font-size:.82rem}
+.party.spotlight{border-color:var(--gold)!important;box-shadow:0 0 0 2px var(--gold),0 0 34px -4px var(--gold)}
+.spot-badge{display:inline-block;margin-bottom:8px;font:400 .72rem var(--display);letter-spacing:.06em;color:var(--night);background:var(--gold);border-radius:999px;padding:3px 10px}
+@media (prefers-reduced-motion:no-preference){.party.spotlight{animation:spotGlow 2.4s ease-in-out infinite alternate}@keyframes spotGlow{to{box-shadow:0 0 0 2px var(--gold),0 0 50px 2px var(--gold)}}}
+.promo-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.promo-row .input{flex:1 1 150px;text-transform:uppercase}
 .invite-row .guest-line{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-top:4px;font-size:.82rem;color:var(--muted)}
 .linkish{background:none;border:0;padding:0;color:var(--cyan);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline}
 .guest-box{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px;display:flex;flex-direction:column;gap:10px}
@@ -787,6 +791,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <script src="/pricing.js"></script>
 <script src="/chapters.js"></script>
 <script src="/map-data.js"></script>
+<script src="/beacon.js" defer></script>
 <script>
 (function(){
   // ---------- data ----------
@@ -941,14 +946,19 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     } else if(!state.user){
       el.innerHTML = '<button class="btn gold" type="button" data-signup>Sign up to get Full Access</button><span class="muted" style="font-size:.85rem">Create your free account first, then upgrade here.</span>';
     } else {
-      el.innerHTML = '<button class="btn gold" type="button" data-buy>Get Full Access · '+esc(priceNow())+'</button><span class="muted" style="font-size:.85rem">One payment, good through '+esc(ends)+'. Secure checkout by Stripe.</span>';
+      el.innerHTML = '<button class="btn gold" type="button" data-buy>Get Full Access · '+esc(priceNow())+'</button><span class="muted" style="font-size:.85rem">One payment, good through '+esc(ends)+'. Secure checkout by Stripe.</span>'
+        + '<button type="button" class="linkish" data-promo-toggle style="font-size:.85rem">Have a promo code?</button>'
+        + '<div class="promo-row" id="promoRow" hidden><input class="input" id="promoCode" maxlength="24" autocomplete="off" placeholder="PROMO CODE" aria-label="Promo code"></div>';
     }
   }
   async function startCheckout(btn){
     if(!state.user){ openLogin(); return; }
     btn.disabled = true; btn.textContent = "Opening checkout…";
     try{
-      const data = await api("/api/checkout", {});
+      const code = ($("#promoCode") && $("#promoCode").value.trim()) || undefined;
+      const data = await api("/api/checkout", code ? {code} : {});
+      // A 100% promo code grants the pass on the spot.
+      if(data.granted){ enterAccount(data); renderAll(); toast("Promo applied. You have Full Access" + (state.user.paidUntil ? " through " + PRICING.passEndLabel(state.user.paidUntil) : "") + "!", 6500); return; }
       location.href = data.url;
     }catch(err){
       toast(err.message);
@@ -1216,9 +1226,10 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     $("#partyCount").textContent = vis.length + " of " + PARTIES.length + " shown";
     const order = Object.fromEntries(DAYS.map((d,i)=>[d.k,i]));
     const sel = state.selected;
-    $("#partyGrid").innerHTML = vis.length ? vis.sort((a,b)=>order[a.day]-order[b.day]).map(p=>{
+    $("#partyGrid").innerHTML = vis.length ? vis.sort((a,b)=>(b.spotlight?1:0)-(a.spotlight?1:0) || order[a.day]-order[b.day]).map(p=>{
       const c = byId[p.ch], v = VIBES[p.vibe];
-      return '<article class="party'+(sel&&sel.type==="party"&&sel.id===p.id?' selected':'')+'" style="--c:'+v.c+'" data-party="'+p.id+'" tabindex="0" aria-label="'+esc(p.title)+'">' +
+      return '<article class="party'+(p.spotlight?' spotlight':'')+(sel&&sel.type==="party"&&sel.id===p.id?' selected':'')+'" style="--c:'+v.c+'" data-party="'+p.id+'" tabindex="0" aria-label="'+esc(p.title)+(p.spotlight?', in the spotlight':'')+'">' +
+        (p.spotlight ? '<span class="spot-badge">★ Spotlight</span>' : '') +
         '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+(p.hosted ? ' · Posted by the house' : '')+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
         '<h3>'+esc(p.title)+'</h3><span class="host">'+esc(c.gl)+' · '+esc(c.name)+'</span>' +
         '<p class="blurb">'+esc(p.blurb)+'</p>' +
@@ -1593,8 +1604,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   });
 
   // ---------- events ----------
+  // Which party or house is open, for the control room's live radar.
+  window.PF_LOOKING = ()=> !state.selected ? null : state.selected.type==="party" ? state.selected.id : "house:"+state.selected.id;
+  let lookPing;
   function select(sel, scroll){
     state.selected = sel;
+    clearTimeout(lookPing); lookPing = setTimeout(()=>{ if(window.PF_PING) window.PF_PING(); }, 1200);
     const c = sel.type==="party" ? byId[partyById[sel.id].ch] : byId[sel.id];
     if(c && c.x!=null) centerOn(c.x, c.y);
     renderMap(); renderDetail(); renderParties();
@@ -1606,6 +1621,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     if(t.closest("[data-signup]")){ openLogin("signup"); return; }
     if(t.closest("[data-plans]")){ e.preventDefault(); goToPlans(); return; }
     const buy = t.closest("[data-buy]"); if(buy){ e.preventDefault(); startCheckout(buy); return; }
+    if(t.closest("[data-promo-toggle]")){ e.preventDefault(); $("#promoRow").hidden = false; $("#promoCode").focus(); return; }
     if(t.closest('a[href="#plans"]')) return;
     if(t.closest("[data-login]") || t.closest("#heroLogin")){
       if(state.user && t.closest("#heroLogin")) document.getElementById("map").scrollIntoView(); else openLogin();
@@ -1636,7 +1652,9 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   try{
     let v = localStorage.getItem("pf_v");
     if(!v){ v = Array.from(crypto.getRandomValues(new Uint8Array(12)), b=>(b%36).toString(36)).join(""); localStorage.setItem("pf_v", v); }
-    fetch("/api/hit", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({v}), keepalive:true}).catch(()=>{});
+    let ref = null;
+    try{ const r = document.referrer && new URL(document.referrer).hostname; if(r && r !== location.hostname) ref = r; }catch(e){}
+    fetch("/api/hit", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({v, ref, path:location.pathname}), keepalive:true}).catch(()=>{});
   }catch(e){}
   api("/api/me").then(data=>{
     state.checkout = !!data.checkout;

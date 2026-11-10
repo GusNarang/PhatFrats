@@ -216,3 +216,58 @@ CREATE TABLE IF NOT EXISTS chapter_profiles (
   updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------- The Batcave (control room extras) ----------
+-- Switches flipped from the control room: lockdown, spotlight, Door Rush event and reset, money goal.
+CREATE TABLE IF NOT EXISTS admin_settings (
+  key        TEXT PRIMARY KEY,
+  value      JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The live ticker. Plain descriptions only, with no names or emails. Kept for 30 days.
+CREATE TABLE IF NOT EXISTS activity_events (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  kind       TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS activity_events_time_idx ON activity_events(created_at);
+-- Every change made from the control room, and by whom.
+CREATE TABLE IF NOT EXISTS admin_log (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  admin_id   BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  action     TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The beacon: a banner across the site. Only the newest active one shows.
+CREATE TABLE IF NOT EXISTS announcements (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  text       TEXT NOT NULL,
+  tone       TEXT NOT NULL DEFAULT 'gold',
+  audience   TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'free', 'full', 'leaders')),
+  ends_at    TIMESTAMPTZ,
+  active     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Discount codes for Full Access checkout.
+CREATE TABLE IF NOT EXISTS promo_codes (
+  code        TEXT PRIMARY KEY,
+  percent_off INTEGER NOT NULL CHECK (percent_off BETWEEN 1 AND 100),
+  max_uses    INTEGER,
+  uses        INTEGER NOT NULL DEFAULT 0,
+  ends_at     TIMESTAMPTZ,
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS promo_code TEXT;
+-- Who has the site open right now, for the live radar. The visitor id is the random one from site_visits.
+CREATE TABLE IF NOT EXISTS site_presence (
+  visitor    TEXT PRIMARY KEY,
+  last_seen  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  path       TEXT NOT NULL DEFAULT '/',
+  looking_at TEXT
+);
+CREATE INDEX IF NOT EXISTS site_presence_seen_idx ON site_presence(last_seen);
+-- The site a visitor came from (just the domain), for the growth panel.
+ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS referrer TEXT;

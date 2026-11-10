@@ -2,6 +2,7 @@
 // A paid checkout grants Full Access through the end of the current semester (see PRICING.passEnds).
 // Two paths grant it, so a payment counts even if one fails: Stripe's webhook, and the
 // confirmation the page asks for when the buyer comes back from Stripe.
+const crypto = require('crypto');
 const Stripe = require('stripe');
 const PRICING = require('./public/pricing.js');
 
@@ -14,7 +15,21 @@ const enabled = () => !!client;
 // Tests swap in a stand-in for Stripe.
 const useClient = (c) => { client = c; };
 
-function create({ pool, wrap, fail, requireVerified, accountPayload }) {
+function create({ pool, wrap, fail, requireVerified, accountPayload, ops }) {
+  // A promo code someone can still use, or a message saying why not.
+  async function promoFor(raw) {
+    const code = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+    if (!code) return null;
+    const { rows: [p] } = await pool.query(
+      'SELECT code, percent_off, max_uses, uses, ends_at, active FROM promo_codes WHERE code = $1',
+      [code]
+    );
+    if (!p || !p.active) return "That promo code doesn't exist.";
+    if (p.ends_at && new Date(p.ends_at) < new Date()) return 'That promo code has expired.';
+    if (p.max_uses != null && p.uses >= p.max_uses) return 'That promo code has been used up.';
+    return p;
+  }
+
   // Records a paid checkout and grants the pass. Safe to call more than once for the same payment.
   async function grant(session) {
     if (!session || session.mode !== 'payment' || session.payment_status !== 'paid') return false;
@@ -25,11 +40,11 @@ function create({ pool, wrap, fail, requireVerified, accountPayload }) {
     try {
       await db.query('BEGIN');
       const { rows: [made] } = await db.query(
-        `INSERT INTO payments (stripe_session_id, user_id, amount_cents, currency, payment_intent, pass_until, livemode)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (stripe_session_id) DO NOTHING RETURNING stripe_session_id`,
+        `INSERT INTO payments (stripe_session_id, user_id, amount_cents, currency, payment_intent, pass_until, livemode, promo_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (stripe_session_id) DO NOTHING RETURNING stripe_session_id`,
         [session.id, userId, session.amount_total || 0, session.currency || 'usd',
           typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null,
-          passUntil, !!session.livemode]
+          passUntil, !!session.livemode, session.metadata?.promo_code || null]
       );
       if (made) {
         // Pass ends at midnight Eastern after its last day. Someone given Full Access by hand with no
@@ -44,7 +59,14 @@ function create({ pool, wrap, fail, requireVerified, accountPayload }) {
           [userId, passUntil]
         );
       }
+      if (made && session.metadata?.promo_code) {
+        await db.query('UPDATE promo_codes SET uses = uses + 1 WHERE code = $1', [session.metadata.promo_code]);
+      }
       await db.query('COMMIT');
+      if (made && ops) {
+        const dollars = '$' + ((session.amount_total || 0) / 100).toFixed(2);
+        ops.activity('sale', `${dollars} Full Access sale${session.metadata?.promo_code ? ` with ${session.metadata.promo_code}` : ''}${session.livemode ? '' : ' (test)'}`);
+      }
       return !!made;
     } catch (err) {
       await db.query('ROLLBACK').catch(() => {});
@@ -74,6 +96,7 @@ function create({ pool, wrap, fail, requireVerified, accountPayload }) {
     // Starts a Stripe Checkout page for one semester of Full Access.
     app.post('/api/checkout', ...requireVerified, wrap(async (req, res) => {
       if (!client) return fail(res, 503, "Checkout isn't open yet. Check back soon.", 'CHECKOUT_OFF');
+      if (ops && await ops.paused('checkout')) return fail(res, 503, 'Checkout is paused for a little while. Check back soon.', 'PAUSED');
       const { rows: [u] } = await pool.query(
         `SELECT plan, plan_paid_until, plan_paid_until > now() + interval '30 days' AS long_pass FROM users WHERE id = $1`,
         [req.user.id]
@@ -82,7 +105,21 @@ function create({ pool, wrap, fail, requireVerified, accountPayload }) {
         return fail(res, 409, 'You already have Full Access.', 'ALREADY_FULL');
       }
       const passUntil = PRICING.passEnds(todayISO());
-      const cents = Math.round(PRICING.current() * 100);
+      const promo = await promoFor(req.body?.code);
+      if (typeof promo === 'string') return fail(res, 400, promo, 'BAD_PROMO');
+      let cents = Math.round(PRICING.current() * 100 * (100 - (promo?.percent_off || 0)) / 100);
+      // A 100% code needs no payment, so the pass is granted straight away.
+      if (promo && cents === 0) {
+        await grant({
+          id: 'promo_' + crypto.randomBytes(12).toString('hex'), mode: 'payment', payment_status: 'paid', amount_total: 0, currency: 'usd',
+          livemode: String(process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_'),
+          metadata: { user_id: String(req.user.id), pass_until: passUntil, promo_code: promo.code },
+        });
+        const { rows: [user] } = await pool.query('SELECT id, name, email, plan, role, email_verified_at, plan_paid_until FROM users WHERE id = $1', [req.user.id]);
+        return res.json({ granted: true, ...(await accountPayload(user)) });
+      }
+      // Stripe's smallest card charge is 50 cents.
+      cents = Math.max(50, cents);
       const session = await client.checkout.sessions.create({
         mode: 'payment',
         line_items: [{
@@ -98,7 +135,7 @@ function create({ pool, wrap, fail, requireVerified, accountPayload }) {
         }],
         customer_email: req.user.email,
         client_reference_id: String(req.user.id),
-        metadata: { user_id: String(req.user.id), pass_until: passUntil },
+        metadata: { user_id: String(req.user.id), pass_until: passUntil, ...(promo ? { promo_code: promo.code } : {}) },
         success_url: `${SITE_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}#plans`,
         cancel_url: `${SITE_URL}/?checkout=cancel#plans`,
       });

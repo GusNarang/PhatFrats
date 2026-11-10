@@ -111,7 +111,7 @@
     }
     function award(guest, base, text, slotX) {
       const hypeBonus = g.hypeLeft > 0 ? 2 : 1;
-      const points = base * (guest.vip ? 3 : 1) * mult() * hypeBonus;
+      const points = base * (guest.vip ? 3 : 1) * mult() * hypeBonus * (api.event ? 2 : 1);
       g.score += points; g.right++; g.streak++;
       say(`${text} +${num(points)}`, slotX, guest.y - 34, guest.vip ? '#ffd23f' : '#ffffff');
       tone(guest.vip ? 880 : 420 + Math.min(g.streak, 30) * 18, .07);
@@ -310,7 +310,7 @@
         g = newGame(); labelButtons();
         overlay.hidden = true; overlay.innerHTML = ''; phase = 'play';
         root.scrollIntoView({ block: 'start', behavior: 'instant' });
-        showBanner('DOORS OPEN!', .8);
+        showBanner(api.event ? 'EVENT WEEK · DOUBLE POINTS!' : 'DOORS OPEN!', api.event ? 1.4 : .8);
       } catch (err) {
         overlay.hidden = false;
         overlay.innerHTML = `<h2>Couldn't start</h2><p>${String(err.message).replace(/[<>&]/g, '')}</p><button type="button" class="dr-play">Try again</button>`;

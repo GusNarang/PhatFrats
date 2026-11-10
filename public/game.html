@@ -81,6 +81,7 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
   </section>
 </div>
 <script src="/pricing.js"></script>
+<script src="/beacon.js" defer></script>
 <script>
 (function(){
   const $ = (s)=>document.querySelector(s);
@@ -119,7 +120,9 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
     await loadClient();
     $("#hello").textContent = "You're on the door tonight, "+status.name+". Don't let the line reach you.";
     standings(status); show("play");
+    if(status.event) $("#hello").textContent += " It's event week: every point counts double!";
     window.PFDoorRush.mount($("#game"), {
+      event: !!status.event,
       start: async ()=> (await api("/api/game/start", {})).ticket,
       finish: async (ticket, r)=>{ const s = await api("/api/game/finish", {ticket, score:r.score, guests:r.guests}); standings(s); return s; },
     });

@@ -144,3 +144,13 @@ A payment is recorded both by the webhook and when the buyer returns to the site
 Each chapter's portal page uses its own identity: national colors and founding (`data/chapter-identity.js`), Greek letters, address, Instagram, live stats and its next party. Leaders can add a tagline and story and pick their own colors in **Settings → Chapter page**. Beta Sigma Beta and Tau Phi Delta have no published colors, so their pages use the site colors until a leader picks some.
 
 The admin can open any chapter's page, with or without a leader, from **Open page** in the control room's Chapters table (`/frats?chapter=ID`). It works only while the control room is unlocked, and gives everything a leader can do.
+
+## The Batcave (control room extras)
+
+The control room has six pages: **Overview**, **Live**, **Money**, **Frats**, **Fame** and **Log**. Code lives in `admin-extras.js` and `ops.js` (server) and `public/batcave.js` (page).
+
+- **Live:** a radar of houses people are viewing, a live ticker (no names or emails), the **beacon** (a site-wide banner for everyone, Free, Full Access or chapter leaders, shown by `public/beacon.js`), **lockdown** switches that pause sign-ups, invite requests or checkout, and the **spotlight** that pins one party to the top of the list.
+- **Money:** revenue by day, this semester and all time, a semester goal, recent sales, **promo codes** (a 100% code grants the pass without Stripe; others discount checkout, minimum $0.50), and **gifts** of Full Access to all leaders, all brothers or a list of emails.
+- **Fame:** Hall of Fame, the Night Forecast of which parties will fill first, growth (conversion, milestones, top referring sites) and Door Rush god mode (double-points events, reset the weekly board, remove a player's scores).
+- **Log:** every change made from the control room, as plain sentences.
+- Search everything from the box at the top, switch on **Batcave mode** with the 🦇 button, and type `batman` anywhere for a surprise.

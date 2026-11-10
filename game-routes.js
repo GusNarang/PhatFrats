@@ -10,7 +10,14 @@ const MAX_POINTS_PER_GUEST = 3000;
 const MAX_GUESTS_PER_SECOND = 3.5;
 const MAX_RUN_MINUTES = 30;
 
-module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL }) {
+module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL, ops }) {
+  // The board covers this week, or less if the admin reset it partway through.
+  const SINCE = `GREATEST(${WEEK_START_SQL}, coalesce($9::timestamptz, '-infinity'))`;
+  async function gameSettings() {
+    const s = ops ? await ops.settings() : {};
+    const eventOn = !!(s.game_event_until && new Date(s.game_event_until) > new Date());
+    return { resetAt: s.game_reset_at || null, eventOn, eventUntil: eventOn ? s.game_event_until : null };
+  }
   const requireFull = [...requireVerified, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     if (req.user.plan !== 'full') return fail(res, 403, 'Door Rush is part of Full Access.', 'GAME_FULL_ONLY');
@@ -29,20 +36,23 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
   };
   // Each person's best game this week. The week resets Monday at midnight in State College.
   async function standings(userId) {
+    const { resetAt } = await gameSettings();
+    const boardSince = SINCE.replace('$9', '$1');
     const [board, mine] = await Promise.all([
       pool.query(
         `WITH best AS (
            SELECT user_id, max(score) AS score FROM game_runs
-           WHERE finished_at >= ${WEEK_START_SQL} GROUP BY user_id
+           WHERE finished_at >= ${boardSince} GROUP BY user_id
          )
          SELECT b.user_id, b.score, u.name FROM best b JOIN users u ON u.id = b.user_id
-         WHERE u.banned_at IS NULL AND u.plan = 'full' ORDER BY b.score DESC, u.name LIMIT 10`
+         WHERE u.banned_at IS NULL AND u.plan = 'full' ORDER BY b.score DESC, u.name LIMIT 10`,
+        [resetAt]
       ),
       pool.query(
         `SELECT coalesce(max(score), 0)::int AS best,
-           coalesce(max(score) FILTER (WHERE finished_at >= ${WEEK_START_SQL}), 0)::int AS week
+           coalesce(max(score) FILTER (WHERE finished_at >= ${SINCE.replace('$9', '$2')}), 0)::int AS week
          FROM game_runs WHERE user_id = $1 AND finished_at IS NOT NULL`,
-        [userId]
+        [userId, resetAt]
       ),
     ]);
     const { best, week } = mine.rows[0];
@@ -50,11 +60,11 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
     if (week > 0) {
       const { rows: [r] } = await pool.query(
         `WITH best AS (
-           SELECT user_id, max(score) AS score FROM game_runs WHERE finished_at >= ${WEEK_START_SQL} GROUP BY user_id
+           SELECT user_id, max(score) AS score FROM game_runs WHERE finished_at >= ${SINCE.replace('$9', '$2')} GROUP BY user_id
          )
          SELECT count(*)::int + 1 AS rank FROM best b JOIN users u ON u.id = b.user_id
          WHERE u.banned_at IS NULL AND u.plan = 'full' AND b.score > $1`,
-        [week]
+        [week, resetAt]
       );
       rank = r.rank;
     }
@@ -68,7 +78,8 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
   app.get('/api/game/status', ...requireVerified, wrap(async (req, res) => {
     res.set('Cache-Control', 'no-store');
     if (req.user.plan !== 'full') return res.json({ access: false });
-    res.json({ access: true, name: req.user.name.split(' ')[0], ...(await standings(req.user.id)) });
+    const { eventOn, eventUntil } = await gameSettings();
+    res.json({ access: true, name: req.user.name.split(' ')[0], event: eventOn, eventUntil, ...(await standings(req.user.id)) });
   }));
 
   app.get('/api/game/client.js', ...requireFull, (req, res) => {
@@ -98,7 +109,9 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
       [ticket, req.user.id, MAX_RUN_MINUTES]
     );
     if (!run) return fail(res, 400, 'That game has already ended.', 'BAD_TICKET');
-    if (guests > run.seconds * MAX_GUESTS_PER_SECOND || score > guests * MAX_POINTS_PER_GUEST) {
+    // Event weeks double every guest's points.
+    const maxPoints = MAX_POINTS_PER_GUEST * ((await gameSettings()).eventOn ? 2 : 1);
+    if (guests > run.seconds * MAX_GUESTS_PER_SECOND || score > guests * maxPoints) {
       return fail(res, 400, "That score doesn't match the game, so it wasn't saved.", 'BAD_SCORE');
     }
     await pool.query('UPDATE game_runs SET score = $2, guests = $3 WHERE ticket = $1', [ticket, score, guests]);

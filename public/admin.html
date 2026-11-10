@@ -131,6 +131,11 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   <header>
     <h1>Control Room<small>PhatFrats · admins only</small></h1>
     <div class="head-actions">
+      <div class="cave-search" role="search">
+        <input type="search" id="caveSearch" placeholder="Search everything…" aria-label="Search accounts, chapters, parties and payments" autocomplete="off">
+        <div class="cave-results" id="caveResults" hidden></div>
+      </div>
+      <button class="btn" type="button" id="caveMode" aria-pressed="false" title="Batcave mode">🦇</button>
       <span class="updated" id="updated"></span>
       <button class="btn" type="button" id="refresh">Refresh</button>
       <a class="btn" href="/">Back to site</a>
@@ -139,7 +144,11 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 
   <nav class="pages" role="tablist" aria-label="Control room pages">
     <button type="button" role="tab" id="tab-overview" aria-controls="pageOverview" aria-selected="true" data-page="overview">Overview</button>
+    <button type="button" role="tab" id="tab-live" aria-controls="pageLive" aria-selected="false" data-page="live">Live</button>
+    <button type="button" role="tab" id="tab-money" aria-controls="pageMoney" aria-selected="false" data-page="money">Money</button>
     <button type="button" role="tab" id="tab-frats" aria-controls="pageFrats" aria-selected="false" data-page="frats">Frats</button>
+    <button type="button" role="tab" id="tab-fame" aria-controls="pageFame" aria-selected="false" data-page="fame">Fame</button>
+    <button type="button" role="tab" id="tab-log" aria-controls="pageLog" aria-selected="false" data-page="log">Log</button>
   </nav>
 
   <div id="pageOverview" role="tabpanel" aria-labelledby="tab-overview">
@@ -611,20 +620,24 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   $("#chapterSearch").addEventListener("input", (e)=>{ state.chQ = e.target.value; renderChapters(); });
 
   // Switching pages. The choice stays in the address (#frats), so Refresh keeps you where you were.
+  const PAGES = ["overview","live","money","frats","fame","log"];
+  const pageEl = (p)=> document.getElementById("page"+p[0].toUpperCase()+p.slice(1));
   function showPage(page){
-    state.page = page === "frats" ? "frats" : "overview";
+    state.page = PAGES.includes(page) && pageEl(page) ? page : "overview";
     for(const b of document.querySelectorAll(".pages [data-page]")){ b.setAttribute("aria-selected", String(b.dataset.page===state.page)); b.tabIndex = b.dataset.page===state.page ? 0 : -1; }
-    $("#pageOverview").hidden = state.page!=="overview";
-    $("#pageFrats").hidden = state.page!=="frats";
-    history.replaceState(null, "", state.page==="frats" ? "#frats" : location.pathname);
+    for(const p of PAGES){ const el = pageEl(p); if(el) el.hidden = p!==state.page; }
+    history.replaceState(null, "", state.page==="overview" ? location.pathname : "#"+state.page);
+    if(window.PFCave) window.PFCave.onPage(state.page);
   }
   document.querySelector(".pages").addEventListener("click", (e)=>{ const b = e.target.closest("[data-page]"); if(b) showPage(b.dataset.page); });
   document.querySelector(".pages").addEventListener("keydown", (e)=>{
     if(e.key!=="ArrowRight" && e.key!=="ArrowLeft") return;
-    showPage(state.page==="frats" ? "overview" : "frats");
+    const shown = PAGES.filter(p=>pageEl(p)), i = shown.indexOf(state.page);
+    showPage(shown[(i + (e.key==="ArrowRight"?1:-1) + shown.length) % shown.length]);
     document.querySelector('.pages [data-page="'+state.page+'"]').focus();
   });
-  showPage(location.hash==="#frats" ? "frats" : "overview");
+  state.startPage = location.hash.slice(1) || "overview";
+  showPage(state.startPage);
 
   let banTarget = null;
   $("#users").addEventListener("click", async (e)=>{
@@ -660,11 +673,15 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   });
 
   $("#search").addEventListener("input", (e)=>{ state.q = e.target.value; renderUsers(); });
-  $("#refresh").addEventListener("click", load);
+  $("#refresh").addEventListener("click", ()=>{ load(); if(window.PFCave) window.PFCave.onPage(state.page, true); });
+  // Shared with the Batcave pages (batcave.js).
+  window.PFAdmin = { api, toast, esc, int, money, smallMoney, dateFmt, ago, drawBars, segButtons, load, showPage, state,
+    findUser: (q)=>{ showPage("overview"); state.q = q; $("#search").value = q; state.filter = "all"; renderUsers(); $("#usersTitle").scrollIntoView({block:"start"}); } };
   // Leaving this page in any way (another site, closing the tab, reloading) locks the control room.
   addEventListener("pagehide", ()=>{ navigator.sendBeacon("/api/admin/lock"); });
   load();
 })();
 </script>
+<script src="/batcave.js"></script>
 </body>
 </html>

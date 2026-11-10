@@ -25,6 +25,11 @@
     const day = (iso) => Date.parse(iso + 'T12:00:00Z') / 86400000;
     return ends.find((e) => day(e) - day(todayISO) >= 30);
   };
+  // The day the current term started (the end of the one before), as 'YYYY-MM-DD'.
+  PRICING.termStart = (todayISO) => {
+    const y = Number(todayISO.slice(0, 4));
+    return [`${y - 1}-08-20`, `${y}-01-10`, `${y}-05-15`, `${y}-08-20`].filter((d) => d <= todayISO).pop();
+  };
   // For example "May 15, 2027".
   PRICING.passEndLabel = (iso) =>
     new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });

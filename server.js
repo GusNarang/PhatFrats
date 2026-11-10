@@ -2,7 +2,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { promisify } = require('util');
 const express = require('express');
-const { rateLimit } = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const partyList = require('./party-list.js');
@@ -115,7 +115,11 @@ const publicUser = (u) => ({
 async function accountPayload(user) {
   if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [], checkout: payments.enabled() };
   const requests = await listRequests(user);
-  return { user: publicUser(user), requests, checkout: payments.enabled(), ...(await partyList.partiesForSite(pool)) };
+  const { parties, days } = await partyList.partiesForSite(pool);
+  const s = await ops.settings();
+  // The admin's spotlight pins one party to the top with a glowing badge.
+  if (s.spotlight) parties.forEach((p) => { if (p.id === s.spotlight) p.spotlight = true; });
+  return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days };
 }
 
 // ---------- email confirmation codes ----------
@@ -258,6 +262,15 @@ let stripeWebhook = (req, res) => res.status(503).json({ error: 'Payments are of
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), (req, res, next) => stripeWebhook(req, res, next));
 app.use(express.json({ limit: '10kb' }));
 
+// Control room switches, the live activity ticker and the admin log. These listen in before the routes below.
+const ops = require('./ops.js').create({ pool, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
+ops.mountActivity(app);
+ops.mountAdminLog(app);
+const LOCKED = {
+  signups: "New sign-ups are paused for a little while. Check back soon.",
+  requests: "Invite requests are paused for a little while. Check back soon.",
+};
+
 const fail = (res, status, error, code) => res.status(status).json({ error, code });
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 const requireUser = wrap(async (req, res, next) => {
@@ -282,6 +295,7 @@ const cleanEmail = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
 const PSU_EMAIL = /^[a-z0-9._%+-]+@psu\.edu$/;
 
 app.post('/api/signup', authLimiter, wrap(async (req, res) => {
+  if (await ops.paused('signups')) return fail(res, 503, LOCKED.signups, 'PAUSED');
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const email = cleanEmail(req.body?.email);
   const password = req.body?.password;
@@ -431,6 +445,7 @@ app.get('/api/requests', requireVerified, wrap(async (req, res) => {
 }));
 
 app.post('/api/requests', requireVerified, wrap(async (req, res) => {
+  if (await ops.paused('requests')) return fail(res, 503, LOCKED.requests, 'PAUSED');
   const partyId = req.body?.partyId;
   if (typeof partyId !== 'string' || !(await partyList.findParty(pool, partyId))) return fail(res, 400, 'That party is not on the schedule.');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
@@ -470,6 +485,7 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
 // A student adds one outside guest (not a Penn State student) to a party they've asked to go to.
 // Only at parties whose chapter allows it. The chapter leader approves the guest separately.
 app.post('/api/requests/guest', requireVerified, wrap(async (req, res) => {
+  if (await ops.paused('requests')) return fail(res, 503, LOCKED.requests, 'PAUSED');
   const partyId = req.body?.partyId;
   const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId) : null;
   if (!party || !party.hosted) return fail(res, 400, 'That party is not on the schedule.');
@@ -548,24 +564,41 @@ app.post('/api/chat', requireVerified, chatLimiter, wrap(async (req, res) => {
 }));
 
 // Counts visits for the control room. The id is random and made up by the browser.
-const hitLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false });
+// Limited per browser, since many students share one campus network address.
+const hitLimiter = rateLimit({
+  windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false,
+  keyGenerator: (req) => (typeof req.body?.v === 'string' ? 'v:' + req.body.v.slice(0, 40) : 'ip:' + ipKeyGenerator(req.ip)),
+});
 app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
   const visitor = typeof req.body?.v === 'string' && /^[a-z0-9]{8,40}$/.test(req.body.v) ? req.body.v : null;
   if (visitor) {
+    // A page view counts once; pings from an open page only keep the live radar current.
+    if (!req.body.ping) {
+      const ref = typeof req.body.ref === 'string' && /^[a-z0-9.-]{3,80}$/i.test(req.body.ref) ? req.body.ref.toLowerCase() : null;
+      await pool.query(
+        `INSERT INTO site_visits (day, visitor, referrer) VALUES (${TODAY_SQL}, $1, $2)
+         ON CONFLICT (day, visitor) DO UPDATE SET views = site_visits.views + 1`,
+        [visitor, ref]
+      );
+    }
+    const path = typeof req.body.path === 'string' ? req.body.path.slice(0, 40) : '/';
+    const looking = typeof req.body.looking === 'string' && /^(house:\d{1,4}|h\d{1,18}|p\d{1,3})$/.test(req.body.looking) ? req.body.looking : null;
     await pool.query(
-      `INSERT INTO site_visits (day, visitor) VALUES (${TODAY_SQL}, $1)
-       ON CONFLICT (day, visitor) DO UPDATE SET views = site_visits.views + 1`,
-      [visitor]
+      `INSERT INTO site_presence (visitor, last_seen, path, looking_at) VALUES ($1, now(), $2, $3)
+       ON CONFLICT (visitor) DO UPDATE SET last_seen = now(), path = EXCLUDED.path, looking_at = EXCLUDED.looking_at`,
+      [visitor, path, looking]
     );
+    if (Math.random() < .01) pool.query(`DELETE FROM site_presence WHERE last_seen < now() - interval '1 day'`).catch(() => {});
   }
   res.status(204).end();
 }));
 
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
-const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload });
+require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
+const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload, ops });
 stripeWebhook = pay.webhookHandler;
 pay.mountRoutes(app);
-require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL });
+require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL, ops });
 require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
