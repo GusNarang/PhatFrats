@@ -383,3 +383,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_invites INTEGER NOT NULL DEFAUL
 ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS used_bonus BOOLEAN NOT NULL DEFAULT FALSE;
 -- Which weeks have had their Door Rush top-10 invites handed out, so it happens once per week.
 ALTER TABLE game_prizes ADD COLUMN IF NOT EXISTS top10_done BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ---------- Full Access perks ----------
+-- Houses a student follows. Full Access followers get an alert the moment the house posts a party;
+-- everyone else hears when the party opens to them, 24 hours later.
+CREATE TABLE IF NOT EXISTS chapter_follows (
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  chapter_id INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, chapter_id)
+);
+CREATE INDEX IF NOT EXISTS chapter_follows_chapter_idx ON chapter_follows(chapter_id);

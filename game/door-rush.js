@@ -12,12 +12,20 @@
   const HAIR = ['#20130d', '#5d3518', '#d7a83c', '#a43f2f', '#111827', '#8b5cf6'];
   const HYPE_FULL = 12, HYPE_SECONDS = 6, GUESTS_PER_LEVEL = 12;
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Door Rush skins, a Full Access perk. Looks only: the doors, guests and scoring are the same for everyone.
+  const THEMES = {
+    classic: { sky: ['#111a48', '#0b1026'], hype: '#32105c', street: '#1b2556', door: '#20295f', stars: '#ffffff' },
+    gold: { sky: ['#3d2c06', '#120c02'], hype: '#5c3d05', street: '#2f2410', door: '#3b2c0a', stars: '#ffd23f' },
+    neon: { sky: ['#2c0b4d', '#0a0420'], hype: '#5a0f6e', street: '#1e0f40', door: '#2b1250', stars: '#35e0ff' },
+    midnight: { sky: ['#060a16', '#000000'], hype: '#131b3d', street: '#0c1224', door: '#121a33', stars: '#9fb3ff' },
+  };
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   const num = (n) => Number(n).toLocaleString('en-US');
 
   function mount(root, api) {
+    const theme = () => THEMES[(api.theme && api.theme()) || 'classic'] || THEMES.classic;
     root.innerHTML = `
       <div class="dr-stage">
         <canvas width="${W}" height="${H}" aria-label="Door Rush game" role="img"></canvas>
@@ -207,11 +215,12 @@
     function drawBackground(t) {
       const hype = g && g.hypeLeft > 0;
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, hype ? '#32105c' : '#111a48'); sky.addColorStop(1, '#0b1026');
+      const th = theme();
+      sky.addColorStop(0, hype ? th.hype : th.sky[0]); sky.addColorStop(1, th.sky[1]);
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-      for (const s of stars) { ctx.globalAlpha = .28 + Math.abs(Math.sin(t + s.p)) * .55; ctx.fillStyle = '#fff'; ctx.fillRect(s.x, s.y, s.r, s.r); }
+      for (const s of stars) { ctx.globalAlpha = .28 + Math.abs(Math.sin(t + s.p)) * .55; ctx.fillStyle = th.stars; ctx.fillRect(s.x, s.y, s.r, s.r); }
       ctx.globalAlpha = 1;
-      ctx.fillStyle = '#1b2556'; ctx.beginPath(); ctx.moveTo(196, 196); ctx.lineTo(284, 196); ctx.lineTo(362, H); ctx.lineTo(118, H); ctx.fill();
+      ctx.fillStyle = th.street; ctx.beginPath(); ctx.moveTo(196, 196); ctx.lineTo(284, 196); ctx.lineTo(362, H); ctx.lineTo(118, H); ctx.fill();
       ctx.strokeStyle = 'rgba(255,210,63,.42)'; ctx.setLineDash([18, 16]); ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(240, 214); ctx.lineTo(240, H); ctx.stroke(); ctx.setLineDash([]);
       ctx.strokeStyle = 'rgba(255,93,108,.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(150, LINE_Y); ctx.lineTo(330, LINE_Y); ctx.stroke();
@@ -221,7 +230,7 @@
         const x = g ? g.doorX[i] : SLOTS[i], y = DOOR_Y;
         ctx.save();
         ctx.shadowColor = house.c; ctx.shadowBlur = g && g.hypeLeft > 0 ? 24 + Math.sin(t * 9) * 10 : 12;
-        ctx.fillStyle = '#20295f'; ctx.strokeStyle = house.c; ctx.lineWidth = 3;
+        ctx.fillStyle = theme().door; ctx.strokeStyle = house.c; ctx.lineWidth = 3;
         roundRect(x - 58, y - 56, 116, 104, 10); ctx.fill(); ctx.stroke();
         ctx.restore();
         ctx.fillStyle = house.c; ctx.beginPath(); ctx.moveTo(x - 68, y - 52); ctx.lineTo(x, y - 94); ctx.lineTo(x + 68, y - 52); ctx.fill();
@@ -374,5 +383,5 @@
     requestAnimationFrame(frame);
   }
 
-  window.PFDoorRush = { mount };
+  window.PFDoorRush = { mount, THEMES: Object.keys(THEMES) };
 })();

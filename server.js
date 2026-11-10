@@ -86,7 +86,7 @@ function expirePasses() {
     .catch((err) => console.error('Could not end expired passes:', err.message));
 }
 // A paid (or given) pass that hasn't ended.
-const PAID_SQL = (u) => `(${u}plan = 'full' AND (${u}plan_paid_until IS NULL OR ${u}plan_paid_until >= now()))`;
+const { PAID_SQL } = require('./plan-sql.js');
 // Full Access comes from a pass or from the first-weekend trial. The trial never changes the stored plan.
 const PLAN_SQL = (u = '') => `CASE WHEN ${PAID_SQL(u)} OR ${u}trial_until > now() THEN 'full' ELSE 'free' END AS plan,
   (${u}trial_until > now() AND NOT ${PAID_SQL(u)}) AS on_trial, ${u}trial_until, ${u}bonus_invites`;
@@ -131,11 +131,24 @@ async function accountPayload(user) {
   if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [], checkout: payments.enabled() };
   const requests = await listRequests(user);
   const s = await ops.settings();
-  const { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo });
+  let { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo });
+  // Early access: Full Access sees a chapter's new party right away; everyone else 24 hours later.
+  // A party someone was already invited to always shows.
+  let early = null;
+  if (user.plan === 'full') parties.forEach((p) => { if (partyList.isEarly(p)) p.early = true; });
+  else {
+    const mine = new Set(requests.map((r) => r.pid));
+    const hidden = parties.filter((p) => partyList.isEarly(p) && !mine.has(p.id));
+    if (hidden.length) {
+      early = { count: hidden.length, nextAt: new Date(Math.min(...hidden.map(partyList.earlyUntil))).toISOString() };
+      parties = parties.filter((p) => !hidden.includes(p));
+      days = days.filter((d) => parties.some((p) => p.day === d.k));
+    }
+  }
   const { rows: saved } = await pool.query('SELECT party_id FROM saved_parties WHERE user_id = $1', [user.id]);
   // The admin's spotlight pins one party to the top with a glowing badge.
   if (s.spotlight) parties.forEach((p) => { if (p.id === s.spotlight) p.spotlight = true; });
-  return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days, saved: saved.map((r) => r.party_id) };
+  return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days, early, saved: saved.map((r) => r.party_id) };
 }
 
 // ---------- email confirmation codes ----------
@@ -289,6 +302,11 @@ const community = require('./community.js').create({
   mailer, IS_PROD, ops, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')],
 });
 community.mountHooks(app);
+// Full Access perks: following houses, with instant alerts for Full Access.
+const premium = require('./premium.js').create({
+  pool, wrap: (fn) => (req, res, next) => fn(req, res, next).catch(next), fail: (res, status, error, code) => res.status(status).json({ error, code }), community,
+});
+premium.mountHooks(app);
 const LOCKED = {
   signups: "New sign-ups are paused for a little while. Check back soon.",
   requests: "Invite requests are paused for a little while. Check back soon.",
@@ -495,7 +513,9 @@ app.get('/api/requests', requireVerified, wrap(async (req, res) => {
 app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   if (await ops.paused('requests')) return fail(res, 503, LOCKED.requests, 'PAUSED');
   const partyId = req.body?.partyId;
-  if (typeof partyId !== 'string' || !(await partyList.findParty(pool, partyId))) return fail(res, 400, 'That party is not on the schedule.');
+  const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId) : null;
+  if (!party) return fail(res, 400, 'That party is not on the schedule.');
+  if (req.user.plan !== 'full' && partyList.isEarly(party)) return fail(res, 403, 'This party is in Full Access early access. It opens to everyone 24 hours after it was posted.', 'EARLY_ACCESS');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
 
   const client = await pool.connect();
@@ -648,6 +668,7 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
+premium.mountRoutes(app, requireVerified);
 // Friends mode: friends, who's going where this weekend, friend profiles and a friends leaderboard.
 require('./friends.js')(app, { pool, wrap, fail, requireVerified, community, WEEK_START_SQL, ops });
 community.mountCron(app);

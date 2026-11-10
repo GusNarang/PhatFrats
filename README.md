@@ -175,6 +175,16 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 - **Install as an app:** the site can be added to a phone's home screen (`public/sw.js` keeps a fallback copy for weak signal; account data is never stored).
 - **Demo parties** can be hidden from the control room (Live) once real chapters are posting.
 
+## Full Access perks
+
+On top of unlimited invites, front of the line and PhatBot (`premium.js` on the server, `public/premium.js` on the site):
+
+- **Early access.** A chapter's new party is Full Access only for its first 24 hours (`party-list.js` `isEarly`). Free accounts don't receive it (or alerts about it) until then, and see a card saying how many are waiting; a party they were already invited to always shows. Requests are refused with `EARLY_ACCESS`.
+- **Follow houses** (`chapter_follows`). When a house posts, Full Access followers get a bell note and email right away; free followers get a bell alert once the party opens to them.
+- **Flair.** A gold ring on the header initials, 💎 by Full Access names in friends lists, profiles and both leaderboards, and Door Rush skins (Classic, Gold Rush, Neon Night, Midnight). Skins only change colors; scoring is identical.
+
+`plan-sql.js` holds the shared "has Full Access right now" SQL (a pass that hasn't ended, or the first-weekend trial).
+
 ## Demo account
 
 For graders and reviewers: log in (not sign up) as `demo@demo.com` through the normal Log in box. The demo link **https://phat-frats.vercel.app/?demo** opens Log in with that email filled in. The account is already confirmed (no email code) and has Full Access with no end date. It is **not** an admin: its role is `user` and it has no control room password.

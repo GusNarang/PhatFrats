@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const partyList = require('./party-list.js');
 const CHAPTERS = require('./public/chapters.js');
+const { FULL_SQL } = require('./plan-sql.js');
 
 const SITE_URL = process.env.SITE_URL || 'https://phat-frats.vercel.app';
 const MAX_FRIENDS = 500;
@@ -97,6 +98,7 @@ module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified,
     const top = Object.entries(going).filter(([pid]) => !skip.has(pid)).sort((a, b) => b[1].length - a[1].length).slice(0, 3);
     for (const [pid, who] of top) {
       const p = await look(pid);
+      if (user.plan !== 'full' && partyList.isEarly(p)) continue;
       const lead = nameOf[who[0]] || 'A friend';
       alerts.push({
         kind: 'friends', party: pid,
@@ -113,7 +115,7 @@ module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified,
     const me = req.user.id, today = partyList.todayISO();
     const [friends, incoming, outgoing, blocked, mine, meRow] = await Promise.all([
       pool.query(
-        `SELECT u.id, u.name, f.accepted_at FROM friendships f
+        `SELECT u.id, u.name, f.accepted_at, ${FULL_SQL('u.')} AS full FROM friendships f
          JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
          WHERE $1 IN (f.requester_id, f.addressee_id) AND f.status = 'accepted' AND u.banned_at IS NULL ORDER BY lower(u.name)`, [me]),
       pool.query(`SELECT u.id, u.name, f.created_at FROM friendships f JOIN users u ON u.id = f.requester_id
@@ -136,6 +138,8 @@ module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified,
     );
     const nameOf = Object.fromEntries(friends.rows.map((f) => [String(f.id), f.name]));
     nameOf[String(me)] = req.user.name;
+    const fullOf = Object.fromEntries(friends.rows.map((f) => [String(f.id), !!f.full]));
+    fullOf[String(me)] = req.user.plan === 'full';
     const code = await community.referralCode(me);
     // Your own plans show even on parties a chapter keeps private, with a note.
     const look = await partyLookup();
@@ -147,13 +151,13 @@ module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified,
     res.json({
       code, link: code ? `${SITE_URL}/?friend=${code}` : null,
       ghost: { on: !!meRow.rows[0]?.ghost, always: !!meRow.rows[0]?.always },
-      friends: friends.rows.map((f) => ({ id: String(f.id), name: f.name, since: f.accepted_at, going: plansOf[String(f.id)] || [] })),
+      friends: friends.rows.map((f) => ({ id: String(f.id), name: f.name, full: !!f.full, since: f.accepted_at, going: plansOf[String(f.id)] || [] })),
       incoming: incoming.rows.map((u) => ({ id: String(u.id), name: u.name, at: u.created_at })),
       outgoing: outgoing.rows.map((u) => ({ id: String(u.id), name: u.name })),
       blocked: blocked.rows.map((u) => ({ id: String(u.id), name: u.name })),
       board: Object.entries(going).map(([partyId, who]) => ({ partyId, friends: who })).sort((a, b) => b.friends.length - a.friends.length),
       mine: myPlans,
-      leaderboard: scores.map((s, i) => ({ place: i + 1, id: String(s.user_id), name: nameOf[String(s.user_id)] || 'Friend', score: s.score, you: String(s.user_id) === String(me) })),
+      leaderboard: scores.map((s, i) => ({ place: i + 1, id: String(s.user_id), name: nameOf[String(s.user_id)] || 'Friend', full: !!fullOf[String(s.user_id)], score: s.score, you: String(s.user_id) === String(me) })),
       suggestions: await suggestions(me, ids),
     });
   }));
@@ -289,7 +293,7 @@ module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified,
     res.set('Cache-Control', 'no-store');
     const id = idParam(req.params.id);
     if (!id || !(await areFriends(req.user.id, id))) return fail(res, 404, "You can only see your friends' profiles.");
-    const { rows: [u] } = await pool.query('SELECT id, name, plan, created_at FROM users WHERE id = $1 AND banned_at IS NULL', [id]);
+    const { rows: [u] } = await pool.query(`SELECT id, name, plan, created_at, ${FULL_SQL()} AS full FROM users WHERE id = $1 AND banned_at IS NULL`, [id]);
     if (!u) return fail(res, 404, "You can only see your friends' profiles.");
     const [prof, game, approved, together, mutual, since, going] = await Promise.all([
       community.profile(u),
@@ -320,7 +324,7 @@ module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified,
     const fav = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
     const g = game.rows[0];
     res.json({
-      id: String(u.id), name: u.name, joined: u.created_at, friendsSince: since.rows[0]?.accepted_at || null,
+      id: String(u.id), name: u.name, full: !!u.full, joined: u.created_at, friendsSince: since.rows[0]?.accepted_at || null,
       streak: prof.streak, badges: prof.badges,
       doorRush: { week: g.week || 0, best: g.best || 0, games: g.games, wins: g.wins },
       parties: approved.rows.length, together: together.rows[0].n,

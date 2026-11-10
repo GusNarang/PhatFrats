@@ -57,7 +57,13 @@ const hostedRow = (r) => ({
   hosted: true,
   allowGuests: !!r.allow_outside_guests,
   hideFriends: !!r.hide_friends,
+  postedAt: r.created_at,
 });
+
+// Early access: a chapter's new party is for Full Access only during its first 24 hours.
+const EARLY_HOURS = 24;
+const earlyUntil = (p) => (p && p.hosted && p.postedAt ? new Date(p.postedAt).getTime() + EARLY_HOURS * 3600 * 1000 : 0);
+const isEarly = (p, now = Date.now()) => earlyUntil(p) > now;
 
 async function hostedParties(pool, { today = todayISO() } = {}) {
   const { rows } = await pool.query(
@@ -107,4 +113,4 @@ async function findParty(pool, id, { includeTest = false } = {}) {
   return r ? hostedRow(r) : null;
 }
 
-module.exports = { DEMO_BY_ID, DAYS_AHEAD, GOING_SQL, todayISO, addDays, dayLabel, demoDate, isHostedId, hostedParties, partiesForSite, findParty };
+module.exports = { EARLY_HOURS, earlyUntil, isEarly, DEMO_BY_ID, DAYS_AHEAD, GOING_SQL, todayISO, addDays, dayLabel, demoDate, isHostedId, hostedParties, partiesForSite, findParty };

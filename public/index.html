@@ -560,6 +560,9 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
           <li>Request invites to as many parties as you want</li>
           <li>Higher preference: your requests go to the front of the host's line</li>
           <li>Chat with PhatBot, the AI party guide</li>
+          <li>💎 Early access: see and request new parties 24 hours before everyone else</li>
+          <li>⭐ Instant alerts the moment a house you follow posts a party</li>
+          <li>A gold ring, a 💎 by your name and Door Rush skins</li>
         </ul>
         <div class="plan-cta" id="fullCta"></div>
       </article>
@@ -805,6 +808,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <script src="/community.js"></script>
 <script src="/friends.js"></script>
 <script src="/guide.js"></script>
+<script src="/premium.js"></script>
 <script>
 (function(){
   // ---------- data ----------
@@ -878,6 +882,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     state.pending = verified ? null : data.user;
     state.requests = verified ? data.requests : [];
     state.saved = verified ? (data.saved || []) : [];
+    state.early = verified ? (data.early || null) : null;
     setParties(verified ? data.parties : [], verified ? data.days : []);
   }
   async function logOut(){
@@ -935,7 +940,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const a = $("#authArea");
     if(state.user){
       const full = state.user.plan === "full";
-      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'"'+(state.user.trial?' title="Full Access free through Sunday"':'')+'>'+(state.user.trial?'Free weekend':full?'Full Access':'Free')+'</span><button class="fr-btn" type="button" id="friendsBtn" aria-label="Friends" title="Friends">👯<b id="friendsCount" hidden></b></button><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn" type="button" id="profileBtn" aria-label="Your profile">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'"'+(state.user.trial?' title="Full Access free through Sunday"':'')+'>'+(state.user.trial?'Free weekend':full?'Full Access':'Free')+'</span><button class="fr-btn" type="button" id="friendsBtn" aria-label="Friends" title="Friends">👯<b id="friendsCount" hidden></b></button><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn'+(full?' gold-ring':'')+'" type="button" id="profileBtn" aria-label="Your profile'+(full?' (Full Access)':'')+'">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
       $("#logoutBtn").onclick = ()=>logOut().catch(e=>toast(e.message));
     } else if(state.pending){
       a.innerHTML = '<button class="btn small" type="button" data-login>Enter your code</button>';
@@ -1229,7 +1234,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<p class="muted">Hosted by '+esc(c.name)+(c.nick?' ('+esc(c.nick)+')':'')+'</p></div>' +
         '<p>'+esc(p.blurb)+'</p>' +
         '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>Invite list + PSU ID</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
-        hypeBlock(p) + chapterLinks(c) +
+        hypeBlock(p) + chapterLinks(c) + (window.PFPremium ? window.PFPremium.followButton(c.id) : '') +
         '<div>'+reqButton(p)+'</div>' +
         (window.PFFriends ? window.PFFriends.detail(p) : '') +
         (window.PFCommunity ? window.PFCommunity.detailExtras(p) : '') +
@@ -1239,7 +1244,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       d.innerHTML =
         '<span class="letters" style="--c:#8f99d6">'+esc(c.gl)+'</span>' +
         '<div><h3 style="font-family:var(--display);font-weight:400;font-size:1.5rem;line-height:1.05">'+esc(c.name)+'</h3>'+(c.nick?'<p class="muted">a.k.a. '+esc(c.nick)+'</p>':'')+'</div>' +
-        chapterLinks(c) +
+        chapterLinks(c) + (window.PFPremium ? window.PFPremium.followButton(c.id) : '') +
         (ps.length ? '<p>Parties this week: '+ps.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a>').join(", ")+'. They\'re hidden by your current filters.</p>'
                    : '<p class="muted">Nothing on the calendar here this week. Follow them on Instagram to catch the next one.</p>');
     }
@@ -1269,17 +1274,20 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     if(!state.user && TEASER){ $("#partyCount").textContent = TEASER.count + " this week"; $("#partyGrid").innerHTML = teaserCards(); return; }
     const vis = visibleParties();
     $("#partyCount").textContent = vis.length + " of " + PARTIES.length + " shown";
+    const earlyCard = window.PFPremium ? window.PFPremium.earlyCard() : "";
     const order = Object.fromEntries(DAYS.map((d,i)=>[d.k,i]));
     const sel = state.selected;
     $("#partyGrid").innerHTML = vis.length ? vis.sort((a,b)=>(b.spotlight?1:0)-(a.spotlight?1:0) || order[a.day]-order[b.day]).map(p=>{
       const c = byId[p.ch], v = VIBES[p.vibe];
       return '<article class="party'+(p.spotlight?' spotlight':'')+(sel&&sel.type==="party"&&sel.id===p.id?' selected':'')+'" style="--c:'+v.c+'" data-party="'+p.id+'" tabindex="0" aria-label="'+esc(p.title)+(p.spotlight?', in the spotlight':'')+'">' +
         (p.spotlight ? '<span class="spot-badge">★ Spotlight</span>' : '') +
+        (p.early ? '<span class="early-tag">💎 Early access</span>' : '') +
         '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+(p.hosted ? ' · Posted by the house' : '')+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
         '<h3>'+esc(p.title)+'</h3><span class="host">'+esc(c.gl)+' · '+esc(c.name)+'</span>' +
         '<p class="blurb">'+esc(p.blurb)+'</p>' +
         '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span><span class="foot-right">'+(window.PFFriends ? window.PFFriends.chip(p.id) : '')+(window.PFCommunity ? window.PFCommunity.saveButton(p.id) : '')+reqButton(p,"small")+'</span></div></article>';
     }).join("") : '<div class="no-results">No parties match that combo. Try another night or vibe.</div>';
+    if(earlyCard) $("#partyGrid").insertAdjacentHTML("afterbegin", earlyCard);
   }
 
   // ---------- my invites ----------
@@ -1654,7 +1662,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       else toast("Request sent to " + host + ". Waiting on the house…");
     } catch(err){
       // At the weekly limit, offer the upgrade right where they hit it.
-      if(err.code === "FREE_LIMIT" && window.PFCommunity){ inviteDlg.close(); state.user.bonusInvites = 0; renderAll(); window.PFCommunity.outOfInvites(); }
+      if(err.code === "EARLY_ACCESS"){ $("#invErr").innerHTML = '<div class="upsell"><span>' + esc(err.message) + '</span><a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a></div>'; }
+      else if(err.code === "FREE_LIMIT" && window.PFCommunity){ inviteDlg.close(); state.user.bonusInvites = 0; renderAll(); window.PFCommunity.outOfInvites(); }
       else if(err.code === "FREE_LIMIT") $("#invErr").innerHTML = '<div class="upsell"><span>' + esc(err.message) + '</span><a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a></div>';
       else $("#invErr").textContent = err.message;
     } finally { btn.disabled = false; }
@@ -1774,6 +1783,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     party: (id)=>partyById[id], parties: ()=>PARTIES };
   if(window.PFCommunity) window.PFCommunity.start();
   if(window.PFFriends) window.PFFriends.start();
+  if(window.PFPremium) window.PFPremium.start();
 })();
 </script>
 

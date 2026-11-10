@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { rateLimit } = require('express-rate-limit');
 const PRICING = require('./public/pricing.js');
+const { FULL_SQL } = require('./plan-sql.js');
 
 const CLIENT = fs.readFileSync(path.join(__dirname, 'game', 'door-rush.js'), 'utf8');
 // The most the game can ever award for one guest, and the fastest guests can arrive per second.
@@ -42,7 +43,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
            SELECT user_id, max(score) AS score FROM game_runs
            WHERE finished_at >= ${boardSince} GROUP BY user_id
          )
-         SELECT b.user_id, b.score, u.name FROM best b JOIN users u ON u.id = b.user_id
+         SELECT b.user_id, b.score, u.name, ${FULL_SQL('u.')} AS full FROM best b JOIN users u ON u.id = b.user_id
          WHERE u.banned_at IS NULL ORDER BY b.score DESC, u.name LIMIT 10`,
         [resetAt]
       ),
@@ -89,7 +90,8 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
       pool.query(`SELECT ${WEEK_START_SQL} + interval '7 days' AS ends`),
     ]);
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
-    const rows = board.rows.map((r, i) => ({ place: i + 1, name: shortName(r.name), score: Number(r.score), you: String(r.user_id) === String(userId) }));
+    // 💎 marks Full Access members on the board. It's a badge only; the game plays the same for everyone.
+    const rows = board.rows.map((r, i) => ({ place: i + 1, name: shortName(r.name), full: !!r.full, score: Number(r.score), you: String(r.user_id) === String(userId) }));
     return {
       best, week, rank, nextUp,
       board: rows,
@@ -130,7 +132,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
   // What the game page shows a logged-in player.
   app.get('/api/game/status', ...requirePlayer, wrap(async (req, res) => {
     const { eventOn, eventUntil } = await gameSettings();
-    res.json({ access: true, name: req.user.name.split(' ')[0], event: eventOn, eventUntil, ...(await standings(req.user.id)) });
+    res.json({ access: true, name: req.user.name.split(' ')[0], full: req.user.plan === 'full', event: eventOn, eventUntil, ...(await standings(req.user.id)) });
   }));
 
   app.get('/api/game/client.js', (req, res) => {

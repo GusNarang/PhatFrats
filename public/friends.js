@@ -64,7 +64,10 @@
   const friendById = (id) => (data ? data.friends.find((f) => f.id === id) : null);
   const goingTo = (pid) => (data ? (data.board.find((b) => b.partyId === pid) || { friends: [] }).friends.map(friendById).filter(Boolean) : []);
   const amGoing = (pid) => !!(data && data.mine.some((m) => m.partyId === pid));
-  const stack = (people, max = 4) => `<span class="fr-stack">${people.slice(0, max).map((p) => `<span class="fr-av" title="${esc(p.name)}">${esc(initials(p.name))}</span>`).join('')}</span>`;
+  // Full Access members get a gold ring and a 💎.
+  const av = (p, style = '') => `<span class="fr-av${p.full ? ' gold-ring' : ''}"${style ? ` style="${style}"` : ''} title="${esc(p.name)}${p.full ? ' · Full Access' : ''}">${esc(initials(p.name))}</span>`;
+  const gem = (p) => (p.full ? ' <span title="Full Access">💎</span>' : '');
+  const stack = (people, max = 4) => `<span class="fr-stack">${people.slice(0, max).map((p) => av(p)).join('')}</span>`;
   const names = (people) => {
     const n = people.map((p) => esc(firstName(p.name)));
     return n.length <= 2 ? n.join(' and ') : `${n.slice(0, 2).join(', ')} and ${n.length - 2} more`;
@@ -170,8 +173,8 @@
     if (!data.friends.length) html += `<div class="fr-empty"><i>🫂</i>No friends yet.<br><button class="btn small" type="button" data-fr-tab="add" style="margin-top:10px">Add friends</button></div>`;
     else html += data.friends.map((f) => {
       const plans = f.going.map((pid) => S().party(pid)).filter(Boolean);
-      return `<div class="fr-card"><div class="fr-row"><span class="fr-av">${esc(initials(f.name))}</span>
-        <span class="grow"><b>${esc(f.name)}</b><br><span class="fr-muted">${plans.length ? '🔥 Going to ' + plans.map((p) => esc(p.title)).join(', ') : 'No plans shared this weekend'}</span></span>
+      return `<div class="fr-card"><div class="fr-row">${av(f)}
+        <span class="grow"><b>${esc(f.name)}</b>${gem(f)}<br><span class="fr-muted">${plans.length ? '🔥 Going to ' + plans.map((p) => esc(p.title)).join(', ') : 'No plans shared this weekend'}</span></span>
         <button class="btn ghost small" type="button" data-fr-profile="${esc(f.id)}">Profile</button></div></div>`;
     }).join('');
     return `<div style="display:flex;flex-direction:column;gap:8px">${html}</div>`;
@@ -191,7 +194,7 @@
   function boardTab() {
     const rows = data.leaderboard;
     return `<div style="display:flex;flex-direction:column;gap:8px"><span class="fr-muted">This week's best Door Rush scores among you and your friends. Resets Monday at midnight.</span>
-      ${rows.length ? rows.map((r) => `<div class="fr-card"><div class="fr-row"><span class="fr-rank">${r.place === 1 ? '👑' : '#' + r.place}</span><span class="fr-av">${esc(initials(r.name))}</span><span class="grow"><b>${esc(r.you ? 'You' : r.name)}</b></span><b style="font-family:var(--mono);color:var(--gold)">${r.score.toLocaleString('en-US')}</b></div></div>`).join('')
+      ${rows.length ? rows.map((r) => `<div class="fr-card"><div class="fr-row"><span class="fr-rank">${r.place === 1 ? '👑' : '#' + r.place}</span>${av(r)}<span class="grow"><b>${esc(r.you ? 'You' : r.name)}</b>${gem(r)}</span><b style="font-family:var(--mono);color:var(--gold)">${r.score.toLocaleString('en-US')}</b></div></div>`).join('')
         : '<div class="fr-empty"><i>🕹️</i>No scores from your crew this week yet.</div>'}
       <a class="btn small" href="/game" style="align-self:flex-start">Play Door Rush</a></div>`;
   }
@@ -224,8 +227,8 @@
     const date = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     const plans = p.going.map((pid) => S().party(pid)).filter(Boolean);
     box.innerHTML = `<div class="fr-head"><button class="btn ghost small" type="button" data-fr-back>← Friends</button><button class="btn ghost small" type="button" data-fr-close>Close</button></div>
-      <div class="fr-row"><span class="fr-av" style="width:56px;height:56px;font-size:1.1rem">${esc(initials(p.name))}</span>
-        <span class="grow"><h3 id="pfFriendsTitle" style="margin:0">${esc(p.name)}</h3><span class="fr-muted">On PhatFrats since ${esc(date(p.joined))}${p.friendsSince ? ` · Friends since ${esc(date(p.friendsSince))}` : ''}</span></span></div>
+      <div class="fr-row">${av(p, 'width:56px;height:56px;font-size:1.1rem')}
+        <span class="grow"><h3 id="pfFriendsTitle" style="margin:0">${esc(p.name)}${gem(p)}</h3><span class="fr-muted">On PhatFrats since ${esc(date(p.joined))}${p.friendsSince ? ` · Friends since ${esc(date(p.friendsSince))}` : ''}</span></span></div>
       ${plans.length ? `<div class="fr-card"><b>🔥 This weekend</b>${plans.map((x) => `<div class="fr-row"><span class="grow">${partyLine(x.id)}</span><button class="btn small" type="button" data-fr-party="${esc(x.id)}">Open</button></div>`).join('')}</div>` : ''}
       <div class="fr-stats">
         <div class="fr-stat"><b>${p.streak}</b><span>weekend streak</span></div>

@@ -59,7 +59,8 @@
       <ul><li><b>Tap a glowing house</b> to see the party: theme, day and start time, dress code and music.</li>
       <li>The <b>hype meter</b> shows how full the party is getting. When it's nearly full, spots go fast.</li>
       <li>Use the <b>night</b> and <b>vibe</b> filters (Neon, Costume, Daytime, Chill, Dress up, Philanthropy) to narrow it down.</li>
-      <li>Scroll down to <b>This week's parties</b> to see them all as cards instead.</li></ul>`],
+      <li>Scroll down to <b>This week's parties</b> to see them all as cards instead.</li>
+      <li>Tap <b>☆ Follow this house</b> on any house to get alerts when it posts a party.</li></ul>`],
     ['Start here', 'invite', '🎟️', 'Getting on the list', 'How invites work', `
       <ol><li>Open a party and tap <b>Request invite</b>.</li>
       <li>The fraternity sees your request and decides. You'll be <b>approved</b> ("you're on the list") or <b>waitlisted</b> if it's packed.</li>
@@ -73,7 +74,10 @@
       <p><b>Full Access (${price} a ${term}):</b></p>
       <ul><li><b>Unlimited</b> invite requests.</li>
       <li>Your requests go to the <b>front of the line</b> with hosts.</li>
-      <li><b>PhatBot</b>, the AI party guide.</li></ul>
+      <li><b>PhatBot</b>, the AI party guide.</li>
+      <li>💎 <b>Early access</b>: when a house posts a new party, you see it and can request it <b>24 hours before everyone else</b>.</li>
+      <li>⭐ <b>Instant alerts</b> the moment a house you follow posts a party.</li>
+      <li>A <b>gold ring</b> around your initials, a <b>💎</b> by your name for friends and on leaderboards, and <b>Door Rush skins</b> (looks only).</li></ul>
       <p>It's <b>one payment with no auto-renew</b>, and it lasts until the end of the term. Pay securely by card from the <b>Passes</b> section. Have a promo code? Enter it at checkout.</p>
       ${tip('You can get Full Access free: bring 3 friends, or win the weekly Door Rush prize. See "Free semester" and "Door Rush" below.')}`],
 

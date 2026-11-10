@@ -26,6 +26,10 @@ h1{font:400 clamp(32px,7vw,54px)/1 var(--display);margin:0 0 6px;color:var(--gol
 .layout{display:grid;grid-template-columns:minmax(0,480px) minmax(240px,1fr);gap:20px;align-items:start}
 @media(max-width:760px){.layout{grid-template-columns:minmax(0,1fr)}}
 .card{background:var(--night-2);border:1px solid var(--line);border-radius:16px;padding:18px}
+.skin-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.skin-row button{font:700 13px var(--body);color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:30px 4px 8px;cursor:pointer;background:var(--sw) top/100% 24px no-repeat,var(--night-3)}
+.skin-row button[aria-pressed="true"]{border-color:var(--gold)}
+.skin-row button:disabled{opacity:.55;cursor:not-allowed}
 .card h2{font:400 18px var(--display);margin:0 0 10px}
 .gate{max-width:560px;margin:8vh auto;text-align:center}
 .gate p{color:var(--muted)}
@@ -112,6 +116,11 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
           <div class="meter" aria-hidden="true"><i id="raceBar" style="width:0"></i></div>
           <p class="note" id="raceText" style="margin:0"></p>
         </section>
+        <section class="card skins" id="skinCard" aria-labelledby="skinTitle" hidden>
+          <h2 id="skinTitle">💎 Door Rush skins</h2>
+          <div class="skin-row" id="skinRow" role="group" aria-label="Choose a skin"></div>
+          <p class="note" id="skinNote" style="margin:8px 0 0"></p>
+        </section>
         <section class="card" aria-labelledby="boardTitle">
           <h2 id="boardTitle">This week's top 10</h2>
           <ol class="board" id="board"></ol>
@@ -196,7 +205,7 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
     lastRank = s.rank;
 
     // Leaderboard, with your own row when you're outside the top 10.
-    let rows = s.board.map(r=>'<li class="'+(r.you?'you ':'')+(r.place===1?'crown':'')+'"><span>'+r.place+'</span><span>'+esc(r.name)+'</span><span>'+num(r.score)+'</span></li>');
+    let rows = s.board.map(r=>'<li class="'+(r.you?'you ':'')+(r.place===1?'crown':'')+'"><span>'+r.place+'</span><span>'+esc(r.name)+(r.full?' <span title="Full Access">💎</span>':'')+'</span><span>'+num(r.score)+'</span></li>');
     if(s.me) rows.push('<li class="gap">…</li><li class="you"><span>'+s.me.place+'</span><span>You</span><span>'+num(s.me.score)+'</span></li>');
     $("#board").innerHTML = rows.length ? rows.join("") : '<li class="empty" style="display:block">Nobody has played this week. Take first place and the prize lead.</li>';
 
@@ -244,6 +253,22 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
       document.body.appendChild(s);
     });
   }
+  // Skins: Full Access picks one (remembered in this browser); everyone else sees what they unlock.
+  const SKINS = [["classic","Classic","linear-gradient(#111a48,#1b2556)"],["gold","Gold Rush","linear-gradient(#3d2c06,#ffd23f)"],["neon","Neon Night","linear-gradient(#2c0b4d,#35e0ff)"],["midnight","Midnight","linear-gradient(#060a16,#9fb3ff)"]];
+  let skin = "classic";
+  try{ skin = localStorage.getItem("pf_dr_skin") || "classic"; }catch(e){}
+  function skins(full){
+    $("#skinCard").hidden = false;
+    $("#skinRow").innerHTML = SKINS.map(([k,label,sw])=>'<button type="button" data-skin="'+k+'" style="--sw:'+sw+'" aria-pressed="'+(full && skin===k)+'"'+(full||k==="classic"?'':' disabled')+'>'+label+'</button>').join("");
+    $("#skinNote").innerHTML = full ? "Looks only. The game plays the same for everyone." : 'Skins come with <a href="/#plans" style="color:var(--gold)">Full Access</a>. Looks only, never extra points.';
+  }
+  document.addEventListener("click", e=>{
+    const b = e.target.closest && e.target.closest("[data-skin]");
+    if(!b || b.disabled) return;
+    skin = b.dataset.skin;
+    try{ localStorage.setItem("pf_dr_skin", skin); }catch(err){}
+    document.querySelectorAll("[data-skin]").forEach(x=>x.setAttribute("aria-pressed", String(x===b)));
+  });
   (async function(){
     let status;
     try{ status = await api("/api/game/status"); }
@@ -265,8 +290,10 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
     $("#hello").textContent = "You're on the door tonight, "+status.name+". Don't let the line reach you.";
     standings(status); show("play");
     if(status.event) $("#hello").textContent += " It's event week: every point counts double!";
+    skins(status.full);
     window.PFDoorRush.mount($("#game"), {
       event: !!status.event,
+      theme: ()=> status.full ? skin : "classic",
       start: async ()=> (await api("/api/game/start", {})).ticket,
       finish: async (ticket, r)=>{ const s = await api("/api/game/finish", {ticket, score:r.score, guests:r.guests}); s.event = status.event; standings(s); return s; },
     });
