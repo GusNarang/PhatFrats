@@ -205,3 +205,14 @@ CREATE TABLE IF NOT EXISTS payments (
   paid_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id);
+
+-- What a chapter's leaders wrote about their chapter, and colors they picked instead of the national ones.
+CREATE TABLE IF NOT EXISTS chapter_profiles (
+  chapter_id INTEGER PRIMARY KEY,
+  tagline    TEXT NOT NULL DEFAULT '',
+  about      TEXT NOT NULL DEFAULT '',
+  color1     TEXT,
+  color2     TEXT,
+  updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

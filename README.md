@@ -138,3 +138,9 @@ Checkout stays off until these are set in Vercel:
 - `STRIPE_WEBHOOK_SECRET`: the signing secret of a webhook endpoint at `https://phat-frats.vercel.app/api/stripe/webhook`, listening for `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
 
 A payment is recorded both by the webhook and when the buyer returns to the site, so either one alone is enough. Each payment is stored once in the `payments` table. The control room counts only live-mode payments as sales.
+
+### Chapter pages
+
+Each chapter's portal page uses its own identity: national colors and founding (`data/chapter-identity.js`), Greek letters, address, Instagram, live stats and its next party. Leaders can add a tagline and story and pick their own colors in **Settings → Chapter page**. Beta Sigma Beta and Tau Phi Delta have no published colors, so their pages use the site colors until a leader picks some.
+
+The admin can open any chapter's page, with or without a leader, from **Open page** in the control room's Chapters table (`/frats?chapter=ID`). It works only while the control room is unlocked, and gives everything a leader can do.

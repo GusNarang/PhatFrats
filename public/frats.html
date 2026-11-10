@@ -59,6 +59,36 @@ textarea{min-height:96px;resize:vertical}
 .steps li{background:var(--night-2);border:1px solid var(--line);border-radius:16px;padding:16px;counter-increment:s}
 .steps li::before{content:counter(s);display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--pink);color:#fff;font:400 16px var(--display);margin-bottom:8px}
 .chapter-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+/* Each chapter's page takes its own colors: --ch1 and --ch2 are its colors darkened for the banner,
+   --acc is a bright version for text and outlines on the dark page. */
+#viewChapter{--ch1:#3a1d6e;--ch2:#123a5c;--acc:var(--cyan)}
+#viewChapter h2{color:var(--acc)}
+.ch-hero{position:relative;overflow:hidden;border-radius:22px;padding:24px 22px 20px;margin-bottom:14px;background:linear-gradient(135deg,var(--ch1),var(--ch2));border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px -20px var(--acc)}
+.ch-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 20%,rgba(255,255,255,.16) 0 2px,transparent 3px) 0 0/28px 28px,linear-gradient(180deg,transparent 40%,rgba(11,16,38,.55));pointer-events:none}
+.ch-hero > *{position:relative}
+.ch-watermark{position:absolute!important;right:-10px;bottom:-34px;font:400 clamp(110px,26vw,210px)/1 var(--display);color:rgba(255,255,255,.09);letter-spacing:-.02em;pointer-events:none;white-space:nowrap}
+.ch-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ch-kind{font:500 12px var(--mono);text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,.85)}
+.ch-hero .gl{font-size:clamp(42px,9vw,66px);color:#fff;text-shadow:3px 3px 0 rgba(0,0,0,.35)}
+.ch-hero h1{color:#fff;text-shadow:3px 3px 0 rgba(0,0,0,.35);margin:6px 0 4px}
+.ch-tagline{font-size:20px;font-weight:700;margin:0 0 8px;color:#fff}
+.ch-facts{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;color:rgba(255,255,255,.9);font-size:15px}
+.ch-facts a{color:#fff}
+.ch-colors{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.ch-swatch{display:inline-flex;align-items:center;gap:8px;background:rgba(11,16,38,.45);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px 4px 5px;font-size:13px;font-weight:600}
+.ch-swatch i{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.75)}
+.ch-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.ch-stat{background:var(--night-2);border:1px solid var(--line);border-top:4px solid var(--acc);border-radius:14px;padding:12px 14px}
+.ch-stat b{display:block;font:800 30px/1.1 var(--body)}
+.ch-stat span{color:var(--muted);font-size:14px}
+.ch-feature{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;margin-bottom:6px}
+@media(max-width:700px){.ch-feature{grid-template-columns:1fr}}
+.ch-next{border-color:var(--acc);background:linear-gradient(160deg,color-mix(in srgb,var(--acc) 16%,var(--night-2)),var(--night-2))}
+.ch-next .count{font:400 26px var(--display);color:var(--acc)}
+.admin-note{background:rgba(255,210,63,.12);border:1px solid rgba(255,210,63,.5);color:#ffe9a3;border-radius:14px;padding:12px 16px;margin-bottom:14px;font-weight:600}
+.color-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.color-row input[type=color]{width:64px;height:48px;padding:4px;cursor:pointer}
+@media (prefers-reduced-motion:no-preference){.ch-hero{animation:chGlow 6s ease-in-out infinite alternate}@keyframes chGlow{to{box-shadow:0 18px 60px -14px var(--acc)}}}
 .gl{font:400 34px var(--display);color:var(--cyan);line-height:1}
 .badge{display:inline-block;font:500 13px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:4px 10px;border-radius:999px;border:1px solid var(--line)}
 .badge.leader{background:var(--gold);color:var(--night);border-color:var(--gold)}
@@ -69,7 +99,7 @@ textarea{min-height:96px;resize:vertical}
 .badge.count{background:var(--pink);color:#fff;border-color:var(--pink);padding:1px 8px;margin-left:4px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
 .tabs button{font:700 16px var(--body);background:transparent;border:2px solid transparent;color:var(--muted);border-radius:999px;padding:9px 16px;min-height:44px;cursor:pointer}
-.tabs button[aria-selected="true"]{background:var(--night-3);border-color:var(--cyan);color:var(--ink)}
+.tabs button[aria-selected="true"]{background:var(--night-3);border-color:var(--acc,var(--cyan));color:var(--ink)}
 .party{border:1px solid var(--line);border-left:6px solid var(--c, var(--cyan));border-radius:14px;padding:16px;margin-bottom:12px;background:var(--night)}
 .party .when{font:500 14px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .party p{margin:6px 0}
@@ -166,13 +196,20 @@ textarea{min-height:96px;resize:vertical}
 
     <!-- In a chapter -->
     <section id="viewChapter" hidden>
-      <div class="chapter-head">
-        <div>
-          <div class="gl" id="chGl"></div>
-          <h1 id="chName" style="margin-top:6px"></h1>
-          <p class="muted" style="margin:0" id="chMeta"></p>
-        </div>
-        <span class="badge" id="chRole"></span>
+      <div class="admin-note" id="adminNote" hidden>You're viewing this chapter as the PhatFrats admin, with everything a leader can do. Keep the control room open in its own tab while you work here.</div>
+      <header class="ch-hero" id="chHero">
+        <div class="ch-watermark" id="chWatermark" aria-hidden="true"></div>
+        <div class="ch-top"><span class="ch-kind" id="chKind"></span><span class="badge" id="chRole"></span></div>
+        <div class="gl" id="chGl"></div>
+        <h1 id="chName"></h1>
+        <p class="ch-tagline" id="chTagline" hidden></p>
+        <p class="ch-facts" id="chFacts"></p>
+        <div class="ch-colors" id="chColors"></div>
+      </header>
+      <section class="ch-stats" id="chStats" aria-label="Chapter numbers"></section>
+      <div class="ch-feature">
+        <section class="card ch-next" id="chNext" aria-label="Next party"></section>
+        <section class="card" id="chAbout" aria-labelledby="aboutTitle"></section>
       </div>
       <div id="chMsg" role="status" aria-live="polite"></div>
 
@@ -319,6 +356,30 @@ textarea{min-height:96px;resize:vertical}
 
       <!-- Settings -->
       <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
+        <div class="card" id="profileCard" hidden>
+          <h2>Chapter page</h2>
+          <p class="muted" style="margin-top:0">How your chapter shows up at the top of this page for your brothers.</p>
+          <form id="profileForm" novalidate>
+            <div id="profileMsg" role="alert"></div>
+            <div class="field">
+              <label for="pTagline">Tagline <span class="hint">One line, up to 90 characters.</span></label>
+              <input id="pTagline" maxlength="90" placeholder="For example: Brotherhood, service and the best tailgates on Fraternity Row">
+            </div>
+            <div class="field">
+              <label for="pAbout">About the chapter <span class="hint">Your story, what you're known for, your philanthropy. Up to 700 characters.</span></label>
+              <textarea id="pAbout" maxlength="700"></textarea>
+            </div>
+            <div class="field">
+              <span style="display:block;font-weight:700;margin-bottom:6px">Page colors <span class="hint" id="pColorHint"></span></span>
+              <div class="color-row">
+                <label class="sr" for="pColor1">First color</label><input id="pColor1" type="color">
+                <label class="sr" for="pColor2">Second color</label><input id="pColor2" type="color">
+                <button class="btn slim" type="button" id="pColorReset">Use national colors</button>
+              </div>
+            </div>
+            <button class="btn primary" type="submit">Save chapter page</button>
+          </form>
+        </div>
         <div class="card" id="pwCard" hidden>
           <h2>Chapter passwords</h2>
           <p class="muted" style="margin-top:0">The brother password lets brothers join. The leader password signs someone in as a leader, so only share it with people who should run the chapter. Changing a password doesn't remove anyone, so also remove people who left from the Members tab.</p>
@@ -372,9 +433,12 @@ textarea{min-height:96px;resize:vertical}
   function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true,3500); }
   const say = (el, msg, kind="err")=>{ el.innerHTML = msg ? '<div class="notice '+kind+'">'+esc(msg)+'</div>' : ""; };
 
+  // The admin opens a chapter from the control room with ?chapter=ID.
+  const viewAs = (/^\d{1,4}$/.test(new URLSearchParams(location.search).get("chapter") || "") ? new URLSearchParams(location.search).get("chapter") : "");
   async function api(path, body){
     let res;
-    try{ res = await fetch(path, body===undefined ? {cache:"no-store"} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}); }
+    const extra = viewAs ? {"X-PF-Chapter": viewAs} : {};
+    try{ res = await fetch(path, body===undefined ? {cache:"no-store", headers:extra} : {method:"POST", headers:{"Content-Type":"application/json", ...extra}, body:JSON.stringify(body)}); }
     catch(e){ throw new Error("Can't reach PhatFrats. Check your connection and try again."); }
     const data = await res.json().catch(()=>({}));
     if(!res.ok){ const err = new Error(data.error || "Something went wrong. Try again."); err.status=res.status; err.code=data.code; throw err; }
@@ -476,12 +540,118 @@ textarea{min-height:96px;resize:vertical}
     goTab(ks[(i + (e.key==="ArrowRight"?1:-1) + ks.length) % ks.length]);
   });
 
+  // ---------- chapter identity ----------
+  const NIGHT = [11,16,38];
+  const rgb = (h)=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+  const toHex = (c)=>"#"+c.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,"0")).join("");
+  const mix = (h, other, t)=>toHex(rgb(h).map((v,i)=>v+(other[i]-v)*t));
+  function hsl(h){ const [r,g,b]=rgb(h).map(v=>v/255), mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2; const s = mx===mn ? 0 : (l>.5 ? (mx-mn)/(2-mx-mn) : (mx-mn)/(mx+mn)); return {s,l}; }
+  // A bright, readable accent from the chapter's colors: the most colorful one, lightened if it's dark.
+  function accentFrom(theme){
+    const colorful = theme.filter(h=>hsl(h).s > .25).sort((a,b)=>hsl(b).s-hsl(a).s)[0];
+    if(!colorful) return "#ffd23f";
+    let a = colorful; for(let i=0;i<6 && hsl(a).l < .6;i++) a = mix(a,[255,255,255],.22);
+    return a;
+  }
+  function applyTheme(identity){
+    const theme = identity.theme.length ? identity.theme : ["#ff3fa4","#35e0ff"];
+    const c1 = theme[0], c2 = theme[1] || theme[0];
+    // White or very light colors are darkened for the banner so the white text stays readable.
+    const banner = (h, t)=> mix(h, NIGHT, hsl(h).l > .7 ? .72 : t);
+    const el = $("#viewChapter");
+    el.style.setProperty("--ch1", banner(c1, .16));
+    el.style.setProperty("--ch2", banner(c2, .5));
+    el.style.setProperty("--acc", accentFrom(theme));
+  }
+  function renderIdentity(){
+    const d = state.data, m = d.membership, idn = d.identity;
+    applyTheme(idn);
+    $("#adminNote").hidden = !m.adminView;
+    $("#chWatermark").textContent = m.chapter.gl;
+    $("#chKind").textContent = m.chapter.test ? "Practice chapter" : (idn.kind || "Penn State IFC chapter");
+    $("#chTagline").hidden = !idn.tagline; $("#chTagline").textContent = idn.tagline;
+    const facts = [];
+    if(idn.founded) facts.push("Est. "+idn.founded.year+" · "+idn.founded.place);
+    if(m.address) facts.push('<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(m.address+", State College, PA")+'" target="_blank" rel="noopener">'+esc(m.address)+'</a>');
+    if(m.instagram) facts.push('<a href="https://www.instagram.com/'+encodeURIComponent(m.instagram)+'/" target="_blank" rel="noopener">@'+esc(m.instagram)+'</a>');
+    $("#chFacts").innerHTML = facts.map(f=>'<span>'+(f.startsWith("<a")?f:esc(f))+'</span>').join("");
+    const swatches = idn.customColors ? idn.theme.map((h,i)=>({name: i ? "Second color" : "First color", hex:h})) : idn.colors;
+    $("#chColors").innerHTML = swatches.map(c=>'<span class="ch-swatch"><i style="background:'+c.hex+'"></i>'+esc(c.name)+'</span>').join("");
+
+    const upcoming = d.parties.filter(p=>p.status==="live" && !p.past).sort((a,b)=>a.day.localeCompare(b.day));
+    const onLists = upcoming.reduce((s,p)=>s+p.going,0);
+    const invites = d.members.reduce((s,x)=>s+x.invites,0);
+    const stats = [
+      [d.members.length, d.members.length===1 ? "brother on PhatFrats" : "brothers on PhatFrats"],
+      [upcoming.length, upcoming.length===1 ? "party coming up" : "parties coming up"],
+      [onLists, "people on your lists"],
+      [invites, invites===1 ? "brother invite sent" : "brother invites sent"],
+    ];
+    $("#chStats").innerHTML = stats.map(s=>'<div class="ch-stat"><b>'+Number(s[0]).toLocaleString("en-US")+'</b><span>'+esc(s[1])+'</span></div>').join("");
+
+    const next = upcoming[0];
+    if(next){
+      const days = Math.round((Date.parse(next.day+"T12:00:00Z") - Date.parse(state.data.today+"T12:00:00Z"))/86400000);
+      const when = days===0 ? "Tonight" : days===1 ? "Tomorrow" : "In "+days+" days";
+      const pct = Math.min(100, Math.round(next.going/next.cap*100));
+      $("#chNext").innerHTML = '<h2 style="margin-bottom:4px">Next up</h2><div class="count">'+when+'</div>'
+        + '<h3 style="margin-top:6px">'+esc(next.title)+'</h3><p class="muted small" style="margin:0">'+esc(next.dayText)+' · '+esc(next.time)+' · '+esc(VIBES[next.vibe].label)+'</p>'
+        + '<div class="meter" style="--c:var(--acc)" role="img" aria-label="'+next.going+' of '+next.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
+        + '<p class="small muted" style="margin:0 0 10px">'+next.going+' of '+next.cap+' on the list'+(next.waiting ? ' · '+next.waiting+' waiting for an answer' : '')+'</p>'
+        + '<div class="btn-row"><button class="btn slim primary" type="button" data-invite="'+next.id+'">Invite people</button>'+(leader() && next.waiting ? '<button class="btn slim" type="button" data-requests="'+next.id+'">Answer requests</button>' : '')+'</div>';
+    } else {
+      $("#chNext").innerHTML = '<h2>Next up</h2><p class="muted" style="margin-top:0">No parties on the calendar yet.</p>'
+        + (leader() ? '<button class="btn primary slim" type="button" data-newparty>+ Post a party</button>' : '<p class="muted small" style="margin:0">Your chapter leader posts parties here, then everyone can invite people.</p>');
+    }
+
+    const defaultAbout = m.chapter.test
+      ? "A practice chapter for trying out the portal. Nothing posted here appears on the public map."
+      : m.chapter.name+(idn.founded ? " was founded in "+idn.founded.year+" ("+idn.founded.place+")" : "")+". This is your chapter's home on PhatFrats: post parties, answer requests and invite the people you want there.";
+    $("#chAbout").innerHTML = '<h2 id="aboutTitle">About '+esc(m.nick || m.chapter.gl)+'</h2><p style="margin-top:0;white-space:pre-line">'+esc(idn.about || defaultAbout)+'</p>'
+      + (leader() ? '<button class="btn slim" type="button" data-editpage>'+(idn.about ? "Edit chapter page" : "Write your chapter's story")+'</button>' : '');
+  }
+  $("#chNext").addEventListener("click", (e)=>{
+    const inv = e.target.closest("[data-invite]"); if(inv){ $("#invParty").value = inv.dataset.invite; goTab("invite"); $("#invEmail").focus(); return; }
+    const rq = e.target.closest("[data-requests]"); if(rq){ state.reqParty = rq.dataset.requests; renderRequests(); renderGuestRequests(); goTab("requests"); return; }
+    if(e.target.closest("[data-newparty]")) openPartyForm(null);
+  });
+  $("#chAbout").addEventListener("click", (e)=>{
+    if(!e.target.closest("[data-editpage]")) return;
+    goTab("settings"); $("#profileCard").scrollIntoView({block:"start"}); $("#pTagline").focus();
+  });
+  function fillProfileForm(){
+    const idn = state.data.identity;
+    $("#pTagline").value = idn.tagline; $("#pAbout").value = idn.about;
+    const theme = idn.theme.length ? idn.theme : ["#ff3fa4","#35e0ff"];
+    $("#pColor1").value = theme[0]; $("#pColor2").value = theme[1] || theme[0];
+    $("#pColorHint").textContent = idn.customColors ? "Custom colors are on." : idn.colors.length ? "Using your national colors." : "No national colors are on file, so pick your own.";
+    $("#pColorReset").hidden = !idn.customColors;
+  }
+  async function saveProfile(extra){
+    say($("#profileMsg"), "");
+    try{
+      const body = { tagline:$("#pTagline").value, about:$("#pAbout").value, ...(extra || {}) };
+      if(!body.resetColors){ body.color1 = $("#pColor1").value; body.color2 = $("#pColor2").value; }
+      const r = await api("/api/chapter/profile", body);
+      state.data.identity = r.identity;
+      renderIdentity(); fillProfileForm();
+      say($("#profileMsg"), "Chapter page saved.", "ok");
+    }catch(err){ say($("#profileMsg"), err.message); }
+  }
+  $("#profileForm").addEventListener("submit", (e)=>{ e.preventDefault(); saveProfile(); });
+  $("#pColorReset").addEventListener("click", ()=>saveProfile({resetColors:true}));
+  // Changing a color previews it on the page right away.
+  for(const id of ["pColor1","pColor2"]) $("#"+id).addEventListener("input", ()=>applyTheme({theme:[$("#pColor1").value, $("#pColor2").value]}));
+
   function renderChapter(){
     const d = state.data, m = d.membership;
     $("#chGl").textContent = m.chapter.gl;
     $("#chName").textContent = m.chapter.name;
-    $("#chMeta").textContent = (m.address ? m.address+" · " : "") + d.members.length + (d.members.length===1?" brother":" brothers") + " on PhatFrats";
-    $("#chRole").textContent = leader() ? "Chapter leader" : "Brother";
+    renderIdentity();
+    $("#profileCard").hidden = !leader();
+    if(leader()) fillProfileForm();
+    $("#leaveBtn").closest(".card").hidden = !!m.adminView;
+    $("#chRole").textContent = m.adminView ? "Admin view" : leader() ? "Chapter leader" : "Brother";
     $("#chRole").className = "badge" + (leader() ? " leader" : "");
     $("#newPartyBtn").hidden = !leader();
     $("#pwCard").hidden = !leader();

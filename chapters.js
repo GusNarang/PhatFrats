@@ -3,6 +3,7 @@
 // - every brother can personally invite people to the chapter's parties by Penn State email.
 const { rateLimit } = require('express-rate-limit');
 // The IFC chapters, plus practice chapters for trying the portal.
+const IDENTITY = require('./data/chapter-identity.js');
 const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
 const partyList = require('./party-list.js');
 
@@ -18,12 +19,39 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const { rows: [m] } = await pool.query('SELECT chapter_id, role FROM chapter_members WHERE user_id = $1', [userId]);
     return m || null;
   };
+  // The site admin can open any chapter's portal from the control room, acting as a leader there.
+  // It only works while the admin's control room is unlocked, and the page asks for it with this header.
+  const adminView = (req) => {
+    const id = Number(req.get('x-pf-chapter'));
+    if (!id || !chapterById.has(id) || req.user.role !== 'admin' || !req.user.admin_unlocked) return null;
+    return { chapter_id: id, role: 'leader', admin: true };
+  };
   const requireMember = [...requireVerified, wrap(async (req, res, next) => {
-    req.member = await memberOf(req.user.id);
+    // Asking for another chapter without an unlocked control room is refused, never quietly sent to your own chapter.
+    if (req.get('x-pf-chapter') && !adminView(req)) {
+      return fail(res, 403, 'Open this chapter from the control room, and keep the control room open while you use it.', 'ADMIN_LOCKED');
+    }
+    req.member = adminView(req) || await memberOf(req.user.id);
     if (!req.member) return fail(res, 403, 'Join your chapter first.', 'NOT_A_MEMBER');
     res.set('Cache-Control', 'no-store');
     next();
   })];
+  // The chapter's look: national colors and founding, plus anything its leaders customized.
+  async function chapterIdentity(id) {
+    const base = IDENTITY[id] || { colors: [], founded: null };
+    const { rows: [p] } = await pool.query('SELECT tagline, about, color1, color2 FROM chapter_profiles WHERE chapter_id = $1', [id]);
+    const custom = p && p.color1 && p.color2;
+    return {
+      colors: base.colors,
+      theme: custom ? [p.color1, p.color2] : base.colors.map((c) => c.hex),
+      customColors: !!custom,
+      founded: base.founded || null,
+      kind: base.kind || '',
+      tagline: p?.tagline || '',
+      about: p?.about || '',
+    };
+  }
+
   const requireLeader = [...requireMember, (req, res, next) => {
     if (req.member.role !== 'leader') return fail(res, 403, 'Only your chapter leader can do that.', 'NOT_LEADER');
     next();
@@ -97,7 +125,10 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       id: c.id, name: c.name, gl: c.gl, test: !!c.test,
       ready: !!ready.get(c.id)?.brother, leaderReady: !!ready.get(c.id)?.leader,
     }));
-    const member = await memberOf(req.user.id);
+    if (req.get('x-pf-chapter') && !adminView(req)) {
+      return fail(res, 403, 'Open this chapter from the control room, and keep the control room open while you use it.', 'ADMIN_LOCKED');
+    }
+    const member = adminView(req) || await memberOf(req.user.id);
     const me = { name: req.user.name, email: req.user.email };
     if (!member) return res.json({ me, chapters, membership: null });
 
@@ -140,7 +171,11 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const out = {
       me,
       chapters,
-      membership: { chapter: chapters.find((c) => c.id === ch), address: chapterById.get(ch)?.addr || '', role: member.role },
+      membership: {
+        chapter: chapters.find((c) => c.id === ch), address: chapterById.get(ch)?.addr || '', role: member.role, adminView: !!member.admin,
+        nick: chapterById.get(ch)?.nick || '', instagram: chapterById.get(ch)?.ig || '',
+      },
+      identity: await chapterIdentity(ch),
       today,
       lastDay: partyList.addDays(today, partyList.DAYS_AHEAD),
       parties: parties.rows.map((p) => ({
@@ -242,7 +277,25 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
 
   // Anyone can leave, including the last leader. A chapter left without a leader keeps its brothers,
   // parties and passwords, and a new leader can sign in with the leader password.
+  // Leaders (and the admin) can give the chapter page its own tagline, story and colors.
+  app.post('/api/chapter/profile', ...requireLeader, wrap(async (req, res) => {
+    const tagline = str(req.body?.tagline, 90);
+    const about = str(req.body?.about, 700);
+    const hex = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null);
+    const reset = req.body?.resetColors === true;
+    const c1 = reset ? null : hex(req.body?.color1), c2 = reset ? null : hex(req.body?.color2);
+    if (!reset && (req.body?.color1 || req.body?.color2) && (!c1 || !c2)) return fail(res, 400, 'Pick both colors.');
+    await pool.query(
+      `INSERT INTO chapter_profiles (chapter_id, tagline, about, color1, color2, updated_by) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (chapter_id) DO UPDATE SET tagline = EXCLUDED.tagline, about = EXCLUDED.about,
+         color1 = EXCLUDED.color1, color2 = EXCLUDED.color2, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      [req.member.chapter_id, tagline, about, c1, c2, req.user.id]
+    );
+    res.json({ identity: await chapterIdentity(req.member.chapter_id) });
+  }));
+
   app.post('/api/chapter/leave', ...requireMember, wrap(async (req, res) => {
+    if (req.member.admin) return fail(res, 400, "You're viewing this chapter as the admin, so there's nothing to leave.");
     await pool.query('DELETE FROM chapter_members WHERE user_id = $1', [req.user.id]);
     res.json({ ok: true });
   }));

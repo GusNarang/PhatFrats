@@ -488,7 +488,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       + '<td class="num">'+int(c.invitesSent)+(c.invitesSent?'<span class="reason" style="color:var(--muted)">'+int(c.invitesClaimed)+' signed up</span>':'')+'</td>'
       + '<td>'+fillBar(c.fill)+'</td>'
       + '<td>'+(c.lastPosted ? ago(c.lastPosted) : '<span class="updated">Never</span>')+'</td>'
-      + '<td><div class="actions"><button class="btn small" data-chpw="'+c.id+'">Brother password</button>'
+      + '<td><div class="actions"><a class="btn small gold" href="/frats?chapter='+c.id+'" target="_blank" rel="noopener">Open page</a><button class="btn small" data-chpw="'+c.id+'">Brother password</button>'
       + '<button class="btn small" data-chlpw="'+c.id+'">Leader password</button>'
       + '<button class="btn small good" data-chlead="'+c.id+'">Add leader</button></div></td></tr>').join("");
   }
