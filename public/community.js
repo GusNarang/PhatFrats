@@ -39,7 +39,11 @@
   .drop-box{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,63,164,.12);border:1px solid rgba(255,63,164,.45);border-radius:999px;padding:8px 14px;margin:0 0 14px;font-weight:700}
   .drop-box .count{font-family:var(--mono);color:var(--gold)}
   .kit{margin-top:16px;background:var(--night-2);border:1px solid var(--line);border-radius:var(--r,18px);padding:18px}
-  .kit h3{margin:0 0 4px}.kit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px}
+  .kit h3{margin:0 0 4px}
+  /* Six tools: rows of 6, 3 or 2, so none is ever left alone on a row. */
+  .kit-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:12px}
+  @media (max-width:1180px){.kit-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (max-width:600px){.kit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .kit-grid a,.kit-grid button{display:flex;align-items:center;gap:10px;justify-content:flex-start;text-align:left;font:600 .95rem var(--body);padding:12px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--night);color:var(--ink);text-decoration:none;cursor:pointer;min-height:52px}
   .kit-grid .sos{border-color:#ff5d6c;color:#ffd0d5}
   `;
