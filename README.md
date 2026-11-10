@@ -175,6 +175,12 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 - **Install as an app:** the site can be added to a phone's home screen (`public/sw.js` keeps a fallback copy for weak signal; account data is never stored).
 - **Demo parties** can be hidden from the control room (Live) once real chapters are posting.
 
+## Demo account
+
+For graders and reviewers: log in (not sign up) as `demo@demo.com` through the normal Log in box. The demo link **https://phat-frats.vercel.app/?demo** opens Log in with that email filled in. The account is already confirmed (no email code) and has Full Access with no end date. It is **not** an admin: its role is `user` and it has no control room password.
+
+To create it, or reset its password: `$env:DEMO_PASSWORD = "..."; npm run demo:account -- demo@demo.com; Remove-Item Env:DEMO_PASSWORD`. Only a hash of the password is stored, and resetting signs it out everywhere.
+
 ## Site guide
 
 A plain-words guide to every feature (`public/guide.js`), with search and topic chips. It opens from the gold "📖 How PhatFrats works" button in the hero, "📖 Guide" in the menu, the floating "📖 Site guide" button (bottom left), or `/#guide`. When a feature changes, update its section there.

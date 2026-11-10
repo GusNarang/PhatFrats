@@ -1457,6 +1457,13 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     $("#loginPassword").placeholder = signup ? "At least 8 characters" : "";
     $("#loginErr").textContent = "";
   }
+  // The demo link (/?demo) opens Log in with the demo email filled in. The password is never put on the page.
+  function openDemoLogin(){
+    if(!new URLSearchParams(location.search).has("demo")) return;
+    openLogin("login");
+    $("#loginEmail").value = "demo@demo.com";
+    $("#loginPassword").focus();
+  }
   function openLogin(mode){
     if(state.pending){ openVerify(); return; }
     setAuthMode(mode || "login");
@@ -1709,7 +1716,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }catch(e){}
   api("/api/me").then(data=>{
     state.checkout = !!data.checkout;
-    if(!data.user){ renderAll(); finishCheckout(); return; }
+    if(!data.user){ renderAll(); finishCheckout(); openDemoLogin(); return; }
     enterAccount(data); renderAll();
     if(state.pending) openVerify();
     finishCheckout();
