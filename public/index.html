@@ -155,9 +155,11 @@ nav.links a:hover{color:var(--ink)}
   margin-right:calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
   transform:rotate(-1deg);margin-block:10px 30px;
 }
-.marquee-track{display:flex;gap:40px;width:max-content;padding-block:10px;font-family:var(--display);font-size:1.05rem;animation:scroll 40s linear infinite}
+/* No flex gap: each item carries its own spacing, so the two copies are exactly equal and the loop has no jump. */
+.marquee-track{display:flex;width:max-content;padding-block:10px;font-family:var(--display);font-size:1.05rem;white-space:nowrap;animation:scroll var(--tape-time,40s) linear infinite;will-change:transform;backface-visibility:hidden}
+.marquee-track span{padding-right:40px}
 .marquee-track span::after{content:"✦";margin-left:40px;color:var(--pink)}
-@keyframes scroll{to{transform:translateX(-50%)}}
+@keyframes scroll{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
 
 section{padding-block:40px}
 .sec-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}
@@ -1025,6 +1027,26 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }
 
   // ---------- hero ----------
+  // The tape scrolls one copy of its items, then snaps back to the start of an identical second copy.
+  // One copy is repeated until it is wider than the screen (or the tape runs out and shows a blank),
+  // the speed stays the same however many items there are, and an unchanged tape is left alone so
+  // re-rendering never restarts it mid-scroll.
+  let tapeBase = "";
+  function fillTape(html){
+    const track = $("#marquee");
+    if(!track || !html) return;
+    const want = Math.max(window.innerWidth, 1200) + 200;
+    if(html === tapeBase && track.dataset.w == want) return;
+    tapeBase = html;
+    track.dataset.w = want;
+    track.innerHTML = html;
+    const one = track.scrollWidth || 1;
+    const reps = Math.max(1, Math.ceil(want / one));
+    const copy = html.repeat(reps);
+    track.innerHTML = copy + copy;
+    track.style.setProperty("--tape-time", Math.round(one * reps / 60) + "s");
+  }
+  window.addEventListener("resize", ()=>{ const b = tapeBase; tapeBase = ""; fillTape(b); });
   function renderHero(){
     $("#statChapters").textContent = CHAPTERS.length;
     $("#statMapped").textContent = CHAPTERS.filter(c=>c.x!=null).length;
@@ -1035,14 +1057,14 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         (TEASER && TEASER.cards.length ? TEASER.cards.slice(0,4).map(c=>'<li><span>🔒 '+esc(VIBES[c.vibe] ? VIBES[c.vibe].label : "Party")+' · '+esc(c.night)+'</span><span class="mono">'+c.full+'% full</span></li>').join("") + '<li><span><a href="#" data-signup style="color:var(--gold);font-weight:700">Sign up free to see which houses</a></span><span></span></li>'
           : '<li><span>Log in to see this week\'s parties</span><span></span></li>');
       const teaser = ["34 chapters","Every house mapped","One free invite every week","Students only","Log in to see the parties"].map(t=>'<span>'+t+'</span>').join("");
-      $("#marquee").innerHTML = teaser + teaser;
+      fillTape(teaser);
       return;
     }
     const top = [...PARTIES].sort((a,b)=>b.going/b.cap - a.going/a.cap).slice(0,4);
     $("#nextList").innerHTML = '<li style="border:0;padding:0"><span class="eyebrow" style="color:var(--muted)">Filling up fastest</span><span></span></li>' +
       top.map(p=>'<li><span><b>'+esc(p.title)+'</b> · '+esc(byId[p.ch].gl)+'</span><span>'+Math.round(p.going/p.cap*100)+'% full</span></li>').join("");
     const items = PARTIES.map(p=>'<span>'+esc(byId[p.ch].gl)+' '+esc(p.title)+'</span>').join("");
-    $("#marquee").innerHTML = items + items;
+    fillTape(items);
   }
 
   // ---------- filters ----------
