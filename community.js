@@ -92,9 +92,11 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       to_char((${WEEK_START_SQL} - interval '7 days') AT TIME ZONE '${ZONE}', 'YYYY-MM-DD') AS week`);
     if (settledWeek === w.week) return;
     const { rows: [champ] } = await pool.query(
-      `SELECT r.user_id, max(r.score)::int AS score FROM game_runs r JOIN users u ON u.id = r.user_id
+      // Ties go to whoever reached the score first.
+      `SELECT r.user_id, max(r.score)::int AS score, (array_agg(r.finished_at ORDER BY r.score DESC, r.finished_at))[1] AS reached
+       FROM game_runs r JOIN users u ON u.id = r.user_id
        WHERE r.finished_at >= $1 AND r.finished_at < $2 AND u.banned_at IS NULL AND r.score > 0
-       GROUP BY r.user_id ORDER BY score DESC LIMIT 1`,
+       GROUP BY r.user_id ORDER BY score DESC, reached ASC LIMIT 1`,
       [w.start, w.stop]
     );
     if (!champ) return;

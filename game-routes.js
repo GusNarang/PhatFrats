@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { rateLimit } = require('express-rate-limit');
+const PRICING = require('./public/pricing.js');
 
 const CLIENT = fs.readFileSync(path.join(__dirname, 'game', 'door-rush.js'), 'utf8');
 // The most the game can ever award for one guest, and the fastest guests can arrive per second.
@@ -68,9 +69,42 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
       );
       rank = r.rank;
     }
+    // The score to beat to move up one place, and how this week's race stands.
+    let nextUp = null;
+    if (rank && rank > 1) {
+      const { rows: [n] } = await pool.query(
+        `WITH best AS (SELECT user_id, max(score) AS score FROM game_runs WHERE finished_at >= ${SINCE.replace('$9', '$2')} GROUP BY user_id)
+         SELECT min(b.score)::int AS score FROM best b JOIN users u ON u.id = b.user_id
+         WHERE u.banned_at IS NULL AND u.plan = 'full' AND b.score > $1`,
+        [week, resetAt]
+      );
+      nextUp = n.score;
+    }
+    const [stats, recent, champ, clock] = await Promise.all([
+      pool.query(
+        `SELECT count(*)::int AS games, coalesce(sum(guests), 0)::int AS guests,
+           count(*) FILTER (WHERE finished_at >= ${SINCE.replace('$9', '$2')})::int AS week_games
+         FROM game_runs WHERE user_id = $1 AND finished_at IS NOT NULL AND score IS NOT NULL`,
+        [userId, resetAt]
+      ),
+      pool.query(`SELECT score, finished_at FROM game_runs WHERE user_id = $1 AND finished_at IS NOT NULL AND score IS NOT NULL ORDER BY finished_at DESC LIMIT 5`, [userId]),
+      pool.query(`SELECT p.score, to_char(p.week_start, 'YYYY-MM-DD') AS week, u.name FROM game_prizes p LEFT JOIN users u ON u.id = p.user_id ORDER BY p.week_start DESC LIMIT 1`),
+      pool.query(`SELECT ${WEEK_START_SQL} + interval '7 days' AS ends`),
+    ]);
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+    const rows = board.rows.map((r, i) => ({ place: i + 1, name: shortName(r.name), score: Number(r.score), you: String(r.user_id) === String(userId) }));
     return {
-      best, week, rank,
-      board: board.rows.map((r, i) => ({ place: i + 1, name: shortName(r.name), score: Number(r.score), you: String(r.user_id) === String(userId) })),
+      best, week, rank, nextUp,
+      board: rows,
+      // Your own row when you're outside the top 10.
+      me: rank && rank > 10 ? { place: rank, score: week } : null,
+      stats: stats.rows[0],
+      recent: recent.rows.map((r) => ({ score: r.score, when: r.finished_at })),
+      prize: {
+        through: PRICING.passEndLabel(PRICING.passEnds(PRICING.passEnds(today))),
+        weekEnds: clock.rows[0].ends,
+        lastChampion: champ.rows[0] ? { name: shortName(champ.rows[0].name || 'Someone'), score: champ.rows[0].score, week: champ.rows[0].week } : null,
+      },
     };
   }
 
@@ -112,6 +146,8 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
     // Event weeks double every guest's points.
     const maxPoints = MAX_POINTS_PER_GUEST * ((await gameSettings()).eventOn ? 2 : 1);
     if (guests > run.seconds * MAX_GUESTS_PER_SECOND || score > guests * maxPoints) {
+      // A refused game keeps no score, so it never counts as a game played.
+      await pool.query('UPDATE game_runs SET score = NULL WHERE ticket = $1', [ticket]);
       return fail(res, 400, "That score doesn't match the game, so it wasn't saved.", 'BAD_SCORE');
     }
     await pool.query('UPDATE game_runs SET score = $2, guests = $3 WHERE ticket = $1', [ticket, score, guests]);

@@ -47,6 +47,38 @@ h1{font:400 clamp(32px,7vw,54px)/1 var(--display);margin:0 0 6px;color:var(--gol
 .dr-controls button:active{transform:scale(.97);background:var(--night-3)}
 .dr-controls .dr-bounce{grid-column:1/-1;--c:#ff5d6c;min-height:52px}
 kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:none){kbd{display:none}}
+.prize{position:relative;overflow:hidden;border-radius:20px;padding:20px 22px;margin:0 0 18px;background:linear-gradient(120deg,#3a1d6e,#123a5c 60%,#0f4a3a);border:1px solid rgba(255,210,63,.45);box-shadow:0 18px 50px -24px var(--gold)}
+.prize::after{content:"🏆";position:absolute;right:-10px;bottom:-30px;font-size:150px;opacity:.12;pointer-events:none}
+.prize-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.prize h2{font:400 clamp(20px,4vw,28px)/1.15 var(--display);color:var(--gold);margin:4px 0 6px}
+.prize p{margin:0;color:#e6e3ff;max-width:60ch}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
+.clock{text-align:center;background:rgba(11,16,38,.55);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:10px 14px;min-width:200px}
+.clock b{display:block;font:400 26px var(--display);color:#fff;letter-spacing:.02em}
+.clock span{font-size:12px;color:var(--muted)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.chip{display:inline-flex;gap:6px;align-items:center;background:rgba(11,16,38,.55);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:600}
+.chip.hot{background:var(--pink);border-color:var(--pink)}
+.side{display:flex;flex-direction:column;gap:14px}
+.race b.big{font:800 34px/1 var(--body);display:block}
+.meter{height:10px;border-radius:999px;background:var(--night-3);overflow:hidden;margin:10px 0 6px}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--pink),var(--gold));transition:width .8s}
+.board li.crown span:nth-child(2)::before{content:"👑 "}
+.board li.gap{grid-template-columns:1fr;color:var(--muted);text-align:center;border-top:1px dashed var(--line)}
+.trophies{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.trophy{text-align:center;background:var(--night);border:1px solid var(--line);border-radius:12px;padding:8px 4px;font-size:12px;color:var(--muted)}
+.trophy i{display:block;font-style:normal;font-size:24px;filter:grayscale(1);opacity:.4}
+.trophy.got{border-color:var(--gold);color:var(--ink)}.trophy.got i{filter:none;opacity:1}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.mini div{background:var(--night);border-radius:12px;padding:10px 4px;font-size:12px;color:var(--muted)}.mini b{display:block;font-size:20px;color:var(--ink)}
+.spark{display:flex;align-items:flex-end;gap:6px;height:70px;margin-top:8px}
+.spark div{flex:1;background:linear-gradient(180deg,var(--cyan),#1b6f8f);border-radius:6px 6px 2px 2px;min-height:4px;position:relative}
+.spark div span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font:11px var(--mono);color:var(--muted);white-space:nowrap}
+.rules{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.rules ul{margin:0;padding-left:20px;color:var(--muted);line-height:1.55}
+.rules li{margin-bottom:4px}
+.pop{animation:pop .6s ease}@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.pop{animation:none}.meter i{transition:none}}
 </style>
 </head>
 <body>
@@ -69,14 +101,61 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
   <section id="play" hidden>
     <h1>Door Rush</h1>
     <p class="lead" id="hello"></p>
+
+    <section class="prize" aria-labelledby="prizeTitle">
+      <div class="prize-top">
+        <div>
+          <span class="eyebrow">This week's prize</span>
+          <h2 id="prizeTitle">🏆 A free semester of Full Access</h2>
+          <p id="prizeText"></p>
+          <div class="chips" id="prizeChips"></div>
+        </div>
+        <div class="clock" role="timer" aria-live="off"><span>Board closes in</span><b id="clock">–</b><span>Sunday at midnight</span></div>
+      </div>
+    </section>
+
     <div class="layout">
       <div id="game"></div>
-      <aside class="card" aria-labelledby="boardTitle">
-        <h2 id="boardTitle">This week's top 10</h2>
-        <div class="stats"><div>Your best<b id="best">0</b></div><div>Your rank<b id="rank">–</b></div></div>
-        <ol class="board" id="board"></ol>
-        <p class="note">Resets Monday at midnight.</p>
-      </aside>
+      <div class="side">
+        <section class="card race" aria-labelledby="raceTitle">
+          <h2 id="raceTitle">Your race</h2>
+          <div class="stats"><div>This week's best<b id="best">0</b></div><div>Your rank<b id="rank">–</b></div></div>
+          <div class="meter" aria-hidden="true"><i id="raceBar" style="width:0"></i></div>
+          <p class="note" id="raceText" style="margin:0"></p>
+        </section>
+        <section class="card" aria-labelledby="boardTitle">
+          <h2 id="boardTitle">This week's top 10</h2>
+          <ol class="board" id="board"></ol>
+          <p class="note">The board resets Monday at midnight.</p>
+        </section>
+      </div>
+    </div>
+
+    <div class="rules">
+      <section class="card" aria-labelledby="statsTitle">
+        <h2 id="statsTitle">Your trophies</h2>
+        <div class="trophies" id="trophies"></div>
+        <p class="note" id="nextTrophy" style="margin:0 0 12px"></p>
+        <div class="mini" id="mini"></div>
+        <h2 style="margin-top:16px">Your last games</h2>
+        <div class="spark" id="spark"></div>
+      </section>
+      <section class="card" aria-labelledby="howTitle">
+        <h2 id="howTitle">How to play</h2>
+        <ul>
+          <li>Send each guest to their party before they reach the red line: <b>★ star → Neon</b>, <b>● circle → Chill</b>, <b>◆ diamond → Costume</b>.</li>
+          <li>Hooded guests with a red <b>✕</b> are crashers. Hit <b>Bounce</b>.</li>
+          <li><b>3 mistakes</b> and the doors close: a wrong door, a crasher getting in, a guest reaching the line, or bouncing someone who was invited.</li>
+          <li>From level 3 the <b>doors switch places</b>. Watch the labels and buttons.</li>
+          <li>Streaks raise your multiplier up to <b>x5</b>. 👑 VIPs are worth <b>triple</b>. Fill the Hype meter for 6 seconds of <b>double points</b> and slower guests.</li>
+          <li>Every 40 correct guests wins back a lost wristband, up to 3.</li>
+          <li>Keys: <b>← ↑ →</b> to send, <b>↓</b> or <b>Space</b> to bounce, <b>P</b> to pause. On a phone, use the big buttons.</li>
+        </ul>
+      </section>
+      <section class="card" aria-labelledby="prizeRulesTitle">
+        <h2 id="prizeRulesTitle">Prize rules</h2>
+        <ul id="prizeRules"></ul>
+      </section>
     </div>
   </section>
 </div>
@@ -96,10 +175,63 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
     return data;
   }
   function show(id){ $("#loading").hidden = true; for(const v of ["login","locked","play"]) $("#"+v).hidden = v!==id; }
+  const TROPHIES = [[5000,"🥉","Bronze"],[15000,"🥈","Silver"],[30000,"🥇","Gold"],[60000,"💎","Diamond"]];
+  let lastRank = null, weekEnds = null;
   function standings(s){
-    $("#best").textContent = num(s.best);
+    // Your race: rank, this week's best, and the gap to the next place.
+    const prev = $("#rank").textContent;
+    $("#best").textContent = num(s.week);
     $("#rank").textContent = s.rank ? "#"+s.rank : "–";
-    $("#board").innerHTML = s.board.length ? s.board.map(r=>'<li class="'+(r.you?'you':'')+'"><span>'+r.place+'</span><span>'+esc(r.name)+'</span><span>'+num(r.score)+'</span></li>').join("") : '<li class="empty" style="display:block">Nobody has played this week. Take first place.</li>';
+    if(prev !== $("#rank").textContent && s.rank){ $("#rank").classList.remove("pop"); void $("#rank").offsetWidth; $("#rank").classList.add("pop"); }
+    const top = s.board[0] ? s.board[0].score : 0;
+    $("#raceBar").style.width = (top ? Math.min(100, s.week / top * 100) : 0) + "%";
+    $("#raceText").textContent = !s.rank ? "Play a game to get on this week's board."
+      : s.rank === 1 ? "👑 You're in first! Hold the lead until Sunday midnight to win the prize."
+      : num(s.nextUp - s.week + 1) + " more points to pass #" + (s.rank - 1) + (s.rank === 2 ? " and take the lead." : ".");
+    if(lastRank && s.rank && s.rank < lastRank) toast("⬆️ Up to #" + s.rank + "!");
+    lastRank = s.rank;
+
+    // Leaderboard, with your own row when you're outside the top 10.
+    let rows = s.board.map(r=>'<li class="'+(r.you?'you ':'')+(r.place===1?'crown':'')+'"><span>'+r.place+'</span><span>'+esc(r.name)+'</span><span>'+num(r.score)+'</span></li>');
+    if(s.me) rows.push('<li class="gap">…</li><li class="you"><span>'+s.me.place+'</span><span>You</span><span>'+num(s.me.score)+'</span></li>');
+    $("#board").innerHTML = rows.length ? rows.join("") : '<li class="empty" style="display:block">Nobody has played this week. Take first place and the prize lead.</li>';
+
+    // The prize banner.
+    const p = s.prize;
+    weekEnds = new Date(p.weekEnds);
+    $("#prizeText").innerHTML = 'The top score by <b>Sunday at midnight</b> wins Full Access through <b>'+esc(p.through)+'</b>. It\'s given automatically on Monday, with a notification and a 🕹️ champion badge.';
+    const chips = [];
+    chips.push(s.board[0] ? '<span class="chip">👑 '+esc(s.board[0].name)+' leads with '+num(s.board[0].score)+'</span>' : '<span class="chip">👑 No leader yet. It could be you.</span>');
+    if(p.lastChampion) chips.push('<span class="chip">🏆 Last week: '+esc(p.lastChampion.name)+' · '+num(p.lastChampion.score)+'</span>');
+    if(s.event) chips.push('<span class="chip hot">⚡ Event week: double points</span>');
+    $("#prizeChips").innerHTML = chips.join("");
+    $("#prizeRules").innerHTML = [
+      'One winner each week (Monday to Sunday, State College time): the highest score on the board when it closes.',
+      'The prize is Full Access through '+esc(p.through)+'. It adds to any pass you already have and never shortens it.',
+      'Ties go to whoever reached the score first.',
+      'Scores have to come from real games. Impossible scores aren\'t saved, and cheaters are removed from the board.',
+      'Door Rush is part of Full Access, so you need it to play and win.',
+    ].map(x=>'<li>'+x+'</li>').join("");
+
+    // Trophies for your best score ever, and your numbers.
+    $("#trophies").innerHTML = TROPHIES.map(t=>'<div class="trophy'+(s.best>=t[0]?' got':'')+'"><i>'+t[1]+'</i>'+t[2]+'<br>'+num(t[0])+'</div>').join("");
+    const next = TROPHIES.find(t=>s.best < t[0]);
+    $("#nextTrophy").textContent = next ? num(next[0] - s.best) + " points to " + next[2] + " (best ever: " + num(s.best) + ")" : "💎 Every trophy unlocked. Legend.";
+    $("#mini").innerHTML = '<div><b>'+num(s.stats.week_games)+'</b>games this week</div><div><b>'+num(s.stats.games)+'</b>games ever</div><div><b>'+num(s.stats.guests)+'</b>guests sorted</div>';
+    const rec = [...s.recent].reverse(), hi = Math.max(1, ...rec.map(r=>r.score));
+    $("#spark").innerHTML = rec.length ? rec.map(r=>'<div style="height:'+Math.max(6, r.score/hi*100)+'%" title="'+num(r.score)+'"><span>'+(r.score>=1000?Math.round(r.score/1000)+'k':r.score)+'</span></div>').join("") : '<p class="note" style="margin:auto">Your games will show up here.</p>';
+  }
+  // Countdown to the board closing.
+  setInterval(()=>{
+    if(!weekEnds) return;
+    const left = Math.max(0, weekEnds - Date.now()), d = Math.floor(left/864e5), h = Math.floor(left%864e5/36e5), m = Math.floor(left%36e5/6e4), sec = Math.floor(left%6e4/1e3);
+    $("#clock").textContent = (d ? d+"d " : "") + String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+  }, 1000);
+  let toastTimer;
+  function toast(msg){
+    let t = document.getElementById("toast");
+    if(!t){ t = document.createElement("div"); t.id = "toast"; t.setAttribute("role","status"); t.style.cssText = "position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--night-3);border:2px solid var(--gold);border-radius:999px;padding:12px 20px;font-weight:700;z-index:30"; document.body.appendChild(t); }
+    t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.hidden = true, 3500);
   }
   function loadClient(){
     return new Promise((resolve,reject)=>{
@@ -124,7 +256,7 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
     window.PFDoorRush.mount($("#game"), {
       event: !!status.event,
       start: async ()=> (await api("/api/game/start", {})).ticket,
-      finish: async (ticket, r)=>{ const s = await api("/api/game/finish", {ticket, score:r.score, guests:r.guests}); standings(s); return s; },
+      finish: async (ticket, r)=>{ const s = await api("/api/game/finish", {ticket, score:r.score, guests:r.guests}); s.event = status.event; standings(s); return s; },
     });
   })().catch(err=>{ $("#loading").hidden = false; $("#loading").textContent = err.message; });
 })();
