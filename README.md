@@ -172,6 +172,10 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 - **Install as an app:** the site can be added to a phone's home screen (`public/sw.js` keeps a fallback copy for weak signal; account data is never stored).
 - **Demo parties** can be hidden from the control room (Live) once real chapters are posting.
 
+## Site guide
+
+A plain-words guide to every feature (`public/guide.js`), with search and topic chips. It opens from the gold "📖 How PhatFrats works" button in the hero, "📖 Guide" in the menu, the floating "📖 Site guide" button (bottom left), or `/#guide`. When a feature changes, update its section there.
+
 ## Friends mode
 
 Free for everyone (`friends.js` on the server, `public/friends.js` on the site). The 👯 button in the header opens the Friends screen:
