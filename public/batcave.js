@@ -426,6 +426,59 @@
     setTimeout(() => s.remove(), 4000);
   });
 
+  // ---------- "How it works" guide ----------
+  const GUIDE = [
+    ['📊 Overview', [
+      'Your quick snapshot: visitors, accounts, money and PhatBot use.',
+      'Scroll down to Accounts to find anyone. Ban them, unban them, or give or remove Full Access.',
+    ]],
+    ['🟢 Live', [
+      'Radar: houses glowing gold are being looked at right now. The number is how many people.',
+      'Ticker: everything happening on the site as it happens. A sale makes a cha-ching sound on any page.',
+      'Beacon: type a message and it shows as a banner across the whole site. Pick the color, who sees it and how long.',
+      'Lockdown: if something goes wrong, pause sign-ups, invite requests or checkout with one click. Click Reopen to undo.',
+      'Spotlight: pin one party to the top of the party list with a glowing star.',
+    ]],
+    ['💰 Money', [
+      'How much you made this semester and all time. Test payments never count.',
+      'Set a semester goal and watch the bar fill.',
+      'Promo codes: make a code with a % off. People type it under "Have a promo code?" when buying. 100% off gives Full Access for free.',
+      'Gifts: give Full Access to every leader, every brother, or a list of emails. Leave the date empty to make it last forever.',
+    ]],
+    ['🏛️ Frats', [
+      "Every chapter's numbers: brothers, parties, requests and invites.",
+      'Needs attention shows chapters with waiting requests, chapters with no leader, and full parties.',
+      'Set each chapter\'s brother and leader passwords. Click Open page to manage any chapter as if you were its leader.',
+      'Take down a party that isn\'t right. Put back brings it back.',
+    ]],
+    ['🏆 Fame', [
+      "Hall of Fame: this week's best party, chapter, inviter and Door Rush player.",
+      'Night Forecast: guesses which parties will fill up first.',
+      'Growth: how many people buy Full Access and which websites send you visitors.',
+      'Door Rush god mode: start a double-points week, reset the leaderboard, or remove a cheater.',
+    ]],
+    ['📜 Log', ['A list of every change made in the control room, newest first.']],
+    ['✨ Extras', [
+      'Search box at the top: type any name, email, chapter or party to jump to it.',
+      '🦇 button: switch to Batcave mode (black and yellow). Click again to switch back.',
+      'Psst: type "batman" anywhere on this page.',
+      'Leaving or reloading the control room locks it. Use the secret keys and your password to get back in.',
+    ]],
+  ];
+  const guide = document.createElement('dialog');
+  guide.id = 'caveGuide';
+  guide.setAttribute('aria-labelledby', 'guideTitle');
+  guide.style.maxWidth = '640px';
+  guide.innerHTML = `<h3 id="guideTitle">How the control room works</h3>
+    <p style="margin:0 0 12px">Everything here, in plain words. Changes take effect on the live site right away.</p>
+    <div style="max-height:62vh;overflow:auto;padding-right:6px">${GUIDE.map(([h, items]) =>
+      `<h4 style="font:400 15px var(--display);color:var(--ink);margin:16px 0 6px">${esc(h)}</h4><ul style="margin:0;padding-left:20px;color:var(--muted);line-height:1.5">${items.map((i) => `<li style="margin-bottom:4px">${esc(i)}</li>`).join('')}</ul>`).join('')}</div>
+    <div class="btns" style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn gold" type="button" id="guideClose">Got it</button></div>`;
+  document.body.appendChild(guide);
+  $('#caveMode').insertAdjacentHTML('beforebegin', '<button class="btn" type="button" id="caveHelp">❓ How it works</button>');
+  $('#caveHelp').addEventListener('click', () => guide.showModal());
+  $('#guideClose').addEventListener('click', () => guide.close());
+
   // ---------- page switching and live polling ----------
   const loaders = { live: loadLive, money: loadMoney, fame: loadFame, log: loadLog };
   window.PFCave = { onPage: (page) => { if (loaders[page]) loaders[page](); } };
