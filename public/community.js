@@ -112,10 +112,13 @@
       ${link ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"><input class="input" readonly value="${esc(link)}" aria-label="Your invite link" style="flex:1 1 180px"><button class="btn small" type="button" data-copy="${esc(link)}">Copy</button>${navigator.share ? `<button class="btn small" type="button" data-share-link="${esc(link)}">Share</button>` : ''}</div>` : ''}
       <b>Saved parties</b>
       <div style="margin:6px 0 14px">${saved.length ? saved.map((x) => `<div class="pf-note">${esc(x.title)} <small>${esc(S().whenText(x))}</small> <button class="btn small" type="button" data-open-party="${esc(x.id)}">Open</button></div>`).join('') : '<p class="muted" style="margin:0">Tap ♡ on a party to save it. You\'ll get an alert when it starts filling up.</p>'}</div>
+      <b>Settings</b>
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin:8px 0"><input type="checkbox" id="pfMusicOpt" ${window.PFMusic && window.PFMusic.isOn() ? 'checked' : ''}> 🎵 Play the PhatFrats theme song in the background</label>
       <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="pfEmailOpt" ${p.emailUpdates ? 'checked' : ''}> Email me when I'm on a list, win a prize, or the Weekend Drop goes live</label>
       <p style="margin:14px 0 0"><button class="btn ghost small" type="button" data-welcome>🎁 Free Full Access and Door Rush rules</button></p>
       ${installHint()}`;
     document.body.appendChild(panel);
+    panel.querySelector('#pfMusicOpt').addEventListener('change', (e) => { if (window.PFMusic) { window.PFMusic.set(e.target.checked); S().toast(e.target.checked ? '🎵 Music on.' : '🔇 Music muted.'); } });
     panel.querySelector('#pfEmailOpt').addEventListener('change', (e) => S().api('/api/profile/email', { on: e.target.checked }).then(() => S().toast(e.target.checked ? 'Email updates on.' : 'Email updates off.')).catch((err) => S().toast(err.message)));
   }
 

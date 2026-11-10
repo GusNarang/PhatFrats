@@ -171,3 +171,7 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 - **About & contact** at `/about`. Messages land in the control room inbox.
 - **Install as an app:** the site can be added to a phone's home screen (`public/sw.js` keeps a fallback copy for weak signal; account data is never stored).
 - **Demo parties** can be hidden from the control room (Live) once real chapters are posting.
+
+## Theme song
+
+"On The List" plays on repeat in the background on the main page and the About page (`public/music.js`). Browsers only allow sound after someone interacts with the page, so it starts on the first tap, click or key. A floating 🔊 button (bottom left) mutes it, and the profile's Settings has a "Play the PhatFrats theme song" switch; the choice is remembered in that browser. People whose device asks for reduced motion start muted. The song file lives at `public/audio/on-the-list.mp3` and only downloads when it's about to play.
