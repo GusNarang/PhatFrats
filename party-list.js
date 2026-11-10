@@ -82,10 +82,11 @@ function forgetOldGuests(pool) {
   ).catch((err) => console.error('Could not clear old outside guests:', err.message));
 }
 
-async function partiesForSite(pool) {
+// The admin can hide the demo parties once real chapter parties are on the map.
+async function partiesForSite(pool, { hideDemo = false } = {}) {
   const today = todayISO();
   forgetOldGuests(pool);
-  const demo = DEMO.map((p) => ({ ...p, day: demoDate(p.day, today) }));
+  const demo = hideDemo ? [] : DEMO.map((p) => ({ ...p, day: demoDate(p.day, today) }));
   const parties = [...demo, ...(await hostedParties(pool, { today }))];
   const days = [...new Set(parties.map((p) => p.day))].sort().map(dayLabel);
   return { parties, days };

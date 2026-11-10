@@ -271,3 +271,67 @@ CREATE TABLE IF NOT EXISTS site_presence (
 CREATE INDEX IF NOT EXISTS site_presence_seen_idx ON site_presence(last_seen);
 -- The site a visitor came from (just the domain), for the growth panel.
 ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS referrer TEXT;
+
+-- ---------- Community: what keeps students coming back ----------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_reward_at TIMESTAMPTZ;
+-- Email updates (approvals, prizes, the Weekend Drop). On by default; switch off in the profile.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_in BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE TABLE IF NOT EXISTS saved_parties (
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  party_id   TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, party_id)
+);
+-- The bell.
+CREATE TABLE IF NOT EXISTS notifications (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  link       TEXT,
+  read_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, id DESC);
+-- Group plans: a shared link for friends going to the same party. Each still requests their own invite.
+CREATE TABLE IF NOT EXISTS party_groups (
+  code       TEXT PRIMARY KEY,
+  party_id   TEXT NOT NULL,
+  owner_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS group_members (
+  code      TEXT NOT NULL REFERENCES party_groups(code) ON DELETE CASCADE,
+  user_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (code, user_id)
+);
+-- Door Rush: last week's champion wins a free semester, recorded once per week.
+CREATE TABLE IF NOT EXISTS game_prizes (
+  week_start DATE PRIMARY KEY,
+  user_id    BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  score      INTEGER NOT NULL,
+  awarded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Reports from the Party Smart kit and messages from the About page, read in the control room.
+CREATE TABLE IF NOT EXISTS reports (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  reporter_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  kind        TEXT NOT NULL,
+  about       TEXT NOT NULL DEFAULT '',
+  details     TEXT NOT NULL,
+  closed_at   TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name       TEXT NOT NULL,
+  email      TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT 'other',
+  message    TEXT NOT NULL,
+  closed_at  TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

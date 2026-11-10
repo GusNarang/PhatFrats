@@ -660,6 +660,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <span class="fl"><span>Phat</span>Frats</span>
       <p class="made">Designed and built by <strong class="builder">Agastya Narang</strong></p>
       <p><a href="/frats" style="color:var(--gold);font-weight:700">In a fraternity? Post your parties on PhatFrats</a></p>
+      <p><a href="/about" style="color:var(--cyan);font-weight:700">About PhatFrats &amp; contact us</a></p>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <p>Concept prototype. Chapter names and addresses come from the Penn State IFC chapter list; the sample parties are fictional demo data, while parties marked "Posted by the house" come from the chapters themselves. Accounts and invite requests are stored in a Neon database.</p>
@@ -792,6 +793,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <script src="/chapters.js"></script>
 <script src="/map-data.js"></script>
 <script src="/beacon.js" defer></script>
+<script src="/community.js"></script>
 <script>
 (function(){
   // ---------- data ----------
@@ -862,6 +864,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     state.user = verified ? data.user : null;
     state.pending = verified ? null : data.user;
     state.requests = verified ? data.requests : [];
+    state.saved = verified ? (data.saved || []) : [];
     setParties(verified ? data.parties : [], verified ? data.days : []);
   }
   async function logOut(){
@@ -919,7 +922,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const a = $("#authArea");
     if(state.user){
       const full = state.user.plan === "full";
-      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><span class="avatar" aria-hidden="true">'+esc(initials(state.user.name))+'</span><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn" type="button" id="profileBtn" aria-label="Your profile">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
       $("#logoutBtn").onclick = ()=>logOut().catch(e=>toast(e.message));
     } else if(state.pending){
       a.innerHTML = '<button class="btn small" type="button" data-login>Enter your code</button>';
@@ -1208,6 +1211,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>Invite list + PSU ID</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
         hypeBlock(p) + chapterLinks(c) +
         '<div>'+reqButton(p)+'</div>' +
+        (window.PFCommunity ? window.PFCommunity.detailExtras(p) : '') +
         (others.length ? '<p class="muted" style="font-size:.88rem">Also at this house: '+others.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a> ('+esc(dayOf(o.day).label)+')').join(", ")+'</p>' : '');
     } else {
       const c = byId[sel.id], ps = partiesFor(c.id);
@@ -1233,7 +1237,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<div class="party-top"><span class="vibe-tag">'+esc(v.label)+(p.hosted ? ' · Posted by the house' : '')+'</span><span class="when">'+esc(dayOf(p.day).label+' '+p.time)+'</span></div>' +
         '<h3>'+esc(p.title)+'</h3><span class="host">'+esc(c.gl)+' · '+esc(c.name)+'</span>' +
         '<p class="blurb">'+esc(p.blurb)+'</p>' +
-        '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span>'+reqButton(p,"small")+'</div></article>';
+        '<div class="foot"><span class="mini-hype">'+Math.round(p.going/p.cap*100)+'% full</span><span class="foot-right">'+(window.PFCommunity ? window.PFCommunity.saveButton(p.id) : '')+reqButton(p,"small")+'</span></div></article>';
     }).join("") : '<div class="no-results">No parties match that combo. Try another night or vibe.</div>';
   }
 
@@ -1424,7 +1428,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     e.preventDefault();
     const signup = authMode === "signup";
     const body = {email:$("#loginEmail").value, password:$("#loginPassword").value};
-    if(signup) body.name = $("#loginName").value;
+    if(signup){ body.name = $("#loginName").value; const ref = window.PFCommunity && window.PFCommunity.referral(); if(ref) body.ref = ref; }
     const btn = $("#loginSubmit");
     btn.disabled = true; $("#loginErr").textContent = "";
     try {
@@ -1583,7 +1587,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; $("#invErr").textContent = "";
     try {
-      const data = await api("/api/requests", {partyId:pendingParty, note:$("#invMsg").value});
+      const group = window.PFCommunity && window.PFCommunity.groupFor(pendingParty);
+      const data = await api("/api/requests", {partyId:pendingParty, note:$("#invMsg").value, ...(group ? {groupCode:group} : {})});
       state.requests = data.requests;
       let guestNote = "";
       if(gName){
@@ -1710,6 +1715,11 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     if(!dlg.open) dlg.showModal();
     dlg.querySelector("#adminPw").focus();
   }
+
+  // Shared with community.js: saves, the bell, profile, share cards, groups, install, safety kit.
+  window.PFSite = { state, api, toast, esc, byId, VIBES, PRICING, dayOf, whenText, renderAll, openInvite, openLogin, select, requestFor,
+    party: (id)=>partyById[id], parties: ()=>PARTIES };
+  if(window.PFCommunity) window.PFCommunity.start();
 })();
 </script>
 

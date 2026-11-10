@@ -103,6 +103,23 @@
       <div class="actions" style="justify-content:flex-start"><button class="bigbtn go" type="button" id="spotOn">Spotlight it</button><button class="bigbtn" type="button" id="spotOff">Clear</button></div>
       <p id="spotNow" style="margin:10px 0 0"></p>
     </section>
+    <div class="grid even">
+      <section class="card"><h2>🔥 The Weekend Drop</h2>
+        <p class="updated" style="margin-top:0">Every Thursday at 6 PM: announce the lineup. It goes to everyone's bell, emails everyone who wants updates (up to 400), and lights the beacon for 3 days.</p>
+        <form id="dropForm"><label class="cave-label" for="dropMsg">What's dropping</label>
+          <textarea class="cave-input" id="dropMsg" maxlength="300" placeholder="6 parties this weekend, including Neon Night at ΣΝ and a white-out at ΦΚΨ"></textarea>
+          <div class="actions" style="justify-content:flex-start;margin-top:10px"><button class="bigbtn go" type="submit">Send the Drop</button></div></form>
+        <p id="dropLast" class="updated"></p>
+      </section>
+      <section class="card"><h2>🎭 Demo parties</h2>
+        <p class="updated" style="margin-top:0">The 14 sample parties keep the map lively until real chapters post. Hide them once real parties are up.</p>
+        <div class="switches"><div class="switch-row" id="demoRow"></div></div>
+      </section>
+    </div>
+    <section class="card" style="margin-bottom:16px"><h2>📥 Inbox</h2>
+      <p class="updated" style="margin-top:0">Reports from the Party Smart kit and messages from the About page. Reply to messages by email.</p>
+      <div id="inbox"></div>
+    </section>
   </div>
 
   <div id="pageMoney" role="tabpanel" aria-labelledby="tab-money" hidden>
@@ -259,6 +276,46 @@
     }
     renderTicker(live.feed);
   }
+  // ---------- Inbox, Weekend Drop, demo parties ----------
+  let inbox = null;
+  async function loadInbox() {
+    try { inbox = await api('/api/admin/inbox'); } catch (e) { return; }
+    const d = inbox.lastDrop;
+    $('#dropLast').textContent = d ? `Last Drop ${ago(d.at)}: "${d.message}" · ${int(d.notified)} bells, ${int(d.emailed)} emails` : 'No Drop sent yet.';
+    $('#demoRow').className = 'switch-row' + (inbox.hideDemo ? ' on' : '');
+    $('#demoRow').innerHTML = `<div><b>Demo parties: ${inbox.hideDemo ? 'HIDDEN' : 'showing'}</b><span>${inbox.hideDemo ? 'Only real chapter parties are on the map.' : 'Sample parties are on the map next to real ones.'}</span></div>
+      <button class="bigbtn ${inbox.hideDemo ? 'go' : 'danger'}" type="button" data-demo="${!inbox.hideDemo}">${inbox.hideDemo ? 'Show them' : 'Hide them'}</button>`;
+    const when = (x) => new Date(x).toLocaleString('en-US', { timeZone: ZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const items = [
+      ...inbox.reports.map((r) => ({ type: 'report', id: r.id, closed: r.closed, at: r.created_at, head: `🚩 Report · ${r.kind}${r.about ? ' · ' + r.about : ''}`, body: r.details, who: r.name ? `${r.name} (${r.email})` : 'Deleted account' })),
+      ...inbox.messages.map((m) => ({ type: 'message', id: m.id, closed: m.closed, at: m.created_at, head: `✉️ Message · ${m.kind}`, body: m.message, who: `${m.name} (${m.email})`, email: m.email })),
+    ].sort((a, b) => (a.closed - b.closed) || (new Date(b.at) - new Date(a.at)));
+    const open = items.filter((i) => !i.closed).length;
+    $('#tab-live').textContent = open ? `Live (${open})` : 'Live';
+    $('#inbox').innerHTML = items.length ? items.map((i) => `<div class="row" style="flex-wrap:wrap;opacity:${i.closed ? .5 : 1}"><div style="flex:1 1 300px"><b>${esc(i.head)}</b><div style="white-space:pre-line;margin:4px 0">${esc(i.body)}</div><span class="updated">${esc(i.who)} · ${esc(when(i.at))}</span></div>
+      <div class="actions">${i.email ? `<a class="btn small" href="mailto:${esc(i.email)}?subject=${encodeURIComponent('Re: your message to PhatFrats')}">Reply</a>` : ''}${i.closed ? '<span class="tag">Done</span>' : `<button class="btn small good" data-close-item="${i.type}/${i.id}">Mark done</button>`}</div></div>`).join('') : '<p class="empty">Nothing here yet.</p>';
+  }
+  $('#inbox').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-close-item]'); if (!b) return;
+    try { await api('/api/admin/inbox/' + b.dataset.closeItem + '/close', {}); loadInbox(); } catch (err) { toast(err.message); }
+  });
+  $('#demoRow').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-demo]'); if (!b) return;
+    const hide = b.dataset.demo === 'true';
+    if (hide && !confirm('Hide the 14 demo parties from the map? Only real chapter parties will show.')) return;
+    try { await api('/api/admin/demo', { hide }); toast(hide ? 'Demo parties hidden.' : 'Demo parties are back.'); loadInbox(); } catch (err) { toast(err.message); }
+  });
+  $('#dropForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = $('#dropMsg').value.trim();
+    if (!message) return toast("Write what's dropping first.");
+    if (!confirm('Send the Weekend Drop to everyone now? This sends emails.')) return;
+    try {
+      const r = await api('/api/admin/weekend-drop', { message });
+      toast(`🔥 Drop sent: ${int(r.notified)} bells, ${int(r.emailed)} emails.`); burst('🔥', 14); $('#dropMsg').value = ''; loadInbox(); loadLive();
+    } catch (err) { toast(err.message); }
+  });
+
   $('#beaconForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = $('#bText').value.trim();
@@ -352,11 +409,14 @@
       <h3 style="font:400 13px var(--display);margin:14px 0 8px">Where visitors come from (30 days)</h3>
       <div class="bars">${g.referrers.length ? g.referrers.map((r) => `<div class="bar-row"><span>${esc(r.referrer)}</span><span>${int(r.n)}</span><div class="track"><i style="width:${r.n / g.referrers[0].n * 100}%;background:var(--cyan)"></i></div></div>`).join('') : '<p class="empty">No outside links yet. Visitors are coming in directly.</p>'}</div>`;
     checkMilestone(g.accounts);
+    let prizes = [];
+    try { prizes = (await api('/api/admin/inbox')).prizes; } catch (e) {}
     const ev = f.game.eventUntil;
     $('#godMode').innerHTML = `<p style="margin-top:0">${ev ? `⚡ <b>Double-points event</b> until ${esc(new Date(ev).toLocaleString('en-US', { timeZone: ZONE, month: 'short', day: 'numeric', hour: 'numeric' }))}` : 'No event running.'}</p>
       <div class="actions" style="justify-content:flex-start;margin-bottom:12px">
         ${ev ? '<button class="btn small" data-game="endEvent">End event</button>' : '<select class="cave-input" id="evDays" style="max-width:130px" aria-label="Event length"><option value="1">1 day</option><option value="3">3 days</option><option value="7" selected>1 week</option></select><button class="btn small gold" data-game="event">Start double points</button>'}
         <button class="btn small danger" data-game="reset">Reset this week's board</button></div>
+      <p class="updated" style="margin:0 0 6px">🏆 Each Monday, last week's champion automatically wins a free semester of Full Access.${prizes.length ? ' Past winners: ' + prizes.map((p) => esc(p.name.split(' ')[0]) + ' (' + int(p.score) + ')').join(', ') : ''}</p>
       <div class="bars">${fm.gamers.length ? fm.gamers.map((x) => `<div class="row"><span>${x.place}. ${esc(x.name)}</span><span>${int(x.score)} <button class="btn small danger" data-remove="${x.userId}" data-name="${esc(x.name)}">Remove</button></span></div>`).join('') : '<p class="empty">Nobody has played this week.</p>'}</div>`;
   }
   $('#godMode').addEventListener('click', async (e) => {
@@ -438,6 +498,9 @@
       'Beacon: type a message and it shows as a banner across the whole site. Pick the color, who sees it and how long.',
       'Lockdown: if something goes wrong, pause sign-ups, invite requests or checkout with one click. Click Reopen to undo.',
       'Spotlight: pin one party to the top of the party list with a glowing star.',
+      'Weekend Drop: every Thursday, announce the lineup. It goes to everyone\'s bell and email and lights the beacon.',
+      'Demo parties: hide the 14 sample parties once real chapters are posting.',
+      'Inbox: reports from students and messages from the About page. Reply by email, then mark them done.',
     ]],
     ['💰 Money', [
       'How much you made this semester and all time. Test payments never count.',
@@ -455,7 +518,7 @@
       "Hall of Fame: this week's best party, chapter, inviter and Door Rush player.",
       'Night Forecast: guesses which parties will fill up first.',
       'Growth: how many people buy Full Access and which websites send you visitors.',
-      'Door Rush god mode: start a double-points week, reset the leaderboard, or remove a cheater.',
+      'Door Rush god mode: start a double-points week, reset the leaderboard, or remove a cheater. Each Monday, last week\'s champion automatically wins a free semester.',
     ]],
     ['📜 Log', ['A list of every change made in the control room, newest first.']],
     ['✨ Extras', [
@@ -480,7 +543,7 @@
   $('#guideClose').addEventListener('click', () => guide.close());
 
   // ---------- page switching and live polling ----------
-  const loaders = { live: loadLive, money: loadMoney, fame: loadFame, log: loadLog };
+  const loaders = { live: () => { loadLive(); loadInbox(); }, money: loadMoney, fame: loadFame, log: loadLog };
   window.PFCave = { onPage: (page) => { if (loaders[page]) loaders[page](); } };
   // The ticker keeps listening on every page, so a sale cha-chings wherever you are.
   setInterval(() => { if (!document.hidden && !$('#app').hidden) loadLive(true); }, 15000);

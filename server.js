@@ -115,11 +115,12 @@ const publicUser = (u) => ({
 async function accountPayload(user) {
   if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [], checkout: payments.enabled() };
   const requests = await listRequests(user);
-  const { parties, days } = await partyList.partiesForSite(pool);
   const s = await ops.settings();
+  const { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo });
+  const { rows: saved } = await pool.query('SELECT party_id FROM saved_parties WHERE user_id = $1', [user.id]);
   // The admin's spotlight pins one party to the top with a glowing badge.
   if (s.spotlight) parties.forEach((p) => { if (p.id === s.spotlight) p.spotlight = true; });
-  return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days };
+  return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days, saved: saved.map((r) => r.party_id) };
 }
 
 // ---------- email confirmation codes ----------
@@ -266,6 +267,13 @@ app.use(express.json({ limit: '10kb' }));
 const ops = require('./ops.js').create({ pool, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 ops.mountActivity(app);
 ops.mountAdminLog(app);
+// Saved parties, the bell, badges, referrals, groups, the Door Rush prize, reports and the contact form.
+const community = require('./community.js').create({
+  pool, wrap: (fn) => (req, res, next) => fn(req, res, next).catch(next), fail: (res, status, error, code) => res.status(status).json({ error, code }),
+  requireUser: (req, res, next) => requireUser(req, res, next),
+  mailer, IS_PROD, ops, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')],
+});
+community.mountHooks(app);
 const LOCKED = {
   signups: "New sign-ups are paused for a little while. Check back soon.",
   requests: "Invite requests are paused for a little while. Check back soon.",
@@ -595,6 +603,8 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
 
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
+community.mountRoutes(app, requireVerified);
+community.mountAdmin(app);
 const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload, ops });
 stripeWebhook = pay.webhookHandler;
 pay.mountRoutes(app);
@@ -606,6 +616,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/frats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'frats.html')));
 app.get('/game', (req, res) => res.sendFile(path.join(__dirname, 'public', 'game.html')));
+app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')));
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') return fail(res, 400, 'That request could not be read.');

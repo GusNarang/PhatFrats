@@ -3,7 +3,7 @@
   "short_name": "PhatFrats",
   "description": "Penn State party finder: every IFC house on one map.",
   "start_url": "/",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#0b1026",
   "theme_color": "#0b1026",
   "icons": [

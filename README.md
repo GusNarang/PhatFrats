@@ -154,3 +154,20 @@ The control room has six pages: **Overview**, **Live**, **Money**, **Frats**, **
 - **Fame:** Hall of Fame, the Night Forecast of which parties will fill first, growth (conversion, milestones, top referring sites) and Door Rush god mode (double-points events, reset the weekly board, remove a player's scores).
 - **Log:** every change made from the control room, as plain sentences.
 - Search everything from the box at the top, switch on **Batcave mode** with the 🦇 button, and type `batman` anywhere for a surprise.
+
+## Community features
+
+Built to bring students back every week. Code is in `community.js` (server) and `public/community.js` (main page).
+
+- **Save parties** with ♡. Saved parties that reach 80% full raise an alert in the bell.
+- **Notification bell** next to your name: approvals, waitlists, brother invites, referral progress, prizes and the Weekend Drop. Most also go by email unless switched off in the profile.
+- **Profile** (tap your initials): weekend streak, badges (First on the list, Party regular, Door Rush champion, Connector, Full Access, Founding member), saved parties and email settings.
+- **Referrals:** everyone gets a link (`/?ref=CODE`). When 3 friends sign up with it and confirm their email, the referrer gets Full Access through the end of the semester.
+- **Share cards:** 📸 Share makes an Instagram-story image of a party, with a link back (`/?party=ID`).
+- **Group plans:** 👯 makes a link (`/?group=CODE`) for friends going together. Each friend still requests their own invite, and the group shows who has.
+- **Door Rush weekly prize:** each Monday, last week's top scorer gets Full Access through the end of next semester, automatically.
+- **The Weekend Drop:** a countdown to Thursday 6 PM on the main page. In the control room (Live), **Send the Drop** notifies everyone, emails up to 400 people in blind-copied batches, and lights the beacon for 3 days.
+- **Party Smart kit:** call 911, Penn State Police, share your location with a friend, tell friends you're home, a check-in reminder, and **Report something** (goes to the control room inbox).
+- **About & contact** at `/about`. Messages land in the control room inbox.
+- **Install as an app:** the site can be added to a phone's home screen (`public/sw.js` keeps a fallback copy for weak signal; account data is never stored).
+- **Demo parties** can be hidden from the control room (Live) once real chapters are posting.
