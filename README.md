@@ -127,3 +127,14 @@ Leaders can switch on **Allow outside guests** for each party (off by default). 
 ## Door Rush
 
 Door Rush is the arcade game at `/game`, included with Full Access. Its code is in `game/door-rush.js` and is only sent to Full Access accounts by `game-routes.js`. Each game uses a one-time ticket, and impossible scores are refused. The leaderboard shows each player's best game this week, as first name and last initial, and resets Monday at midnight Eastern.
+
+## Payments (Stripe)
+
+Full Access is sold with Stripe Checkout: one payment, no subscription. A pass lasts through the end of the current term (Spring through May 15, Summer through Aug 20, Fall through Jan 10). Buying with less than 30 days left also covers the next term. The rules are in `PRICING.passEnds` in `public/pricing.js`. When a pass ends, the account goes back to Free. Full Access given by hand in the control room never ends.
+
+Checkout stays off until these are set in Vercel:
+
+- `STRIPE_SECRET_KEY`: from the Stripe dashboard. A test key (`sk_test_`) takes only test cards; a live key (`sk_live_`) takes real money.
+- `STRIPE_WEBHOOK_SECRET`: the signing secret of a webhook endpoint at `https://phat-frats.vercel.app/api/stripe/webhook`, listening for `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+
+A payment is recorded both by the webhook and when the buyer returns to the site, so either one alone is enough. Each payment is stored once in the `payments` table. The control room counts only live-mode payments as sales.

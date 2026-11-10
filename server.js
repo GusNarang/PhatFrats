@@ -6,6 +6,7 @@ const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const partyList = require('./party-list.js');
+const payments = require('./payments.js');
 const guests = require('./guests.js');
 const phatbot = require('./ai.js');
 const PRICING = require('./public/pricing.js');
@@ -75,11 +76,23 @@ function readSessionToken(req) {
   }
   return null;
 }
+// Paid passes end after their semester. Most checks read the plan straight from the users table,
+// so expired passes are switched back to Free here, at most every few minutes.
+let lastExpirySweep = 0;
+function expirePasses() {
+  if (Date.now() - lastExpirySweep < 5 * 60 * 1000) return;
+  lastExpirySweep = Date.now();
+  pool.query(`UPDATE users SET plan = 'free' WHERE plan = 'full' AND plan_paid_until < now()`)
+    .catch((err) => console.error('Could not end expired passes:', err.message));
+}
 async function currentUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
+  expirePasses();
   const { rows } = await pool.query(
-    `SELECT u.id, u.name, u.email, u.plan, u.role, u.email_verified_at, (s.admin_until > now()) AS admin_unlocked FROM sessions s JOIN users u ON u.id = s.user_id
+    `SELECT u.id, u.name, u.email, u.role, u.email_verified_at, u.plan_paid_until, (s.admin_until > now()) AS admin_unlocked,
+       CASE WHEN u.plan = 'full' AND u.plan_paid_until < now() THEN 'free' ELSE u.plan END AS plan
+     FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now() AND u.banned_at IS NULL`,
     [hashToken(token)]
   );
@@ -93,12 +106,16 @@ const publicUser = (u) => ({
   freeLimit: FREE_INVITES_PER_WEEK,
   chat: phatbot.isEnabled() && u.plan === 'full',
   admin: u.role === 'admin',
+  // When a paid pass ends, as 'YYYY-MM-DD' in Eastern time. Null for Free, or Full Access with no end date.
+  paidUntil: u.plan === 'full' && u.plan_paid_until
+    ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(new Date(u.plan_paid_until).getTime() - 1000))
+    : null,
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
-  if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [] };
+  if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [], checkout: payments.enabled() };
   const requests = await listRequests(user);
-  return { user: publicUser(user), requests, ...(await partyList.partiesForSite(pool)) };
+  return { user: publicUser(user), requests, checkout: payments.enabled(), ...(await partyList.partiesForSite(pool)) };
 }
 
 // ---------- email confirmation codes ----------
@@ -236,6 +253,9 @@ async function listRequests(user) {
 const app = express();
 app.disable('x-powered-by');
 if (IS_PROD) app.set('trust proxy', 1);
+// Stripe's webhook has to read the raw body to check its signature, so it's registered before the JSON parser.
+let stripeWebhook = (req, res) => res.status(503).json({ error: 'Payments are off.' });
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), (req, res, next) => stripeWebhook(req, res, next));
 app.use(express.json({ limit: '10kb' }));
 
 const fail = (res, status, error, code) => res.status(status).json({ error, code });
@@ -287,7 +307,9 @@ app.post('/api/login', authLimiter, wrap(async (req, res) => {
   const email = cleanEmail(req.body?.email);
   const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
   const { rows } = await pool.query(
-    'SELECT id, name, email, plan, role, password_hash, email_verified_at, banned_at FROM users WHERE email = $1',
+    `SELECT id, name, email, role, password_hash, email_verified_at, banned_at, plan_paid_until,
+       CASE WHEN plan = 'full' AND plan_paid_until < now() THEN 'free' ELSE plan END AS plan
+     FROM users WHERE email = $1`,
     [email]
   );
   const ok = await verifyPassword(password, rows[0] ? rows[0].password_hash : await dummyHash);
@@ -396,7 +418,7 @@ app.post('/api/logout', wrap(async (req, res) => {
 
 app.get('/api/me', wrap(async (req, res) => {
   const user = await currentUser(req);
-  if (!user) return res.json({ user: null, requests: [], parties: [] });
+  if (!user) return res.json({ user: null, requests: [], parties: [], checkout: payments.enabled() });
   // Opening the main site locks the control room again, so the admin password is needed every time.
   if (user.admin_unlocked) {
     await pool.query('UPDATE sessions SET admin_until = NULL WHERE token_hash = $1', [hashToken(readSessionToken(req))]);
@@ -540,6 +562,9 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
 }));
 
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
+const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload });
+stripeWebhook = pay.webhookHandler;
+pay.mountRoutes(app);
 require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL });
 require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests });
 

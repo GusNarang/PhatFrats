@@ -550,10 +550,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
           <li>Chat with PhatBot, the AI party guide</li>
           <li>Play Door Rush and climb the weekly leaderboard</li>
         </ul>
-        <div class="plan-cta">
-          <button class="btn gold" type="button" disabled>Checkout coming soon</button>
-          <span class="muted" style="font-size:.85rem">Checkout isn't open yet. Start free and upgrade when it is.</span>
-        </div>
+        <div class="plan-cta" id="fullCta"></div>
       </article>
     </div>
   </section>
@@ -681,7 +678,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     <fieldset class="pass-choice" id="passChoice">
       <legend>Your pass</legend>
       <label class="pass-opt"><input type="radio" name="pass" id="passFree" checked><span><b>Free</b><small>See the map and request an invite to one party per week.</small></span></label>
-      <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · <span class="js-price">$4.99</span> a semester</b><small>Checkout coming soon. Start free and upgrade later.</small></span></label>
+      <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · <span class="js-price">$4.99</span> a semester</b><small>Sign up free first, then get Full Access from Passes in one click.</small></span></label>
     </fieldset>
     <button class="btn ghost small verify-resend" type="button" id="forgotBtn">Forgot password?</button>
     <p class="err" id="loginErr" role="alert"></p>
@@ -927,8 +924,53 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     $("#freeCta").innerHTML = state.user
       ? '<span class="plan-badge">'+(state.user.plan==="full" ? 'Included in your pass' : 'Your current pass')+'</span>'
       : '<button class="btn" type="button" data-signup>Sign up free</button>';
+    renderFullCta();
     $("#gate").classList.toggle("locked", !state.user);
     $("#heroLogin").textContent = state.user ? "Open the party map" : state.pending ? "Confirm your email" : "Log in to see the map";
+  }
+
+  // ---------- Full Access checkout ----------
+  const todayET = () => new Intl.DateTimeFormat("en-CA", {timeZone:"America/New_York"}).format(new Date());
+  function renderFullCta(){
+    const el = $("#fullCta"); if(!el) return;
+    const ends = PRICING.passEndLabel(PRICING.passEnds(todayET()));
+    if(state.user && state.user.plan === "full"){
+      el.innerHTML = '<span class="plan-badge full">You have Full Access'+(state.user.paidUntil ? ' through '+esc(PRICING.passEndLabel(state.user.paidUntil)) : '')+'</span>';
+    } else if(!state.checkout){
+      el.innerHTML = '<button class="btn gold" type="button" disabled>Checkout coming soon</button><span class="muted" style="font-size:.85rem">Checkout isn\'t open yet. Start free and upgrade when it is.</span>';
+    } else if(!state.user){
+      el.innerHTML = '<button class="btn gold" type="button" data-signup>Sign up to get Full Access</button><span class="muted" style="font-size:.85rem">Create your free account first, then upgrade here.</span>';
+    } else {
+      el.innerHTML = '<button class="btn gold" type="button" data-buy>Get Full Access · '+esc(priceNow())+'</button><span class="muted" style="font-size:.85rem">One payment, good through '+esc(ends)+'. Secure checkout by Stripe.</span>';
+    }
+  }
+  async function startCheckout(btn){
+    if(!state.user){ openLogin(); return; }
+    btn.disabled = true; btn.textContent = "Opening checkout…";
+    try{
+      const data = await api("/api/checkout", {});
+      location.href = data.url;
+    }catch(err){
+      toast(err.message);
+      renderFullCta();
+    }
+  }
+  // Coming back from Stripe: ?checkout=success&session_id=… or ?checkout=cancel
+  async function finishCheckout(){
+    const params = new URLSearchParams(location.search);
+    const result = params.get("checkout");
+    if(!result) return;
+    history.replaceState(null, "", location.pathname + "#plans");
+    if(result === "cancel"){ toast("Checkout cancelled. You weren't charged."); return; }
+    const sessionId = params.get("session_id");
+    if(result !== "success" || !sessionId || !state.user) return;
+    try{
+      const data = await api("/api/checkout/confirm", {sessionId});
+      state.checkout = data.checkout;
+      enterAccount(data); renderAll();
+      toast("You have Full Access" + (state.user.paidUntil ? " through " + PRICING.passEndLabel(state.user.paidUntil) : "") + ". Enjoy!", 6500);
+      goToPlans();
+    }catch(err){ toast(err.message, 8000); }
   }
 
   // ---------- hero ----------
@@ -1563,6 +1605,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const mode = t.closest("[data-auth-mode]"); if(mode){ setAuthMode(mode.dataset.authMode); return; }
     if(t.closest("[data-signup]")){ openLogin("signup"); return; }
     if(t.closest("[data-plans]")){ e.preventDefault(); goToPlans(); return; }
+    const buy = t.closest("[data-buy]"); if(buy){ e.preventDefault(); startCheckout(buy); return; }
     if(t.closest('a[href="#plans"]')) return;
     if(t.closest("[data-login]") || t.closest("#heroLogin")){
       if(state.user && t.closest("#heroLogin")) document.getElementById("map").scrollIntoView(); else openLogin();
@@ -1596,9 +1639,11 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     fetch("/api/hit", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({v}), keepalive:true}).catch(()=>{});
   }catch(e){}
   api("/api/me").then(data=>{
-    if(!data.user) return;
+    state.checkout = !!data.checkout;
+    if(!data.user){ renderAll(); finishCheckout(); return; }
     enterAccount(data); renderAll();
     if(state.pending) openVerify();
+    finishCheckout();
   }).catch(err=>toast(err.message));
 
   // Hidden way into the control room: Shift, Caps Lock, P, P, L, G, U, S, one after another.

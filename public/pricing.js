@@ -17,6 +17,17 @@
     PRICING.launch.ends
       ? new Date(PRICING.launch.ends + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
       : '';
+  // A pass lasts through the end of the current term: Spring through May 15, Summer through Aug 20,
+  // Fall through Jan 10. Buying with less than 30 days left covers the next term too.
+  PRICING.passEnds = (todayISO) => {
+    const y = Number(todayISO.slice(0, 4));
+    const ends = [`${y}-01-10`, `${y}-05-15`, `${y}-08-20`, `${y + 1}-01-10`, `${y + 1}-05-15`];
+    const day = (iso) => Date.parse(iso + 'T12:00:00Z') / 86400000;
+    return ends.find((e) => day(e) - day(todayISO) >= 30);
+  };
+  // For example "May 15, 2027".
+  PRICING.passEndLabel = (iso) =>
+    new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   // One sentence, for messages and PhatBot.
   PRICING.summary = (now) => {
     const base = `${PRICING.money(PRICING.price)} per ${PRICING.term}, paid once with no auto-renew`;

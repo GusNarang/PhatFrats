@@ -313,8 +313,8 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     const tiles = [
       {label:"Visitors today", value:int(v.today), sub:int(v.week)+" this week · "+int(v.month)+" in 30 days"},
       {label:"Accounts", value:int(a.total), sub:"+"+int(a.new_7d)+" this week · "+int(a.verified)+" confirmed"},
-      {label:"Full Access", value:int(a.full), sub:int(m.paying)+" paying"+(a.full>m.paying?" · "+int(a.full-m.paying)+" admin":"")},
-      {label:"Sales (est.)", value:money(m.gross), sub:money(m.price)+" per "+m.term},
+      {label:"Full Access", value:int(a.full), sub:int(m.activePasses)+" paid pass"+(m.activePasses===1?"":"es")+" active"},
+      {label:"Sales", value:money(m.gross), sub:int(m.sales)+" sale"+(m.sales===1?"":"s")+(m.connected?"":" · checkout off")},
       {label:"AI spend", value:smallMoney(m.aiAll), sub:smallMoney(m.aiMonth)+" in 30 days"},
       {label:"Banned", value:int(a.banned), sub:a.banned ? "can't log in" : "nobody yet"},
     ];
@@ -366,7 +366,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 
   function renderMoney(m, chat){
     const rows = [
-      ["Full Access sales ("+int(m.paying)+" × "+money(m.price)+")", money(m.gross), ""],
+      ["Full Access sales ("+int(m.sales)+")", money(m.gross), ""],
       ["Stripe fees (2.9% + 30¢ each)", "-"+money(m.fees), "neg"],
       ["PhatBot AI, all time", m.aiAll==null ? "n/a" : "-"+smallMoney(m.aiAll), "neg"],
     ];
@@ -376,7 +376,10 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       const left = Math.max(0, m.aiCredit-m.aiAll), pct = Math.min(100, m.aiAll/m.aiCredit*100);
       $("#credit").innerHTML = '<div style="margin-top:16px;font-size:13px;color:var(--muted)">Anthropic credit: '+smallMoney(m.aiAll)+' of '+money(m.aiCredit)+' used, about '+money(left)+' left</div><div class="meter" aria-hidden="true"><i style="width:'+Math.max(pct, m.aiAll>0?1:0)+'%"></i></div>';
     } else $("#credit").innerHTML = "";
-    $("#moneyNote").textContent = "Payments aren't connected yet, so sales are estimated as paying Full Access members × the price. Members you switched on by hand count too. AI spend counts PhatBot messages since this page was added, on "+chat.model+".";
+    $("#moneyNote").textContent = (m.connected
+      ? "Sales are real Stripe payments. "+int(m.activePasses)+" paid pass"+(m.activePasses===1?" is":"es are")+" active now"+(m.testSales ? ", and "+int(m.testSales)+" test-mode payment"+(m.testSales===1?" is":"s are")+" left out of the money" : "")+". Fees are estimated; the exact amounts are in your Stripe dashboard. "
+      : "Checkout is off until your Stripe keys are added to Vercel, so there are no sales yet. Members you switched on by hand aren't counted. ")
+      + "AI spend counts PhatBot messages since this page was added, on "+chat.model+".";
   }
 
   function renderParties(list){

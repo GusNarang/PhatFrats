@@ -13,6 +13,7 @@ const AI_CREDIT = Number(process.env.AI_CREDIT_DOLLARS) || 5;
 const DAYS = 30;
 const PARTY_TITLES = new Map(require('./data/parties.js').map((p) => [p.id, p.title]));
 const partyList = require('./party-list.js');
+const payments = require('./payments.js');
 
 // Entering the admin password opens the control room for one visit. Leaving it, or opening the main
 // site, locks it again. This limit only matters if the tab is left open or the lock message gets lost.
@@ -53,7 +54,7 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
   };
 
   app.get('/api/admin/overview', requireAdmin, wrap(async (req, res) => {
-    const [accounts, visits, series, invites, topParties, chat] = await Promise.all([
+    const [accounts, visits, series, invites, topParties, chat, paid] = await Promise.all([
       pool.query(`SELECT
           count(*)                                                        AS total,
           count(*) FILTER (WHERE email_verified_at IS NOT NULL)           AS verified,
@@ -95,14 +96,23 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
           coalesce(sum(cache_write_tokens) FILTER (WHERE day > ${TODAY_SQL} - 30), 0) AS m_cache_write,
           count(DISTINCT user_id) AS people
         FROM chat_usage`),
+      // Real Stripe payments. Test-mode payments are counted separately and never added to the money.
+      pool.query(`SELECT
+          count(*) FILTER (WHERE livemode)::int AS sales,
+          coalesce(sum(amount_cents) FILTER (WHERE livemode), 0)::int AS cents,
+          coalesce(sum(round(amount_cents * ${STRIPE_PERCENT}) + ${STRIPE_FIXED * 100}) FILTER (WHERE livemode), 0)::int AS fee_cents,
+          count(*) FILTER (WHERE NOT livemode)::int AS test_sales,
+          (SELECT count(*) FROM users WHERE plan = 'full' AND plan_paid_until > now())::int AS active_passes
+        FROM payments`),
     ]);
 
     const a = accounts.rows[0];
     const c = chat.rows[0];
     const num = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Number(v)]));
-    const paying = Number(a.paying);
-    const gross = paying * PRICING.price;
-    const fees = paying * (PRICING.price * STRIPE_PERCENT + STRIPE_FIXED);
+    const p = paid.rows[0];
+    const gross = p.cents / 100;
+    // Stripe's standard card fee for each sale. The exact fee is in the Stripe dashboard.
+    const fees = p.fee_cents / 100;
     const aiAll = aiCost(c);
     const aiMonth = aiCost({ input: c.m_input, output: c.m_output, cache_read: c.m_cache_read, cache_write: c.m_cache_write });
 
@@ -115,10 +125,13 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
       topParties: topParties.rows.map((r) => ({ id: r.party_id, title: r.hosted_title || PARTY_TITLES.get(r.party_id) || r.party_id, requests: Number(r.requests) })),
       chat: { messages: Number(c.messages), today: Number(c.today), people: Number(c.people), model: phatbot.MODEL, enabled: phatbot.isEnabled() },
       money: {
-        connected: false,
+        connected: payments.enabled(),
         price: PRICING.price,
         term: PRICING.term,
-        paying,
+        sales: p.sales,
+        testSales: p.test_sales,
+        activePasses: p.active_passes,
+        paying: p.sales,
         gross,
         fees,
         aiAll,
@@ -201,7 +214,7 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     const plan = req.body?.plan;
     if (!id || (plan !== 'full' && plan !== 'free')) return fail(res, 400, 'Choose free or full.');
     const { rowCount } = await pool.query(
-      `UPDATE users SET plan = $2, plan_paid_at = CASE WHEN $2 = 'full' THEN now() ELSE NULL END WHERE id = $1`,
+      `UPDATE users SET plan = $2, plan_paid_at = CASE WHEN $2 = 'full' THEN now() ELSE NULL END, plan_paid_until = NULL WHERE id = $1`,
       [id, plan]
     );
     if (!rowCount) return fail(res, 404, 'That account is gone.');

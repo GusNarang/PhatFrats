@@ -188,3 +188,20 @@ CREATE TABLE IF NOT EXISTS game_runs (
 );
 CREATE INDEX IF NOT EXISTS game_runs_week_idx ON game_runs(finished_at, score DESC);
 CREATE INDEX IF NOT EXISTS game_runs_user_idx ON game_runs(user_id, score DESC);
+
+-- ---------- Payments ----------
+-- When a paid Full Access pass ends. Empty for Free, and for Full Access given by hand with no end date.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_paid_until TIMESTAMPTZ;
+
+-- One row per paid Stripe Checkout. The session id makes recording a payment safe to repeat.
+CREATE TABLE IF NOT EXISTS payments (
+  stripe_session_id TEXT PRIMARY KEY,
+  user_id           BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  amount_cents      INTEGER NOT NULL,
+  currency          TEXT NOT NULL,
+  payment_intent    TEXT,
+  pass_until        DATE NOT NULL,
+  livemode          BOOLEAN NOT NULL DEFAULT FALSE,
+  paid_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id);
