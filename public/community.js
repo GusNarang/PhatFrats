@@ -113,6 +113,7 @@
       <b>Saved parties</b>
       <div style="margin:6px 0 14px">${saved.length ? saved.map((x) => `<div class="pf-note">${esc(x.title)} <small>${esc(S().whenText(x))}</small> <button class="btn small" type="button" data-open-party="${esc(x.id)}">Open</button></div>`).join('') : '<p class="muted" style="margin:0">Tap ♡ on a party to save it. You\'ll get an alert when it starts filling up.</p>'}</div>
       <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="pfEmailOpt" ${p.emailUpdates ? 'checked' : ''}> Email me when I'm on a list, win a prize, or the Weekend Drop goes live</label>
+      <p style="margin:14px 0 0"><button class="btn ghost small" type="button" data-welcome>🎁 Free Full Access and Door Rush rules</button></p>
       ${installHint()}`;
     document.body.appendChild(panel);
     panel.querySelector('#pfEmailOpt').addEventListener('change', (e) => S().api('/api/profile/email', { on: e.target.checked }).then(() => S().toast(e.target.checked ? 'Email updates on.' : 'Email updates off.')).catch((err) => S().toast(err.message)));
@@ -285,6 +286,59 @@
     }
   }
 
+  // ---------- welcome pop-up ----------
+  // Shown once, the first time someone is logged in on this browser. They can open it again from their profile.
+  const WELCOME_KEY = 'pf_welcome_v1';
+  async function openWelcome() {
+    closePanels();
+    let p = null;
+    try { p = await S().api('/api/profile'); } catch (e) {}
+    const link = p && p.referral.code ? p.referral.link + p.referral.code : '';
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+    const P = S().PRICING, thisTerm = P.passEndLabel(P.passEnds(today)), nextTerm = P.passEndLabel(P.passEnds(P.passEnds(today)));
+    let dlg = document.getElementById('pfWelcome');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'pfWelcome';
+      dlg.setAttribute('aria-labelledby', 'pfWelcomeTitle');
+      dlg.style.maxWidth = '560px';
+      document.body.appendChild(dlg);
+    }
+    const first = esc(S().state.user.name.split(' ')[0]);
+    dlg.innerHTML = `<div class="dlg" style="max-height:82vh;overflow:auto">
+      <span class="eyebrow">Welcome to PhatFrats</span>
+      <h3 id="pfWelcomeTitle">Hey ${first}! Two ways to get Full Access free 🎉</h3>
+
+      <div class="pf-note" style="margin-top:12px"><b>🎁 Bring 3 friends, get a free semester</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Share your invite link. When 3 friends sign up with it <b>and confirm their Penn State email</b>, you get Full Access free through <b>${esc(thisTerm)}</b>. It happens automatically, and you'll get a notification. Track your progress in your profile (tap your initials).</p>
+        ${link ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><input class="input" readonly value="${esc(link)}" aria-label="Your invite link" style="flex:1 1 180px"><button class="btn small" type="button" data-copy="${esc(link)}">Copy link</button>${navigator.share ? `<button class="btn small" type="button" data-share-link="${esc(link)}">Share</button>` : ''}</div>` : ''}
+      </div>
+
+      <div class="pf-note"><b>🏆 Win Door Rush, win a free semester</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Each week (Monday to Sunday), the top Door Rush score wins Full Access through <b>${esc(nextTerm)}</b>. The prize is given automatically every Monday, with a notification and a champion badge. Door Rush is part of Full Access; play it from <a href="/game">Game</a> in the menu.</p>
+      </div>
+
+      <div class="pf-note"><b>🕹️ How Door Rush works</b>
+        <ul style="margin:6px 0 0;padding-left:20px;color:var(--muted);line-height:1.5">
+          <li>Guests walk up the street. Send each one to the right party before they reach the red line: <b>★ star → Neon</b>, <b>● circle → Chill</b>, <b>◆ diamond → Costume</b>.</li>
+          <li>Hooded guests with a red <b>✕</b> are crashers: hit <b>Bounce</b>. Letting one in counts as a mistake.</li>
+          <li><b>3 mistakes</b> (wrong door, a crasher gets in, too slow, or bouncing a real guest) and the doors close.</li>
+          <li>From level 3 the <b>doors switch places</b>, so watch the labels.</li>
+          <li>Streaks raise your multiplier up to <b>x5</b>. 👑 VIPs are worth <b>triple</b>. Fill the Hype meter for 6 seconds of <b>double points</b>.</li>
+          <li>Every 40 correct guests wins back a lost wristband (up to 3).</li>
+          <li>Keys: ← ↑ → to send, ↓ or Space to bounce. On a phone, use the big buttons.</li>
+          <li>The leaderboard resets Monday at midnight. Scores have to come from real games; impossible scores aren't saved.</li>
+        </ul>
+      </div>
+
+      <div class="dlg-actions"><button class="btn" type="button" data-welcome-done>Let's go</button></div>
+    </div>`;
+    dlg.querySelector('[data-welcome-done]').addEventListener('click', () => dlg.close());
+    // Counted as seen as soon as it shows, so it never pops up twice.
+    store.set(WELCOME_KEY, '1');
+    if (!dlg.open) dlg.showModal();
+  }
+
   // ---------- events ----------
   document.addEventListener('click', async (e) => {
     const t = e.target;
@@ -306,6 +360,7 @@
     const cp = t.closest('[data-copy]'); if (cp) { copy(cp.dataset.copy, 'Link copied!'); return; }
     const sl = t.closest('[data-share-link]'); if (sl) { try { await navigator.share({ text: 'Join me on PhatFrats, the Penn State party map:', url: sl.dataset.shareLink }); } catch (err) {} return; }
     if (t.closest('[data-install]')) { install(); return; }
+    if (t.closest('[data-welcome]')) { openWelcome(); return; }
     const k = t.closest('[data-kit]'); if (k) { kit(k.dataset.kit); return; }
     if (!t.closest('.pf-panel')) closePanels();
   }, true);
@@ -333,7 +388,14 @@
     const auth = $('#authArea');
     // Logging in later (without a reload) also starts the bell.
     let started = false;
-    const kick = () => { if (!started && $('#bellBtn')) { started = true; loadNotes(); setInterval(() => { if (!document.hidden) loadNotes(); }, 60000); } paintBell(); };
+    const kick = () => {
+      if (!started && $('#bellBtn')) {
+        started = true; loadNotes(); setInterval(() => { if (!document.hidden) loadNotes(); }, 60000);
+        // First time logged in on this browser (including right after signing up): the welcome pop-up.
+        if (!store.get(WELCOME_KEY) && !params.get('group')) setTimeout(openWelcome, 900);
+      }
+      paintBell();
+    };
     // Only the header being rebuilt counts, not the bell's own number changing.
     if (auth) new MutationObserver(kick).observe(auth, { childList: true });
     kick();
