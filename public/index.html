@@ -184,7 +184,7 @@ section{padding-block:40px}
 }
 .lock-inner h3{font-family:var(--display);font-weight:400;font-size:1.5rem}
 
-.map-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:start}
+.map-layout{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px;align-items:stretch}
 @media (max-width:900px){.map-layout{grid-template-columns:1fr}}
 .map-box{
   background:var(--night-2);border-radius:20px;border:1px solid var(--line);overflow:hidden;position:relative;
@@ -219,6 +219,11 @@ section{padding-block:40px}
 .detail{
   background:var(--night-2);border-radius:20px;border:1px solid var(--line);padding:20px;
   display:flex;flex-direction:column;gap:14px;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 74px);
+}
+/* Side by side, the details panel is exactly as tall as the map and scrolls inside, so a long party never leaves empty space under the map. */
+@media (min-width:901px){
+  .map-layout>.detail{position:relative;top:auto;height:0;min-height:100%;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .map-layout>.detail::-webkit-scrollbar{width:8px}.map-layout>.detail::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
 }
 @media (max-width:900px){.detail{position:static}}
 .detail .empty{display:flex;flex-direction:column;gap:10px;color:var(--muted)}
@@ -1623,6 +1628,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const c = sel.type==="party" ? byId[partyById[sel.id].ch] : byId[sel.id];
     if(c && c.x!=null) centerOn(c.x, c.y);
     renderMap(); renderDetail(); renderParties();
+    $("#detail").scrollTop = 0;
     if(scroll) document.getElementById("map").scrollIntoView();
   }
   document.addEventListener("click", e=>{
