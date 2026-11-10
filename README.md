@@ -165,7 +165,7 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 - **Referrals:** everyone gets a link (`/?ref=CODE`). When 3 friends sign up with it and confirm their email, the referrer gets Full Access through the end of the semester.
 - **Share cards:** 📸 Share makes an Instagram-story image of a party, with a link back (`/?party=ID`).
 - **Group plans:** 👯 makes a link (`/?group=CODE`) for friends going together. Each friend still requests their own invite, and the group shows who has.
-- **Door Rush weekly prize:** each Monday, last week's top scorer gets Full Access through the end of next semester, automatically.
+- **Door Rush weekly prize:** each Monday, last week's top scorer gets Full Access through the end of next semester, automatically. A Vercel scheduled job (`crons` in `vercel.json`) calls `/api/cron/door-rush-prize` every Monday at 05:10 UTC (just after midnight in State College; Vercel's free plan may run it any time within that hour). Visiting Door Rush or the bell also checks, as a backup, and a week's prize is only ever given once. Set `CRON_SECRET` in Vercel so only the scheduler can call the job.
 - **The Weekend Drop:** a countdown to Thursday 6 PM on the main page. In the control room (Live), **Send the Drop** notifies everyone, emails up to 400 people in blind-copied batches, and lights the beacon for 3 days.
 - **Party Smart kit:** call 911, Penn State Police, share your location with a friend, tell friends you're home, a check-in reminder, and **Report something** (goes to the control room inbox).
 - **About & contact** at `/about`. Messages land in the control room inbox.

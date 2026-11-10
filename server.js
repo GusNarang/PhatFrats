@@ -604,6 +604,7 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
+community.mountCron(app);
 community.mountAdmin(app);
 const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload, ops });
 stripeWebhook = pay.webhookHandler;

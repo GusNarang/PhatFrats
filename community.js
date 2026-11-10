@@ -82,15 +82,16 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
   }
 
   // ---------- Door Rush weekly prize ----------
-  // Last week's champion wins a free semester. Checked lazily when people load their bell or Door Rush.
+  // Last week's champion wins a free semester. A scheduled job runs this every Monday just after midnight;
+  // loading Door Rush or the bell also checks, as a backup. A week's prize can only ever be given once.
   // Once a week's prize is settled, nothing more is checked until next week; otherwise it rechecks each minute.
   let lastPrizeCheck = 0, settledWeek = null;
-  async function awardDoorRushPrize() {
-    if (Date.now() - lastPrizeCheck < 60 * 1000) return;
+  async function awardDoorRushPrize({ force = false } = {}) {
+    if (!force && Date.now() - lastPrizeCheck < 60 * 1000) return { result: 'skipped' };
     lastPrizeCheck = Date.now();
     const { rows: [w] } = await pool.query(`SELECT (${WEEK_START_SQL} - interval '7 days') AS start, ${WEEK_START_SQL} AS stop,
       to_char((${WEEK_START_SQL} - interval '7 days') AT TIME ZONE '${ZONE}', 'YYYY-MM-DD') AS week`);
-    if (settledWeek === w.week) return;
+    if (settledWeek === w.week) return { result: 'already-awarded', week: w.week };
     const { rows: [champ] } = await pool.query(
       // Ties go to whoever reached the score first.
       `SELECT r.user_id, max(r.score)::int AS score, (array_agg(r.finished_at ORDER BY r.score DESC, r.finished_at))[1] AS reached
@@ -99,18 +100,30 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
        GROUP BY r.user_id ORDER BY score DESC, reached ASC LIMIT 1`,
       [w.start, w.stop]
     );
-    if (!champ) return;
+    if (!champ) return { result: 'nobody-played', week: w.week };
     const { rowCount } = await pool.query(
       'INSERT INTO game_prizes (week_start, user_id, score) VALUES ($1, $2, $3) ON CONFLICT (week_start) DO NOTHING',
       [w.week, champ.user_id, champ.score]
     );
     settledWeek = w.week;
-    if (!rowCount) return;
+    if (!rowCount) return { result: 'already-awarded', week: w.week };
     // A free semester: through the end of next term, so it's worth something even to someone with a pass.
     const through = PRICING.passEnds(PRICING.passEnds(todayISO()));
     const { forever } = await extendPass(champ.user_id, through);
     await notify(champ.user_id, 'prize', `🏆 You were last week's Door Rush champion with ${champ.score.toLocaleString('en-US')} points! ${forever ? 'Your Full Access already has no end date, so enjoy the crown.' : `Your Full Access now runs through ${PRICING.passEndLabel(through)}.`}`, { link: '/game' });
     ops.activity('prize', `A Door Rush champion won a free semester`);
+    return { result: 'awarded', week: w.week, score: champ.score };
+  }
+
+  // Vercel's scheduler calls this every Monday. With CRON_SECRET set in Vercel, only the scheduler can call it;
+  // without it, anyone could trigger it, which is harmless because each week's prize is given once, to the right person.
+  function mountCron(app) {
+    app.get('/api/cron/door-rush-prize', wrap(async (req, res) => {
+      const secret = process.env.CRON_SECRET;
+      if (secret && req.get('authorization') !== `Bearer ${secret}`) return fail(res, 401, 'Not allowed.');
+      res.set('Cache-Control', 'no-store');
+      res.json(await awardDoorRushPrize({ force: true }));
+    }));
   }
 
   // ---------- badges and streaks ----------
@@ -354,7 +367,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     }));
   }
 
-  return { mountHooks, mountRoutes, mountAdmin, awardDoorRushPrize, notify };
+  return { mountHooks, mountRoutes, mountAdmin, mountCron, awardDoorRushPrize, notify };
 }
 
 module.exports = { create };
