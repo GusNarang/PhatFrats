@@ -174,4 +174,4 @@ Built to bring students back every week. Code is in `community.js` (server) and 
 
 ## Theme song
 
-"On The List" plays on repeat in the background on the main page and the About page (`public/music.js`). Browsers only allow sound after someone interacts with the page, so it starts on the first tap, click or key. A floating 🔊 button (bottom left) mutes it, and the profile's Settings has a "Play the PhatFrats theme song" switch; the choice is remembered in that browser. People whose device asks for reduced motion start muted. The song file lives at `public/audio/on-the-list.mp3` and only downloads when it's about to play.
+"On The List" plays on repeat on the Door Rush page only (`public/music.js`, loaded by `public/game.html`). Browsers only allow sound after someone interacts with the page, so it starts on the first tap, click or key. A floating 🔊 button (bottom left) mutes it, separately from the game's own sound effects button; the choice is remembered in that browser. People whose device asks for reduced motion start muted. The song file lives at `public/audio/on-the-list.mp3` and only downloads when it's about to play.

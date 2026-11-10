@@ -1,4 +1,4 @@
-// The PhatFrats theme song, "On The List", playing on repeat in the background.
+// The PhatFrats theme song, "On The List", playing on repeat on the Door Rush page.
 // Browsers don't allow sound until someone interacts with the page, so it starts on the first tap, click or key.
 // A floating button mutes or unmutes it, and the choice is remembered in this browser. The song only
 // downloads once it's about to play, so muted visitors never load it.

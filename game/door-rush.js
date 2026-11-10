@@ -21,7 +21,7 @@
     root.innerHTML = `
       <div class="dr-stage">
         <canvas width="${W}" height="${H}" aria-label="Door Rush game" role="img"></canvas>
-        <button class="dr-mute" type="button" aria-pressed="false" aria-label="Sound">Sound on</button>
+        <button class="dr-mute" type="button" aria-pressed="false" aria-label="Sound effects">Effects on</button>
         <div class="dr-overlay"></div>
       </div>
       <div class="dr-controls" role="group" aria-label="Game controls">
@@ -60,7 +60,7 @@
     }
     function setMute(value) {
       muted = value;
-      muteButton.textContent = muted ? 'Sound off' : 'Sound on';
+      muteButton.textContent = muted ? 'Effects off' : 'Effects on';
       muteButton.setAttribute('aria-pressed', String(muted));
       try { localStorage.setItem('pf_dr_muted', muted ? '1' : '0'); } catch (e) {}
     }
