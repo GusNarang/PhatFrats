@@ -109,6 +109,7 @@
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:1.1rem">${esc(st.user.name)}</b><button class="btn ghost small" type="button" data-close-panel>Close</button></div>
       <p class="muted" style="margin:4px 0 10px">${p.streak >= 1 ? `🔥 ${p.streak}-weekend streak. Keep it going!` : 'Request an invite this weekend to start a streak.'}</p>
       <b>Badges</b><div class="pf-badges">${p.badges.length ? p.badges.map((b) => `<div class="pf-badge"><i>${b.icon}</i><b>${esc(b.name)}</b><span>${esc(b.about)}</span></div>`).join('') : '<p class="muted" style="grid-column:1/-1">No badges yet. They unlock as you go out, invite friends and play Door Rush.</p>'}</div>
+      ${st.user.plan !== 'full' ? `<div class="pf-note" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>🎟️ <b>${p.bonusInvites || 0}</b> extra invite${p.bonusInvites === 1 ? '' : 's'} saved</span><button class="btn ghost small" type="button" data-out-of-invites="earn">Earn more</button></div>` : ''}
       <b>Invite friends, get a free semester</b>
       <p class="muted" style="margin:4px 0">${p.referral.rewarded ? '🎁 You earned your free semester. Thank you!' : `When ${p.referral.needed} friends sign up with your link and confirm their email, you get Full Access free for the semester.`}</p>
       <div class="pf-progress"><i style="width:${Math.min(100, p.referral.joined / p.referral.needed * 100)}%"></i></div>
@@ -291,6 +292,50 @@
     }
   }
 
+  // ---------- out of invites: how to get another ----------
+  // Shown when a free account taps a party after its weekly invite (and any extras) are used,
+  // or from "Earn extra invites" in My invites.
+  async function outOfInvites(mode) {
+    closePanels();
+    let p = null;
+    try { p = await S().api('/api/profile'); } catch (e) {}
+    const link = p && p.referral.code ? p.referral.link + p.referral.code : '';
+    const { day, min } = etParts();
+    const left = 7 * 1440 - (day * 1440 + min), d = Math.floor(left / 1440), h = Math.floor((left % 1440) / 60);
+    const extras = (p && p.bonusInvites) || 0;
+    const earnOnly = mode === 'earn';
+    let dlg = document.getElementById('pfOut');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'pfOut';
+      dlg.setAttribute('aria-labelledby', 'pfOutTitle');
+      dlg.style.maxWidth = '520px';
+      dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-out-close]') || e.target.closest('[data-plans]') || e.target.closest('a[href="/game"]')) dlg.close(); });
+      document.body.appendChild(dlg);
+    }
+    dlg.innerHTML = `<div class="dlg" style="max-height:86vh;overflow:auto">
+      <span class="eyebrow">${earnOnly ? 'Extra invites' : 'Out of invites this week'}</span>
+      <h3 id="pfOutTitle">${earnOnly ? 'Earn extra invites 🎟️' : "You've used this week's free invite"}</h3>
+      <p class="muted" style="margin:0">${earnOnly ? 'Extra invites are used after your weekly free one, and they\'re saved until you need them.' : 'Want to go to this one too? Earn an extra invite. It\'s saved until you use it, this week or next.'}${extras ? ` You have <b>${extras}</b> saved.` : ''}</p>
+      <div class="pf-note"><b>👯 Bring a friend: +1 invite each</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Every friend who signs up with your link and confirms their Penn State email earns you <b>an extra invite</b> right away. Bring 3 and you also get <b>Full Access free</b> for the semester.</p>
+        ${link ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><input class="input" readonly value="${esc(link)}" aria-label="Your invite link" style="flex:1 1 180px"><button class="btn small" type="button" data-copy="${esc(link)}">Copy link</button>${navigator.share ? `<button class="btn small" type="button" data-share-link="${esc(link)}">Share</button>` : ''}</div>` : ''}
+      </div>
+      <div class="pf-note"><b>🕹️ Finish top 10 in Door Rush: +1 invite</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Places 2 to 10 on this week's Door Rush leaderboard each get an extra invite on Monday, ready for next weekend. First place wins a whole free semester.</p>
+        <a class="btn small" href="/game" style="margin-top:10px;display:inline-flex">Play Door Rush</a>
+      </div>
+      ${earnOnly ? '' : `<div class="pf-note"><b>⏰ Or wait it out</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Your free invite comes back Monday at midnight, in <b>${d ? d + 'd ' : ''}${h}h</b>.</p></div>`}
+      <div class="pf-note" style="border:1px solid rgba(255,210,63,.45)"><b>💎 Or go unlimited</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Full Access is <b>${esc(S().PRICING.money(S().PRICING.current()))} a ${esc(S().PRICING.term)}</b>, one payment: unlimited invites, front of the line and PhatBot.</p>
+        <a class="btn gold small" href="#plans" data-plans style="margin-top:10px;display:inline-flex">Get Full Access</a>
+      </div>
+      <div class="dlg-actions"><button class="btn ghost" type="button" data-out-close>Close</button></div>
+    </div>`;
+    if (!dlg.open) dlg.showModal();
+  }
+
   // ---------- welcome pop-up ----------
   // Shown once, the first time someone is logged in on this browser. They can open it again from their profile.
   const WELCOME_KEY = 'pf_welcome_v1';
@@ -312,10 +357,12 @@
     const first = esc(S().state.user.name.split(' ')[0]);
     dlg.innerHTML = `<div class="dlg" style="max-height:82vh;overflow:auto">
       <span class="eyebrow">Welcome to PhatFrats</span>
-      <h3 id="pfWelcomeTitle">Hey ${first}! Two ways to get Full Access free 🎉</h3>
+      <h3 id="pfWelcomeTitle">Hey ${first}! ${S().state.user.trial ? 'Your first weekend is on us 🎉' : 'Two ways to get Full Access free 🎉'}</h3>
+      ${S().state.user.trial ? `<div class="pf-note" style="margin-top:12px;border:1px solid rgba(255,210,63,.5)"><b>🎉 Full Access is free through Sunday night</b>
+        <p style="margin:6px 0 0;color:var(--muted)">Request as many parties as you want, go to the front of the line, and try PhatBot. After Sunday you're on the free plan (one invite a week), unless you keep Full Access or earn it free below.</p></div>` : ''}
 
       <div class="pf-note" style="margin-top:12px"><b>🎁 Bring 3 friends, get a free semester</b>
-        <p style="margin:6px 0 0;color:var(--muted)">Share your invite link. When 3 friends sign up with it <b>and confirm their Penn State email</b>, you get Full Access free through <b>${esc(thisTerm)}</b>. It happens automatically, and you'll get a notification. Track your progress in your profile (tap your initials).</p>
+        <p style="margin:6px 0 0;color:var(--muted)">Share your invite link. <b>Every friend</b> who signs up with it and confirms their Penn State email earns you <b>an extra invite</b>. Bring 3 and you get Full Access free through <b>${esc(thisTerm)}</b>. It all happens automatically, with a notification. Track it in your profile (tap your initials).</p>
         ${link ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><input class="input" readonly value="${esc(link)}" aria-label="Your invite link" style="flex:1 1 180px"><button class="btn small" type="button" data-copy="${esc(link)}">Copy link</button>${navigator.share ? `<button class="btn small" type="button" data-share-link="${esc(link)}">Share</button>` : ''}</div>` : ''}
       </div>
 
@@ -378,6 +425,7 @@
     const sl = t.closest('[data-share-link]'); if (sl) { try { await navigator.share({ text: 'Join me on PhatFrats, the Penn State party map:', url: sl.dataset.shareLink }); } catch (err) {} return; }
     if (t.closest('[data-install]')) { install(); return; }
     if (t.closest('[data-welcome]')) { openWelcome(); return; }
+    const oo = t.closest('[data-out-of-invites]'); if (oo) { e.preventDefault(); outOfInvites(oo.dataset.outOfInvites === 'earn' ? 'earn' : ''); return; }
     const k = t.closest('[data-kit]'); if (k) { kit(k.dataset.kit); return; }
     if (!t.closest('.pf-panel')) closePanels();
   }, true);
@@ -419,7 +467,7 @@
   }
 
   window.PFCommunity = {
-    start, saveButton, detailExtras, groupFor,
+    start, saveButton, detailExtras, groupFor, outOfInvites,
     referral: () => store.get('pf_ref'),
   };
 })();

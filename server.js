@@ -85,13 +85,22 @@ function expirePasses() {
   pool.query(`UPDATE users SET plan = 'free' WHERE plan = 'full' AND plan_paid_until < now()`)
     .catch((err) => console.error('Could not end expired passes:', err.message));
 }
+// A paid (or given) pass that hasn't ended.
+const PAID_SQL = (u) => `(${u}plan = 'full' AND (${u}plan_paid_until IS NULL OR ${u}plan_paid_until >= now()))`;
+// Full Access comes from a pass or from the first-weekend trial. The trial never changes the stored plan.
+const PLAN_SQL = (u = '') => `CASE WHEN ${PAID_SQL(u)} OR ${u}trial_until > now() THEN 'full' ELSE 'free' END AS plan,
+  (${u}trial_until > now() AND NOT ${PAID_SQL(u)}) AS on_trial, ${u}trial_until, ${u}bonus_invites`;
+async function loadUser(id) {
+  const { rows: [u] } = await pool.query(`SELECT id, name, email, role, email_verified_at, plan_paid_until, ${PLAN_SQL()} FROM users WHERE id = $1`, [id]);
+  return u || null;
+}
 async function currentUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
   expirePasses();
   const { rows } = await pool.query(
     `SELECT u.id, u.name, u.email, u.role, u.email_verified_at, u.plan_paid_until, (s.admin_until > now()) AS admin_unlocked,
-       CASE WHEN u.plan = 'full' AND u.plan_paid_until < now() THEN 'free' ELSE u.plan END AS plan
+       ${PLAN_SQL('u.')}
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now() AND u.banned_at IS NULL`,
     [hashToken(token)]
@@ -106,10 +115,16 @@ const publicUser = (u) => ({
   freeLimit: FREE_INVITES_PER_WEEK,
   chat: phatbot.isEnabled() && u.plan === 'full',
   admin: u.role === 'admin',
-  // When a paid pass ends, as 'YYYY-MM-DD' in Eastern time. Null for Free, or Full Access with no end date.
-  paidUntil: u.plan === 'full' && u.plan_paid_until
+  // When a paid pass ends, as 'YYYY-MM-DD' in Eastern time. Null for Free, the trial, or Full Access with no end date.
+  paidUntil: u.plan === 'full' && !u.on_trial && u.plan_paid_until
     ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(new Date(u.plan_paid_until).getTime() - 1000))
     : null,
+  // The first-weekend trial's last day ('YYYY-MM-DD', a Sunday), while it's running.
+  trial: u.on_trial && u.trial_until
+    ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(new Date(u.trial_until).getTime() - 1000))
+    : null,
+  // Extra invites earned and not used yet.
+  bonusInvites: u.bonus_invites || 0,
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
 async function accountPayload(user) {
@@ -330,7 +345,7 @@ app.post('/api/login', authLimiter, wrap(async (req, res) => {
   const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
   const { rows } = await pool.query(
     `SELECT id, name, email, role, password_hash, email_verified_at, banned_at, plan_paid_until,
-       CASE WHEN plan = 'full' AND plan_paid_until < now() THEN 'free' ELSE plan END AS plan
+       ${PLAN_SQL()}
      FROM users WHERE email = $1`,
     [email]
   );
@@ -415,11 +430,23 @@ app.post('/api/verify', authLimiter, requireUser, wrap(async (req, res) => {
   if (!rows[0]) return fail(res, 400, 'That code has expired or had too many tries. Send yourself a new one.', 'CODE_EXPIRED');
   const matches = crypto.timingSafeEqual(Buffer.from(rows[0].code_hash), Buffer.from(hashCode(req.user.id, code)));
   if (!matches) return fail(res, 400, "That code doesn't match. Check your email and try again.", 'CODE_WRONG');
-  const { rows: [user] } = await pool.query(
-    `UPDATE users SET email_verified_at = now() WHERE id = $1 RETURNING id, name, email, plan, email_verified_at, role`,
+  await pool.query('UPDATE users SET email_verified_at = now() WHERE id = $1', [req.user.id]);
+  await pool.query('DELETE FROM email_codes WHERE user_id = $1', [req.user.id]);
+  // First weekend free: Full Access through the coming Sunday night. If that's under 3 days away,
+  // it runs through the Sunday after, so everyone gets a whole weekend. Only ever given once.
+  const { rowCount: trial } = await pool.query(
+    `UPDATE users SET trial_until = CASE WHEN (${WEEK_START_SQL} + interval '7 days') - now() < interval '3 days'
+        THEN ${WEEK_START_SQL} + interval '14 days' ELSE ${WEEK_START_SQL} + interval '7 days' END
+     WHERE id = $1 AND trial_until IS NULL AND NOT ${PAID_SQL('')}`,
     [req.user.id]
   );
-  await pool.query('DELETE FROM email_codes WHERE user_id = $1', [req.user.id]);
+  const user = await loadUser(req.user.id);
+  if (trial && user.on_trial) {
+    const ends = publicUser(user).trial;
+    const label = new Date(ends + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
+    community.notify(user.id, 'trial', `🎉 Your first weekend is on us: Full Access free through ${label} at midnight. Unlimited invites, front of the line and PhatBot.`, { email: false })
+      .catch((err) => console.error('Trial note failed:', err.message));
+  }
   res.json(await accountPayload(user));
 }));
 
@@ -448,6 +475,19 @@ app.get('/api/me', wrap(async (req, res) => {
   res.json(await accountPayload(user));
 }));
 
+app.get('/api/teaser', wrap(async (req, res) => {
+  const s = await ops.settings();
+  const { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo });
+  const pct = (p) => Math.min(100, Math.round(p.going / p.cap * 100));
+  res.set('Cache-Control', 'public, max-age=60');
+  res.json({
+    count: parties.length,
+    filling: parties.filter((p) => pct(p) >= 80).length,
+    nights: days.map((d) => ({ label: d.label, count: parties.filter((p) => p.day === d.k).length })).filter((n) => n.count),
+    cards: [...parties].sort((a, b) => pct(b) - pct(a)).slice(0, 6).map((p) => ({ vibe: p.vibe, night: partyList.dayLabel(p.day).label, full: pct(p) })),
+  });
+}));
+
 app.get('/api/requests', requireVerified, wrap(async (req, res) => {
   res.json({ requests: await listRequests(req.user) });
 }));
@@ -462,7 +502,8 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   try {
     await client.query('BEGIN');
     // Locks this user's row so two requests sent at once can't both use the weekly free invite.
-    const { rows: [user] } = await client.query('SELECT plan FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
+    const { rows: [user] } = await client.query('SELECT bonus_invites FROM users WHERE id = $1 FOR UPDATE', [req.user.id]);
+    const full = req.user.plan === 'full';
     const { rows: existing } = await client.query(
       `SELECT party_id, created_at >= ${WEEK_START_SQL} AND invited_by IS NULL AS this_week FROM invite_requests WHERE user_id = $1`,
       [req.user.id]
@@ -471,14 +512,17 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
       await client.query('ROLLBACK');
       return fail(res, 409, 'You already requested an invite to this party.', 'ALREADY_REQUESTED');
     }
-    if (user.plan !== 'full' && existing.filter((r) => r.this_week).length >= FREE_INVITES_PER_WEEK) {
+    // Past the weekly free invite, a free account spends an extra invite it earned, if it has one.
+    const useBonus = !full && existing.filter((r) => r.this_week).length >= FREE_INVITES_PER_WEEK;
+    if (useBonus && user.bonus_invites < 1) {
       await client.query('ROLLBACK');
-      return fail(res, 403, `That's your free invite for this week. It resets Monday at midnight, or go unlimited with Full Access for ${PRICING.money(PRICING.current())} a ${PRICING.term}.`, 'FREE_LIMIT');
+      return fail(res, 403, `That's your free invite for this week. It comes back Monday at midnight. Earn an extra one now by bringing a friend to PhatFrats or finishing top 10 in Door Rush, or go unlimited with Full Access for ${PRICING.money(PRICING.current())} a ${PRICING.term}.`, 'FREE_LIMIT');
     }
+    if (useBonus) await client.query('UPDATE users SET bonus_invites = bonus_invites - 1 WHERE id = $1', [req.user.id]);
     await client.query(
       // No plus-ones: everyone coming needs their own invite.
-      'INSERT INTO invite_requests (user_id, party_id, note, priority) VALUES ($1, $2, $3, $4)',
-      [req.user.id, partyId, note, user.plan === 'full']
+      'INSERT INTO invite_requests (user_id, party_id, note, priority, used_bonus) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.id, partyId, note, full, useBonus]
     );
     await client.query('COMMIT');
   } catch (err) {

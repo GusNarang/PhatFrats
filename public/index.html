@@ -617,6 +617,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
           <span class="eyebrow">Students only</span>
           <h3>The party map is behind the velvet rope</h3>
           <p class="muted">Log in or create a free account to see where the parties are and request invites.</p>
+          <p id="lockTeaser" hidden style="margin:0"></p>
+          <p class="muted" style="margin:0;font-size:.88rem">🎉 New accounts get their <b>first weekend of Full Access free</b>.</p>
           <div class="cta-row" style="justify-content:center"><button class="btn" type="button" data-signup>Sign up free</button><button class="btn ghost" type="button" data-login>Log in</button></div>
         </div>
       </div>
@@ -866,7 +868,9 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }
   const isFree = () => !!state.user && state.user.plan !== "full";
   const invitesThisWeek = () => state.requests.filter(r=>r.thisWeek).length;
-  const freeInviteUsed = () => isFree() && invitesThisWeek() >= state.user.freeLimit;
+  const extraInvites = () => (state.user && state.user.bonusInvites) || 0;
+  const weeklyUsed = () => isFree() && invitesThisWeek() >= state.user.freeLimit;
+  const freeInviteUsed = () => weeklyUsed() && extraInvites() < 1;
   // An account stays logged out of the map until its email is confirmed.
   function enterAccount(data){
     const verified = data.user.verified;
@@ -931,7 +935,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     const a = $("#authArea");
     if(state.user){
       const full = state.user.plan === "full";
-      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'">'+(full?'Full Access':'Free')+'</span><button class="fr-btn" type="button" id="friendsBtn" aria-label="Friends" title="Friends">👯<b id="friendsCount" hidden></b></button><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn" type="button" id="profileBtn" aria-label="Your profile">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
+      a.innerHTML = '<div class="user-chip"><span class="plan-badge'+(full?' full':'')+'"'+(state.user.trial?' title="Full Access free through Sunday"':'')+'>'+(state.user.trial?'Free weekend':full?'Full Access':'Free')+'</span><button class="fr-btn" type="button" id="friendsBtn" aria-label="Friends" title="Friends">👯<b id="friendsCount" hidden></b></button><button class="bell-btn" type="button" id="bellBtn" aria-label="Notifications">🔔<b id="bellCount" hidden></b></button><button class="avatar avatar-btn" type="button" id="profileBtn" aria-label="Your profile">'+esc(initials(state.user.name))+'</button><button class="btn ghost small" type="button" id="logoutBtn">Log out</button></div>';
       $("#logoutBtn").onclick = ()=>logOut().catch(e=>toast(e.message));
     } else if(state.pending){
       a.innerHTML = '<button class="btn small" type="button" data-login>Enter your code</button>';
@@ -943,6 +947,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       : '<button class="btn" type="button" data-signup>Sign up free</button>';
     renderFullCta();
     $("#gate").classList.toggle("locked", !state.user);
+    paintLockTeaser();
     $("#heroLogin").textContent = state.user ? "Open the party map" : state.pending ? "Confirm your email" : "Log in to see the map";
   }
 
@@ -951,7 +956,10 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   function renderFullCta(){
     const el = $("#fullCta"); if(!el) return;
     const ends = PRICING.passEndLabel(PRICING.passEnds(todayET()));
-    if(state.user && state.user.plan === "full"){
+    if(state.user && state.user.trial){
+      el.innerHTML = '<span class="plan-badge full">Free weekend through '+esc(PRICING.passEndLabel(state.user.trial).replace(/, \d{4}$/, ""))+'</span>' +
+        (state.checkout ? '<button class="btn gold" type="button" data-buy>Keep Full Access · '+esc(priceNow())+'</button><span class="muted" style="font-size:.85rem">Your free weekend ends Sunday at midnight. Keep unlimited invites through '+esc(ends)+'.</span>' : '<span class="muted" style="font-size:.85rem">Your free weekend ends Sunday at midnight.</span>');
+    } else if(state.user && state.user.plan === "full"){
       el.innerHTML = '<span class="plan-badge full">You have Full Access'+(state.user.paidUntil ? ' through '+esc(PRICING.passEndLabel(state.user.paidUntil)) : '')+'</span>';
     } else if(!state.checkout){
       el.innerHTML = '<button class="btn gold" type="button" disabled>Checkout coming soon</button><span class="muted" style="font-size:.85rem">Checkout isn\'t open yet. Start free and upgrade when it is.</span>';
@@ -999,9 +1007,12 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   function renderHero(){
     $("#statChapters").textContent = CHAPTERS.length;
     $("#statMapped").textContent = CHAPTERS.filter(c=>c.x!=null).length;
-    $("#statParties").textContent = state.user ? PARTIES.length : "?";
+    $("#statParties").textContent = state.user ? PARTIES.length : (TEASER ? TEASER.count : "?");
     if(!state.user){
-      $("#nextList").innerHTML = '<li style="border:0;padding:0"><span class="eyebrow" style="color:var(--muted)">Filling up fastest</span><span></span></li><li><span>Log in to see this week\'s parties</span><span></span></li>';
+      loadTeaser();
+      $("#nextList").innerHTML = '<li style="border:0;padding:0"><span class="eyebrow" style="color:var(--muted)">Filling up fastest</span><span></span></li>' +
+        (TEASER && TEASER.cards.length ? TEASER.cards.slice(0,4).map(c=>'<li><span>🔒 '+esc(VIBES[c.vibe] ? VIBES[c.vibe].label : "Party")+' · '+esc(c.night)+'</span><span class="mono">'+c.full+'% full</span></li>').join("") + '<li><span><a href="#" data-signup style="color:var(--gold);font-weight:700">Sign up free to see which houses</a></span><span></span></li>'
+          : '<li><span>Log in to see this week\'s parties</span><span></span></li>');
       const teaser = ["34 chapters","Every house mapped","One free invite every week","Students only","Log in to see the parties"].map(t=>'<span>'+t+'</span>').join("");
       $("#marquee").innerHTML = teaser + teaser;
       return;
@@ -1193,7 +1204,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }
   function reqButton(p, cls){
     const r = requestFor(p.id);
-    if(!r && freeInviteUsed()) return '<a class="status-pill st-locked" href="#plans" style="text-decoration:none" data-plans>Weekly invite used · Go unlimited</a>';
+    if(!r && freeInviteUsed()) return '<button class="status-pill st-locked" type="button" data-out-of-invites="'+p.id+'" style="border:0;cursor:pointer;font:inherit">Invite used · Get another</button>';
     if(!r) return '<button class="btn '+(cls||"")+'" type="button" data-request="'+p.id+'">Request invite</button>';
     const map = {pending:["Requested · pending","st-pending"], approved:["You're on the list","st-approved"], waitlist:["Waitlisted","st-waitlist"]};
     return '<span class="status-pill '+map[r.status][1]+'">'+map[r.status][0]+'</span>';
@@ -1235,7 +1246,27 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }
 
   // ---------- party cards ----------
+  // What logged-out visitors get: counts, nights, vibes and how full, with no names or houses.
+  let TEASER = null, teaserAsked = false;
+  function loadTeaser(){
+    if(teaserAsked) return; teaserAsked = true;
+    fetch("/api/teaser").then(r=>r.ok?r.json():null).then(t=>{ if(t && t.count){ TEASER = t; if(!state.user){ renderHero(); renderParties(); paintLockTeaser(); } } }).catch(()=>{});
+  }
+  function paintLockTeaser(){
+    const el = $("#lockTeaser"); if(!el) return;
+    el.hidden = !(TEASER && !state.user);
+    if(TEASER) el.innerHTML = '🔥 <b>'+TEASER.count+' part'+(TEASER.count===1?'y':'ies')+' this week</b>'+(TEASER.filling ? ' · '+TEASER.filling+' filling up fast' : '')+'<br><span class="muted">'+TEASER.nights.map(n=>esc(n.label)+' '+n.count).join(" · ")+'</span>';
+  }
+  function teaserCards(){
+    return TEASER.cards.map(c=>{
+      const v = VIBES[c.vibe] || VIBES.chill;
+      return '<article class="party" style="--c:'+v.c+'" aria-hidden="true"><div class="party-top"><span class="vibe-tag">'+esc(v.label)+'</span><span class="when">'+esc(c.night)+'</span></div>' +
+        '<h3>🔒 Secret party</h3><span class="host">Sign up to see the house</span><p class="blurb">Theme, time, dress code and the guest list unlock with a free account.</p>' +
+        '<div class="foot"><span class="mini-hype">'+c.full+'% full</span><span class="foot-right"><button class="btn small" type="button" data-signup>Sign up free</button></span></div></article>';
+    }).join("");
+  }
   function renderParties(){
+    if(!state.user && TEASER){ $("#partyCount").textContent = TEASER.count + " this week"; $("#partyGrid").innerHTML = teaserCards(); return; }
     const vis = visibleParties();
     $("#partyCount").textContent = vis.length + " of " + PARTIES.length + " shown";
     const order = Object.fromEntries(DAYS.map((d,i)=>[d.k,i]));
@@ -1257,8 +1288,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     if(!state.user){ el.innerHTML = ""; return; }
     const note = state.user.plan === "full"
       ? '<div class="plan-note"><span><b>Full Access:</b> request as many parties as you want. Your requests go to the front of the line.</span></div>'
-      : '<div class="plan-note"><span><b>Free pass:</b> '+Math.min(invitesThisWeek(), state.user.freeLimit)+' of '+state.user.freeLimit+' invite used this week. Resets Monday at midnight.</span>' +
-        (freeInviteUsed() ? '<a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a>' : '<a href="#plans" data-plans>See Full Access</a>') + '</div>';
+      : '<div class="plan-note"><span><b>Free pass:</b> '+Math.min(invitesThisWeek(), state.user.freeLimit)+' of '+state.user.freeLimit+' invite used this week. Resets Monday at midnight.'+(extraInvites() ? ' <b>🎟️ '+extraInvites()+' extra invite'+(extraInvites()===1?'':'s')+' saved.</b>' : '')+'</span>' +
+        (freeInviteUsed() ? '<button class="btn gold small" type="button" data-out-of-invites>Get another invite</button>' : '<button class="btn ghost small" type="button" data-out-of-invites="earn">🎟️ Earn extra invites</button>') + '</div>';
     if(!state.requests.length){ el.innerHTML = note + '<div class="no-results" style="text-align:left">No requests yet. Pick a party and hit <b>Request invite</b>. Hosts usually answer in seconds here.</div>'; return; }
     const map = {pending:["Pending","st-pending"], approved:["On the list","st-approved"], waitlist:["Waitlist","st-waitlist"]};
     el.innerHTML = note + [...state.requests].sort((a,b)=>b.ts-a.ts).map(r=>{
@@ -1525,7 +1556,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       const data = await api("/api/verify", {code:$("#verifyCode").value});
       enterAccount(data);
       verifyDlg.close(); renderAll();
-      toast("You're in, " + state.user.name.split(" ")[0] + ". The map is live.");
+      toast(state.user.trial ? "You're in, " + state.user.name.split(" ")[0] + "! 🎉 Your first weekend has Full Access free: unlimited invites through Sunday." : "You're in, " + state.user.name.split(" ")[0] + ". The map is live.", 7000);
       document.getElementById("map").scrollIntoView();
     } catch(err){
       $("#verifyErr").textContent = err.message;
@@ -1598,8 +1629,10 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     btn.disabled = true; $("#invErr").textContent = "";
     try {
       const group = window.PFCommunity && window.PFCommunity.groupFor(pendingParty);
+      const hadWeekly = weeklyUsed();
       const data = await api("/api/requests", {partyId:pendingParty, note:$("#invMsg").value, ...(group ? {groupCode:group} : {})});
       state.requests = data.requests;
+      if(hadWeekly && isFree()) state.user.bonusInvites = Math.max(0, extraInvites() - 1);
       let guestNote = "";
       if(gName){
         // The request already went through, so a problem with the guest is reported without undoing it.
@@ -1609,11 +1642,13 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       inviteDlg.close(); renderAll();
       const host = byId[partyById[pendingParty].ch].gl;
       if(guestNote){ toast("Request sent to " + host + "." + guestNote, 7000); return; }
-      if(freeInviteUsed()) toast("Request sent to " + host + "! That was your free invite this week. Want more? Full Access is " + priceNow() + " a " + PRICING.term + ".", 6500);
+      if(hadWeekly && isFree()) toast("Request sent to " + host + " with one of your extra invites! " + (extraInvites() ? extraInvites() + " left." : "Bring a friend or play Door Rush to earn more."), 6500);
+      else if(freeInviteUsed()) toast("Request sent to " + host + "! That was your free invite this week. Bring a friend or finish top 10 in Door Rush to earn an extra one.", 7000);
       else toast("Request sent to " + host + ". Waiting on the house…");
     } catch(err){
       // At the weekly limit, offer the upgrade right where they hit it.
-      if(err.code === "FREE_LIMIT") $("#invErr").innerHTML = '<div class="upsell"><span>' + esc(err.message) + '</span><a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a></div>';
+      if(err.code === "FREE_LIMIT" && window.PFCommunity){ inviteDlg.close(); state.user.bonusInvites = 0; renderAll(); window.PFCommunity.outOfInvites(); }
+      else if(err.code === "FREE_LIMIT") $("#invErr").innerHTML = '<div class="upsell"><span>' + esc(err.message) + '</span><a class="btn gold small" href="#plans" data-plans>' + esc(upgradeLabel()) + '</a></div>';
       else $("#invErr").textContent = err.message;
     } finally { btn.disabled = false; }
   });

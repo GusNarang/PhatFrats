@@ -68,7 +68,8 @@
       <p>Your invite is just for you. Friends coming along each request their own.</p>
       ${tip('A brother can also put you on the list directly by your email. Those invites are free and don\'t use your weekly invite.')}`],
     ['Start here', 'passes', '💎', 'Free vs Full Access', 'What you get, and what it costs', `
-      <p><b>Free account:</b> see the whole map and every party, and request an invite to <b>one party per week</b>. Your free invite comes back every <b>Monday at midnight</b>.</p>
+      <p><b>🎉 Your first weekend is free:</b> new accounts get Full Access through their first Sunday night.</p>
+      <p><b>Free account:</b> see the whole map and every party, and request an invite to <b>one party per week</b>. Your free invite comes back every <b>Monday at midnight</b>. Need more? <b>Earn extra invites</b>: +1 for every friend who joins with your link, and +1 for finishing top 10 in Door Rush. Extra invites are saved until you use them.</p>
       <p><b>Full Access (${price} a ${term}):</b></p>
       <ul><li><b>Unlimited</b> invite requests.</li>
       <li>Your requests go to the <b>front of the line</b> with hosts.</li>
@@ -90,7 +91,7 @@
       <li><b>📸 Share</b> makes a story-sized picture of the party for Instagram or Snapchat, with a link back to it.</li></ul>`],
     ['With friends', 'free', '🎁', 'Free semester: bring 3 friends', 'Invite friends, get Full Access free', `
       <p>Tap your <b>initials</b> at the top to open your profile and copy your <b>invite link</b>.</p>
-      <p>When <b>3 friends</b> sign up with it <b>and confirm their Penn State email</b>, you get Full Access free for the rest of the term. It happens automatically, and you'll get a notification.</p>
+      <p><b>Every friend</b> who signs up with it and confirms their Penn State email earns you <b>an extra invite</b>. When <b>3 friends</b> have joined, you also get Full Access free for the rest of the term. It all happens automatically, with a notification.</p>
       <p>Your profile shows how many friends have joined so far. Your friend link counts too.</p>`],
 
     ['Your account', 'bell', '🔔', 'Saved parties and the bell', 'Never miss a party', `
@@ -116,7 +117,7 @@
       <ul><li>Guests walk up the street. Send each to the right party before they reach the red line: <b>★ → Neon</b>, <b>● → Chill</b>, <b>◆ → Costume</b>.</li>
       <li>Hooded crashers with a red ✕: hit <b>Bounce</b>.</li>
       <li>3 mistakes and the doors close. Streaks, 👑 VIPs and the Hype meter boost your score.</li></ul>
-      <p><b>The prize:</b> each week (Monday to Sunday) the <b>top score wins Full Access free</b> through the end of next term. It's given automatically every Monday.</p>
+      <p><b>The prizes:</b> each week (Monday to Sunday) the <b>top score wins Full Access free</b> through the end of next term, and <b>places 2 to 10 each earn an extra invite</b>. They're given automatically every Monday.</p>
       ${tip('Anyone can play for practice. Log in to save your scores and compete for the prize.')}`],
     ['Fun extras', 'drop', '🔥', 'The Weekend Drop', 'New lineup every Thursday', `
       <p>Every <b>Thursday at 6 PM</b>, the weekend's lineup drops. The countdown on the homepage tells you how long is left.</p>
@@ -149,7 +150,7 @@
       <li>Each chapter has its own page with its colors and story.</li></ul>`],
     ['More', 'faq', '❓', 'Quick answers', 'Common questions', `
       <p><b>Do I need a Penn State email?</b> Yes. That keeps PhatFrats just for students.</p>
-      <p><b>When does my free invite come back?</b> Every Monday at midnight.</p>
+      <p><b>When does my free invite come back?</b> Every Monday at midnight. Used it already? Earn an extra one by bringing a friend or finishing top 10 in Door Rush.</p>
       <p><b>Does Full Access renew by itself?</b> No. It's one payment, and it ends with the term.</p>
       <p><b>I didn't get my code.</b> Check spam, then ask for a new one (once a minute).</p>
       <p><b>Something's wrong or I have an idea.</b> Use the contact form on the <a href="/about" style="color:var(--cyan)">About page</a>.</p>`],

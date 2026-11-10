@@ -371,3 +371,15 @@ CREATE INDEX IF NOT EXISTS friend_going_day_idx ON friend_going(party_day);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_until TIMESTAMPTZ;
 -- A chapter can keep who's going to a party private, so it never shows on friends' boards.
 ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS hide_friends BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ---------- Free boosts ----------
+-- First weekend free: new accounts get Full Access through their first Sunday. Set once, when the email is
+-- confirmed, so nobody gets it twice. It doesn't change `plan`, so it never counts as a paid pass.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_until TIMESTAMPTZ;
+-- Extra invites a free account earned (a friend joined with their link, or a Door Rush top-10 week).
+-- Used up one at a time after the weekly free invite, and kept until used.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_invites INTEGER NOT NULL DEFAULT 0;
+-- Set on a request that used an earned extra invite, so the bonus can be handed back if needed.
+ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS used_bonus BOOLEAN NOT NULL DEFAULT FALSE;
+-- Which weeks have had their Door Rush top-10 invites handed out, so it happens once per week.
+ALTER TABLE game_prizes ADD COLUMN IF NOT EXISTS top10_done BOOLEAN NOT NULL DEFAULT FALSE;

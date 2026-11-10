@@ -13,6 +13,9 @@ Create an account with a Penn State email and get a map of every Interfraternity
 | Place in the host's line | Normal | Front of the line |
 | PhatBot, the AI party guide | No | Yes |
 
+**Free boosts.** New accounts get Full Access free through their first Sunday night (`users.trial_until`, set once when the email is confirmed; it never changes `plan`, so it doesn't count as a paid pass). Free accounts earn extra invites (`users.bonus_invites`, up to 10 saved): +1 for each friend who joins with their link and confirms, and +1 for places 2 to 10 in the weekly Door Rush (handed out with the Monday prize). Extras are used after the weekly free invite. When a free account is out of invites, tapping a party opens a pop-up explaining how to earn another. Logged-out visitors see a teaser from `/api/teaser`: how many parties, which nights, vibes and how full, with no names or houses.
+
+
 The free invite resets every Monday at midnight Eastern. Full Access is one payment per semester with no auto-renew. The price and an optional launch deal live in `public/pricing.js`; set `launch.ends` to a date to switch the deal on. Checkout isn't built yet, so accounts are Free unless set by hand. Only a confirmed payment should ever set `plan = 'full'`.
 
 ## Email confirmation

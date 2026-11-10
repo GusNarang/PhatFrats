@@ -9,6 +9,9 @@ const ZONE = 'America/New_York';
 const SITE_URL = process.env.SITE_URL || 'https://phat-frats.vercel.app';
 const REFERRALS_NEEDED = 3;
 const FOUNDING_UNTIL = '2027-01-10';
+// The most extra invites anyone can save up.
+const MAX_BONUS = 10;
+const TOP_PLACES = 10;
 const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date());
 const endOfDay = (iso) => `(($${iso}::date + 1)::timestamp AT TIME ZONE '${ZONE}')`;
 
@@ -68,8 +71,9 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       [newUserId]
     );
     if (!r) return;
+    await pool.query('UPDATE users SET bonus_invites = LEAST(bonus_invites + 1, $2) WHERE id = $1', [r.id, MAX_BONUS]);
     if (r.n < REFERRALS_NEEDED) {
-      await notify(r.id, 'referral', `A friend joined PhatFrats with your link! ${r.n} of ${REFERRALS_NEEDED} for a free semester of Full Access.`, { email: false });
+      await notify(r.id, 'referral', `🎟️ A friend joined PhatFrats with your link, so you earned an extra invite! And ${r.n} of ${REFERRALS_NEEDED} for a free semester of Full Access.`, { email: false });
       return;
     }
     const { rowCount } = await pool.query('UPDATE users SET ref_reward_at = now() WHERE id = $1 AND ref_reward_at IS NULL', [r.id]);
@@ -106,6 +110,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       [w.week, champ.user_id, champ.score]
     );
     settledWeek = w.week;
+    await awardTopTen(w, champ.user_id);
     if (!rowCount) return { result: 'already-awarded', week: w.week };
     // A free semester: through the end of next term, so it's worth something even to someone with a pass.
     const through = PRICING.passEnds(PRICING.passEnds(todayISO()));
@@ -113,6 +118,24 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     await notify(champ.user_id, 'prize', `🏆 You were last week's Door Rush champion with ${champ.score.toLocaleString('en-US')} points! ${forever ? 'Your Full Access already has no end date, so enjoy the crown.' : `Your Full Access now runs through ${PRICING.passEndLabel(through)}.`}`, { link: '/game' });
     ops.activity('prize', `A Door Rush champion won a free semester`);
     return { result: 'awarded', week: w.week, score: champ.score };
+  }
+
+  // Places 2 to 10 in last week's Door Rush each get an extra invite. Runs once per week.
+  async function awardTopTen(w, champId) {
+    const { rowCount } = await pool.query('UPDATE game_prizes SET top10_done = TRUE WHERE week_start = $1 AND NOT top10_done', [w.week]);
+    if (!rowCount) return;
+    const { rows } = await pool.query(
+      `SELECT r.user_id, max(r.score)::int AS score, (array_agg(r.finished_at ORDER BY r.score DESC, r.finished_at))[1] AS first
+       FROM game_runs r JOIN users u ON u.id = r.user_id
+       WHERE r.finished_at >= $1 AND r.finished_at < $2 AND u.banned_at IS NULL AND r.score > 0
+       GROUP BY r.user_id ORDER BY score DESC, first ASC LIMIT $3`,
+      [w.start, w.stop, TOP_PLACES]
+    );
+    for (const [i, r] of rows.entries()) {
+      if (String(r.user_id) === String(champId)) continue;
+      await pool.query('UPDATE users SET bonus_invites = LEAST(bonus_invites + 1, $2) WHERE id = $1', [r.user_id, MAX_BONUS]);
+      await notify(r.user_id, 'bonus', `🎟️ You finished #${i + 1} in Door Rush last week, so you earned an extra invite! It's saved for whenever you need it.`, { email: false, link: '/game' });
+    }
   }
 
   // Vercel's scheduler calls this every Monday. With CRON_SECRET set in Vercel, only the scheduler can call it;
@@ -135,7 +158,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       pool.query(`SELECT count(*)::int AS n FROM invite_requests WHERE user_id = $1 AND status = 'approved'`, [user.id]),
       pool.query(`SELECT count(*)::int AS n FROM game_prizes WHERE user_id = $1`, [user.id]),
       pool.query(`SELECT count(*) FILTER (WHERE email_verified_at IS NOT NULL)::int AS joined FROM users WHERE referred_by = $1`, [user.id]),
-      pool.query(`SELECT created_at, email_opt_in, ref_reward_at FROM users WHERE id = $1`, [user.id]),
+      pool.query(`SELECT created_at, email_opt_in, ref_reward_at, bonus_invites FROM users WHERE id = $1`, [user.id]),
     ]);
     // Weekends in a row with at least one invite, counting back from this week or last week.
     const set = new Set(weeks.rows.map((r) => r.wk));
@@ -154,7 +177,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     if (user.plan === 'full') badges.push({ icon: '💎', name: 'Full Access', about: 'Unlimited invites and priority with hosts' });
     if (new Date(m.created_at) < new Date(FOUNDING_UNTIL + 'T05:00:00Z')) badges.push({ icon: '🌱', name: 'Founding member', about: 'Joined in PhatFrats\' first semester' });
     return {
-      streak, badges, emailUpdates: m.email_opt_in,
+      streak, badges, emailUpdates: m.email_opt_in, bonusInvites: m.bonus_invites,
       referral: { code: await referralCode(user.id), joined: refs.rows[0].joined, needed: REFERRALS_NEEDED, rewarded: !!m.ref_reward_at, link: `${SITE_URL}/?ref=` },
     };
   }
@@ -239,6 +262,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
         if (p && p.going / p.cap >= .8) alerts.push({ kind: 'filling', text: `🔥 ${p.title} is ${Math.round(p.going / p.cap * 100)}% full. Request before it's gone!`, party: p.id });
       }
       if (req.user.plan !== 'full' && wk.ever > 0 && wk.this_week === 0) alerts.push({ kind: 'reset', text: '🎟️ Your free invite for this week is ready.' });
+      if (req.user.on_trial) alerts.push({ kind: 'trial', text: `🎉 Your free Full Access weekend ends Sunday at midnight. Keep unlimited invites for ${PRICING.money(PRICING.current())} a ${PRICING.term}.` });
       // Other features (like friends) add their own live alerts.
       for (const source of alertSources) { try { alerts.push(...(await source(req.user))); } catch (err) { console.error('Alert source failed:', err.message); } }
       res.json({ alerts, notes, unread: notes.filter((n) => !n.read).length });
