@@ -120,6 +120,12 @@ nav.links a:hover{color:var(--ink)}
 .logo-big .ph{color:var(--gold)}
 .tagline{font-family:var(--shade);font-size:clamp(1.2rem,3vw,1.7rem);color:var(--cyan);line-height:1.1}
 .lede{font-size:1.1rem;max-width:58ch}
+.hero-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:clamp(1.05rem,2.6vw,1.25rem);font-weight:700}
+.hero-points li{display:flex;gap:12px;align-items:center}
+.hero-points span{font-size:1.3em;width:1.4em;text-align:center;flex:none}
+.hero-fine{margin:0;color:var(--muted);font-size:.9rem}
+/* Phones: only the essentials in the header. The plan badge and Log out live in your profile panel. */
+@media (max-width:520px){.user-chip .plan-badge,#logoutBtn{display:none}.user-chip{gap:8px}}
 .cta-row{display:flex;gap:12px;flex-wrap:wrap}
 .byline{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:.85rem;color:var(--muted)}
 .byline strong{color:var(--ink);font-weight:500}
@@ -496,16 +502,16 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <span class="eyebrow">Penn State · University Park · IFC houses</span>
       <h1 class="logo-big"><span class="ph">Phat</span>Frats</h1>
       <p class="tagline">Your whole weekend, mapped.</p>
-      <p class="lede">
-        PhatFrats is a party finder for Penn State students. Create an account, confirm your Penn State email with a code, and you get a live map of every
-        Interfraternity Council house around State College, with this week's parties lit up on it. Tap a glowing house to see the
-        theme, start time, dress code and how full it's getting, then request an invite straight from the page. Free accounts can see the whole map and request an invite to one party per week. Full Access is <span class="js-price">$4.99</span> a semester, one payment with no auto-renew, which removes the limit, moves your requests up the line and unlocks PhatBot, the AI party guide. The full directory of all 34 chapters is open to everyone.
-      </p>
+      <ul class="hero-points">
+        <li><span aria-hidden="true">🗺️</span>Every frat party at Penn State, on one map.</li>
+        <li><span aria-hidden="true">👯</span>See where your friends are going.</li>
+        <li><span aria-hidden="true">🎟️</span>Get on the list in one tap.</li>
+      </ul>
       <div class="cta-row">
-        <button class="btn" id="heroLogin" type="button">Log in to see the map</button>
-        <a class="btn ghost" href="#directory">Browse all 34 houses</a>
-        <button class="btn gold" type="button" data-guide>📖 How PhatFrats works</button>
+        <button class="btn" id="heroLogin" type="button">Get started free</button>
+        <button class="btn ghost" type="button" data-guide id="heroGuide">📖 How it works</button>
       </div>
+      <p class="hero-fine" id="heroFine">Free with your Penn State email. Your first weekend of Full Access is on us.</p>
       <span class="byline"><span class="dot"></span>Built by&nbsp;<strong class="builder">Agastya Narang</strong>&nbsp;· Penn State</span>
     </div>
 
@@ -953,7 +959,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     renderFullCta();
     $("#gate").classList.toggle("locked", !state.user);
     paintLockTeaser();
-    $("#heroLogin").textContent = state.user ? "Open the party map" : state.pending ? "Confirm your email" : "Log in to see the map";
+    $("#heroLogin").textContent = state.user ? "Open the party map" : state.pending ? "Confirm your email" : "Get started free";
+    $("#heroFine").hidden = !!state.user;
   }
 
   // ---------- Full Access checkout ----------
@@ -1691,7 +1698,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     if(t.closest("[data-promo-toggle]")){ e.preventDefault(); $("#promoRow").hidden = false; $("#promoCode").focus(); return; }
     if(t.closest('a[href="#plans"]')) return;
     if(t.closest("[data-login]") || t.closest("#heroLogin")){
-      if(state.user && t.closest("#heroLogin")) document.getElementById("map").scrollIntoView(); else openLogin();
+      if(state.user && t.closest("#heroLogin")) document.getElementById("map").scrollIntoView(); else openLogin(t.closest("#heroLogin") && !state.pending ? "signup" : undefined);
       return;
     }
     const zb = t.closest("[data-zoom]"); if(zb){ zoomAt(zb.dataset.zoom==="in" ? 1/1.5 : 1.5, view.x + view.w/2, view.y + viewH()/2); return; }

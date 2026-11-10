@@ -119,7 +119,8 @@
       <div style="margin:6px 0 14px">${saved.length ? saved.map((x) => `<div class="pf-note">${esc(x.title)} <small>${esc(S().whenText(x))}</small> <button class="btn small" type="button" data-open-party="${esc(x.id)}">Open</button></div>`).join('') : '<p class="muted" style="margin:0">Tap ♡ on a party to save it. You\'ll get an alert when it starts filling up.</p>'}</div>
       <b>Settings</b>
       <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="pfEmailOpt" ${p.emailUpdates ? 'checked' : ''}> Email me when I'm on a list, win a prize, or the Weekend Drop goes live</label>
-      <p style="margin:14px 0 0"><button class="btn ghost small" type="button" data-welcome>🎁 Free Full Access and Door Rush rules</button></p>
+      <p style="margin:14px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost small" type="button" data-welcome>🎁 Free Full Access and Door Rush rules</button><button class="btn ghost small" type="button" data-guide>📖 Site guide</button></p>
+      <p style="margin:14px 0 0;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span class="plan-badge${st.user.plan === 'full' ? ' full' : ''}">${st.user.trial ? 'Free weekend' : st.user.plan === 'full' ? 'Full Access' : 'Free plan'}</span><button class="btn ghost small" type="button" data-logout>Log out</button></p>
       ${installHint()}`;
     document.body.appendChild(panel);
     panel.querySelector('#pfEmailOpt').addEventListener('change', (e) => S().api('/api/profile/email', { on: e.target.checked }).then(() => S().toast(e.target.checked ? 'Email updates on.' : 'Email updates off.')).catch((err) => S().toast(err.message)));
@@ -216,7 +217,7 @@
     let box = $('#dropBox');
     const row = $('#heroLogin') && $('#heroLogin').parentElement;
     if (!row) return;
-    if (!box) { row.insertAdjacentHTML('beforebegin', '<div class="drop-box" id="dropBox" role="status"></div>'); box = $('#dropBox'); }
+    if (!box) { ($('#heroFine') || row).insertAdjacentHTML('afterend', '<div class="drop-box" id="dropBox" role="status" style="margin:0;align-self:flex-start"></div>'); box = $('#dropBox'); }
     const { day, min } = etParts();
     const dropAt = 3 * 1440 + 18 * 60, now = day * 1440 + min;
     if (now >= dropAt) box.innerHTML = '🔥 <span>The Weekend Drop is live. This weekend\'s lineup is up!</span>';
@@ -402,6 +403,7 @@
     if (t.closest('#bellBtn')) { e.preventDefault(); if (document.querySelector('.pf-panel[aria-label="Notifications"]')) closePanels(); else openBell(); return; }
     if (t.closest('#profileBtn')) { e.preventDefault(); openProfile(); return; }
     if (t.closest('[data-close-panel]')) { closePanels(); return; }
+    if (t.closest('[data-logout]')) { closePanels(); const lo = document.getElementById('logoutBtn'); if (lo) lo.click(); return; }
     const nl = t.closest('[data-note-link]');
     if (nl) {
       closePanels();

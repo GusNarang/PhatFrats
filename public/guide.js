@@ -12,7 +12,9 @@
     font:800 .95rem var(--body);color:#241a00;background:var(--gold);border:0;border-radius:999px;padding:12px 18px;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.45),0 0 0 2px rgba(255,210,63,.35)}
   .guide-fab:hover{transform:translateY(-2px)}
   .guide-fab:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
-  @media (max-width:520px){.guide-fab{padding:11px 14px;font-size:.88rem}}
+  @media (max-width:520px){.guide-fab{padding:0;width:46px;height:46px;justify-content:center;font-size:1.25rem}.guide-fab .g-fab-label{display:none}}
+  .guide-fab{transition:opacity .2s,transform .2s}
+  .guide-fab.away{opacity:0;transform:translateY(12px);pointer-events:none}
   nav.links a.guide-link{color:var(--gold)}
   #pfGuide{width:min(760px,calc(100vw - 24px))}
   #pfGuide .g-wrap{display:flex;flex-direction:column;max-height:88vh}
@@ -222,8 +224,13 @@
   const fab = document.createElement('button');
   fab.type = 'button'; fab.className = 'guide-fab'; fab.setAttribute('data-guide', '');
   fab.setAttribute('aria-label', 'Open the site guide: how PhatFrats works');
-  fab.innerHTML = '<span aria-hidden="true">📖</span><span>Site guide</span>';
+  fab.innerHTML = '<span aria-hidden="true">📖</span><span class="g-fab-label">Site guide</span>';
   document.body.appendChild(fab);
+  // No need for two guide buttons on screen at once: it steps aside while the hero's button is visible.
+  const heroBtn = document.getElementById('heroGuide');
+  if (heroBtn && 'IntersectionObserver' in window) {
+    new IntersectionObserver(([e]) => fab.classList.toggle('away', e.isIntersecting)).observe(heroBtn);
+  }
 
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('[data-guide]');
