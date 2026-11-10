@@ -108,10 +108,11 @@ nav.links a:hover{color:var(--ink)}
 /* ---------- hero ---------- */
 .hero{display:grid;grid-template-columns:1.25fr 1fr;gap:40px;align-items:center;padding-block:56px 40px}
 @media (max-width:900px){.hero{grid-template-columns:1fr;padding-block:36px 24px}}
-.hero-copy{display:flex;flex-direction:column;gap:18px;min-width:0}
+.hero-copy{display:flex;flex-direction:column;gap:18px;min-width:0;container-type:inline-size}
 .logo-big{
   font-family:var(--display);font-weight:400;
-  font-size:clamp(3.4rem,11vw,7.6rem);line-height:.9;letter-spacing:-.01em;
+  /* Sized to its own column (the word is about 6.1em wide), so it never runs under the ticket card. */
+  font-size:clamp(3.4rem,11vw,7.6rem);font-size:clamp(2.6rem,15.5cqi,7.6rem);line-height:.9;letter-spacing:-.01em;
   color:var(--ink);
   text-shadow:4px 4px 0 var(--pink), 8px 8px 0 var(--cyan);
   transform:rotate(-3deg);transform-origin:left center;
