@@ -117,7 +117,7 @@
       </section>
     </div>
     <section class="card" style="margin-bottom:16px"><h2>📥 Inbox</h2>
-      <p class="updated" style="margin-top:0">Reports from the Party Smart kit and messages from the About page. Reply to messages by email.</p>
+      <p class="updated" style="margin-top:0">Reports from the Party Smart kit and messages from the About page. Reply sends your answer by email. Report marks it as spam or abuse and blocks that sender.</p>
       <div id="inbox"></div>
     </section>
   </div>
@@ -287,17 +287,41 @@
       <button class="bigbtn ${inbox.hideDemo ? 'go' : 'danger'}" type="button" data-demo="${!inbox.hideDemo}">${inbox.hideDemo ? 'Show them' : 'Hide them'}</button>`;
     const when = (x) => new Date(x).toLocaleString('en-US', { timeZone: ZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const items = [
-      ...inbox.reports.map((r) => ({ type: 'report', id: r.id, closed: r.closed, at: r.created_at, head: `🚩 Report · ${r.kind}${r.about ? ' · ' + r.about : ''}`, body: r.details, who: r.name ? `${r.name} (${r.email})` : 'Deleted account' })),
-      ...inbox.messages.map((m) => ({ type: 'message', id: m.id, closed: m.closed, at: m.created_at, head: `✉️ Message · ${m.kind}`, body: m.message, who: `${m.name} (${m.email})`, email: m.email })),
+      ...inbox.reports.map((r) => ({ type: 'report', id: r.id, closed: r.closed, status: r.status, reply: r.reply, at: r.created_at, head: `🚩 Report · ${r.kind}${r.about ? ' · ' + r.about : ''}`, body: r.details, who: r.name ? `${r.name} (${r.email})` : 'Deleted account', email: r.email })),
+      ...inbox.messages.map((m) => ({ type: 'message', id: m.id, closed: m.closed, status: m.status, reply: m.reply, at: m.created_at, head: `✉️ Message · ${m.kind}`, body: m.message, who: `${m.name} (${m.email})`, email: m.email })),
     ].sort((a, b) => (a.closed - b.closed) || (new Date(b.at) - new Date(a.at)));
     const open = items.filter((i) => !i.closed).length;
     $('#tab-live').textContent = open ? `Live (${open})` : 'Live';
     $('#inbox').innerHTML = items.length ? items.map((i) => `<div class="row" style="flex-wrap:wrap;opacity:${i.closed ? .5 : 1}"><div style="flex:1 1 300px"><b>${esc(i.head)}</b><div style="white-space:pre-line;margin:4px 0">${esc(i.body)}</div><span class="updated">${esc(i.who)} · ${esc(when(i.at))}</span></div>
-      <div class="actions">${i.email ? `<a class="btn small" href="mailto:${esc(i.email)}?subject=${encodeURIComponent('Re: your message to PhatFrats')}">Reply</a>` : ''}${i.closed ? '<span class="tag">Done</span>' : `<button class="btn small good" data-close-item="${i.type}/${i.id}">Mark done</button>`}</div></div>`).join('') : '<p class="empty">Nothing here yet.</p>';
+      <div class="actions">${i.closed
+        ? `<span class="tag">${{ replied: '↩︎ Replied', dismissed: 'Dismissed', reported: '🚫 Reported' }[i.status] || 'Done'}</span>${i.status === 'reported' && i.email ? `<button class="btn small" data-unblock="${esc(i.email)}">Unblock</button>` : ''}`
+        : `${i.email ? `<button class="btn small good" data-reply="${i.type}/${i.id}">Reply</button>` : ''}<button class="btn small" data-inbox="dismiss" data-item="${i.type}/${i.id}">Dismiss</button><button class="btn small danger" data-inbox="report" data-item="${i.type}/${i.id}">Report</button>`}</div>
+      ${i.reply ? `<div class="updated" style="flex:1 1 100%;white-space:pre-line;border-left:3px solid var(--gold,#ffd84d);padding-left:10px;margin-top:6px">↩︎ You replied: ${esc(i.reply)}</div>` : ''}
+      <div data-reply-box="${i.type}/${i.id}" hidden style="flex:1 1 100%;margin-top:8px"><textarea class="cave-input" maxlength="2000" placeholder="Write your reply to ${esc((i.who || '').split(' (')[0])}. It's emailed from PhatFrats."></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn small good" data-send-reply="${i.type}/${i.id}">Send reply</button><button class="btn small" data-cancel-reply="${i.type}/${i.id}">Cancel</button></div></div></div>`).join('') : '<p class="empty">Nothing here yet.</p>';
   }
   $('#inbox').addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-close-item]'); if (!b) return;
-    try { await api('/api/admin/inbox/' + b.dataset.closeItem + '/close', {}); loadInbox(); } catch (err) { toast(err.message); }
+    const box = (k) => $('#inbox').querySelector(`[data-reply-box="${k}"]`);
+    const t = e.target;
+    let b;
+    if ((b = t.closest('[data-reply]'))) { const bx = box(b.dataset.reply); bx.hidden = !bx.hidden; if (!bx.hidden) bx.querySelector('textarea').focus(); return; }
+    if ((b = t.closest('[data-cancel-reply]'))) { box(b.dataset.cancelReply).hidden = true; return; }
+    if ((b = t.closest('[data-send-reply]'))) {
+      const text = box(b.dataset.sendReply).querySelector('textarea').value.trim();
+      if (!text) { toast('Write your reply first.'); return; }
+      b.disabled = true;
+      try { await api('/api/admin/inbox/' + b.dataset.sendReply + '/reply', { text }); toast('↩︎ Reply sent.'); loadInbox(); } catch (err) { toast(err.message); b.disabled = false; }
+      return;
+    }
+    if ((b = t.closest('[data-inbox]'))) {
+      const act = b.dataset.inbox;
+      if (act === 'report' && !confirm('Report this as spam or abuse? It closes, and new messages and reports from this sender are quietly ignored. You can unblock them later.')) return;
+      try { await api('/api/admin/inbox/' + b.dataset.item + '/' + act, {}); toast(act === 'report' ? '🚫 Reported and blocked.' : 'Dismissed.'); loadInbox(); } catch (err) { toast(err.message); }
+      return;
+    }
+    if ((b = t.closest('[data-unblock]'))) {
+      try { await api('/api/admin/inbox/unblock', { email: b.dataset.unblock }); toast('Unblocked. Their new messages will come through.'); loadInbox(); } catch (err) { toast(err.message); }
+    }
   });
   $('#demoRow').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-demo]'); if (!b) return;
@@ -500,7 +524,7 @@
       'Spotlight: pin one party to the top of the party list with a glowing star.',
       'Weekend Drop: every Thursday, announce the lineup. It goes to everyone\'s bell and email and lights the beacon.',
       'Demo parties: hide the 14 sample parties once real chapters are posting.',
-      'Inbox: reports from students and messages from the About page. Reply by email, then mark them done.',
+      'Inbox: reports from students and messages from the About page. Reply answers by email, Dismiss sets it aside, and Report blocks spam or abuse.',
     ]],
     ['💰 Money', [
       'How much you made this semester and all time. Test payments never count.',

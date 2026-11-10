@@ -335,6 +335,16 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   closed_at  TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- How an inbox item was closed (replied, dismissed or reported), and the reply that was sent.
+ALTER TABLE reports          ADD COLUMN IF NOT EXISTS status TEXT;
+ALTER TABLE reports          ADD COLUMN IF NOT EXISTS reply  TEXT;
+ALTER TABLE contact_messages ADD COLUMN IF NOT EXISTS status TEXT;
+ALTER TABLE contact_messages ADD COLUMN IF NOT EXISTS reply  TEXT;
+-- Senders reported as spam or abuse. Their new messages and reports are quietly dropped.
+CREATE TABLE IF NOT EXISTS inbox_blocks (
+  email      TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- ---------- Friends ----------
 -- One row per pair of people. It starts as a request and becomes a friendship when the other person accepts.

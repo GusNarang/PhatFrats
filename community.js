@@ -322,6 +322,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       const details = typeof req.body?.details === 'string' ? req.body.details.trim().slice(0, 1500) : '';
       if (details.length < 10) return fail(res, 400, 'Tell us a little more, at least a sentence.');
       const about = typeof req.body?.about === 'string' ? req.body.about.trim().slice(0, 120) : '';
+      if (await isBlocked(req.user.email)) return res.status(201).json({ ok: true });
       await pool.query('INSERT INTO reports (reporter_id, kind, about, details) VALUES ($1, $2, $3, $4)', [req.user.id, kind, about, details]);
       res.status(201).json({ ok: true });
     }));
@@ -335,9 +336,15 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       if (!name) return fail(res, 400, 'Add your name.');
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail(res, 400, 'Add an email we can reply to.');
       if (message.length < 10) return fail(res, 400, 'Write a little more, at least a sentence.');
+      if (await isBlocked(email)) return res.status(201).json({ ok: true });
       await pool.query('INSERT INTO contact_messages (name, email, kind, message) VALUES ($1, $2, $3, $4)', [name, email, kind, message]);
       res.status(201).json({ ok: true });
     }));
+  }
+
+  async function isBlocked(email) {
+    const { rowCount } = await pool.query('SELECT 1 FROM inbox_blocks WHERE email = lower($1)', [email || '']);
+    return rowCount > 0;
   }
 
   // ---------- control room: inbox, Weekend Drop, demo parties, prizes ----------
@@ -349,9 +356,9 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     }];
     app.get('/api/admin/inbox', requireAdmin, wrap(async (req, res) => {
       const [reports, messages, prizes, s] = await Promise.all([
-        pool.query(`SELECT r.id, r.kind, r.about, r.details, r.created_at, r.closed_at IS NOT NULL AS closed, u.name, u.email
+        pool.query(`SELECT r.id, r.kind, r.about, r.details, r.created_at, r.closed_at IS NOT NULL AS closed, r.status, r.reply, u.name, u.email
                     FROM reports r LEFT JOIN users u ON u.id = r.reporter_id ORDER BY r.closed_at IS NOT NULL, r.id DESC LIMIT 60`),
-        pool.query(`SELECT id, name, email, kind, message, created_at, closed_at IS NOT NULL AS closed FROM contact_messages ORDER BY closed_at IS NOT NULL, id DESC LIMIT 60`),
+        pool.query(`SELECT id, name, email, kind, message, created_at, closed_at IS NOT NULL AS closed, status, reply FROM contact_messages ORDER BY closed_at IS NOT NULL, id DESC LIMIT 60`),
         pool.query(`SELECT p.week_start, p.score, u.name FROM game_prizes p LEFT JOIN users u ON u.id = p.user_id ORDER BY p.week_start DESC LIMIT 10`),
         ops.settings(),
       ]);
@@ -361,10 +368,53 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
         hideDemo: !!s.hide_demo, lastDrop: s.last_drop || null,
       });
     }));
-    app.post('/api/admin/inbox/:type/:id/close', requireAdmin, wrap(async (req, res) => {
-      const table = req.params.type === 'report' ? 'reports' : req.params.type === 'message' ? 'contact_messages' : null;
-      if (!table || !/^\d{1,18}$/.test(req.params.id)) return fail(res, 400, 'Not found.');
-      await pool.query(`UPDATE ${table} SET closed_at = now() WHERE id = $1`, [req.params.id]);
+    // Each inbox item can be answered (Reply), set aside (Dismiss) or flagged as spam or abuse (Report).
+    async function inboxItem(req, res) {
+      const type = req.params.type;
+      if (!['report', 'message'].includes(type) || !/^\d{1,18}$/.test(req.params.id)) { fail(res, 404, 'Not found.'); return null; }
+      const { rows: [it] } = type === 'report'
+        ? await pool.query(`SELECT r.id, r.reporter_id AS user_id, u.name, u.email FROM reports r LEFT JOIN users u ON u.id = r.reporter_id WHERE r.id = $1`, [req.params.id])
+        : await pool.query('SELECT id, NULL::bigint AS user_id, name, email FROM contact_messages WHERE id = $1', [req.params.id]);
+      if (!it) { fail(res, 404, 'That item is gone.'); return null; }
+      return { ...it, table: type === 'report' ? 'reports' : 'contact_messages', type };
+    }
+    app.post('/api/admin/inbox/:type/:id/reply', requireAdmin, wrap(async (req, res) => {
+      const it = await inboxItem(req, res); if (!it) return;
+      const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, 2000) : '';
+      if (text.length < 2) return fail(res, 400, 'Write your reply first.');
+      if (!it.email) return fail(res, 400, "That account was deleted, so there's no one to reply to.");
+      const first = (it.name || '').split(' ')[0] || 'there';
+      const what = it.type === 'report' ? 'your report' : 'your message';
+      try {
+        await sendMail(it.email, `Re: ${what} to PhatFrats`, `Hi ${first},\n\n${text}\n\nThe PhatFrats team\n${SITE_URL}`);
+      } catch (err) {
+        console.error('Inbox reply email failed:', err.message);
+        return fail(res, 502, "The email didn't send. Try again in a minute.");
+      }
+      // Students who sent a report also see the answer in their bell.
+      if (it.user_id) await pool.query('INSERT INTO notifications (user_id, kind, text) VALUES ($1, $2, $3)', [it.user_id, 'reply', `📬 The PhatFrats team answered your report: ${text}`.slice(0, 240)]);
+      await pool.query(`UPDATE ${it.table} SET status = 'replied', reply = $2, closed_at = now() WHERE id = $1`, [it.id, text]);
+      res.json({ ok: true });
+    }));
+    app.post('/api/admin/inbox/:type/:id/dismiss', requireAdmin, wrap(async (req, res) => {
+      const it = await inboxItem(req, res); if (!it) return;
+      await pool.query(`UPDATE ${it.table} SET status = 'dismissed', closed_at = now() WHERE id = $1`, [it.id]);
+      res.json({ ok: true });
+    }));
+    app.post('/api/admin/inbox/:type/:id/report', requireAdmin, wrap(async (req, res) => {
+      const it = await inboxItem(req, res); if (!it) return;
+      await pool.query(`UPDATE ${it.table} SET status = 'reported', closed_at = now() WHERE id = $1`, [it.id]);
+      if (it.email) {
+        const email = it.email.toLowerCase();
+        await pool.query('INSERT INTO inbox_blocks (email) VALUES ($1) ON CONFLICT DO NOTHING', [email]);
+        // Anything else still open from the same sender goes with it.
+        await pool.query(`UPDATE contact_messages SET status = 'reported', closed_at = now() WHERE lower(email) = $1 AND closed_at IS NULL`, [email]);
+        await pool.query(`UPDATE reports r SET status = 'reported', closed_at = now() FROM users u WHERE u.id = r.reporter_id AND lower(u.email) = $1 AND r.closed_at IS NULL`, [email]);
+      }
+      res.json({ ok: true });
+    }));
+    app.post('/api/admin/inbox/unblock', requireAdmin, wrap(async (req, res) => {
+      await pool.query('DELETE FROM inbox_blocks WHERE email = lower($1)', [String(req.body?.email || '')]);
       res.json({ ok: true });
     }));
     app.post('/api/admin/demo', requireAdmin, wrap(async (req, res) => {

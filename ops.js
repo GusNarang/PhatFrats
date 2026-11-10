@@ -96,7 +96,8 @@ function create({ pool, CHAPTERS }) {
     if (p === '/goal') return `Set the money goal to $${b.dollars}`;
     if (p === '/demo') return b.hide ? 'Hid the demo parties' : 'Showed the demo parties';
     if (p === '/weekend-drop') return `Sent the Weekend Drop: "${String(b.message || '').slice(0, 80)}"`;
-    if ((m = /^\/inbox\/(report|message)\/(\d+)\/close$/.exec(p))) return `Closed ${m[1]} #${m[2]} in the inbox`;
+    if ((m = /^\/inbox\/(report|message)\/(\d+)\/(reply|dismiss|report)$/.exec(p))) return `${{ reply: 'Replied to', dismiss: 'Dismissed', report: 'Reported as spam or abuse:' }[m[3]]} ${m[1]} #${m[2]} in the inbox`;
+    if (p === '/inbox/unblock') return `Unblocked ${b.email} in the inbox`;
     if (p === '/game/reset') return 'Reset the Door Rush weekly leaderboard';
     if (p === '/game/event') return b.days ? `Started a Door Rush double-points event for ${b.days} days` : 'Ended the Door Rush event';
     if ((m = /^\/game\/remove\/(\d+)$/.exec(p))) return `Removed ${await userLabel(m[1])} from this week's Door Rush board`;
