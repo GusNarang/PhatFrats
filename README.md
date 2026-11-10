@@ -126,7 +126,7 @@ Leaders can switch on **Allow outside guests** for each party (off by default). 
 
 ## Door Rush
 
-Door Rush is the arcade game at `/game`, included with Full Access. Its code is in `game/door-rush.js` and is only sent to Full Access accounts by `game-routes.js`. Each game uses a one-time ticket, and impossible scores are refused. The leaderboard shows each player's best game this week, as first name and last initial, and resets Monday at midnight Eastern.
+Door Rush is the arcade game at `/game`, free for everyone. Visitors without an account play practice games; any confirmed account (Free or Full Access) saves scores, joins the weekly leaderboard and can win the weekly prize. Its code is in `game/door-rush.js`, served by `game-routes.js`. Each saved game uses a one-time ticket, and impossible scores are refused. The leaderboard shows each player's best game this week, as first name and last initial, and resets Monday at midnight Eastern.
 
 ## Payments (Stripe)
 

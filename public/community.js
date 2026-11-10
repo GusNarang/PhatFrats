@@ -315,7 +315,7 @@
       </div>
 
       <div class="pf-note"><b>🏆 Win Door Rush, win a free semester</b>
-        <p style="margin:6px 0 0;color:var(--muted)">Each week (Monday to Sunday), the top Door Rush score wins Full Access through <b>${esc(nextTerm)}</b>. The prize is given automatically every Monday, with a notification and a champion badge. Door Rush is part of Full Access; play it from <a href="/game">Game</a> in the menu.</p>
+        <p style="margin:6px 0 0;color:var(--muted)">Each week (Monday to Sunday), the top Door Rush score wins Full Access through <b>${esc(nextTerm)}</b>. The prize is given automatically every Monday, with a notification and a champion badge. Door Rush is free for everyone; play it from <a href="/game">Game</a> in the menu.</p>
       </div>
 
       <div class="pf-note"><b>🕹️ How Door Rush works</b>

@@ -1,4 +1,5 @@
-// Door Rush, the Full Access arcade game. The game's code and every score route check the plan on the server.
+// Door Rush, the arcade game. Anyone can play; saving scores and competing for the weekly prize needs a
+// confirmed PhatFrats account (Free or Full Access).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,11 +20,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
     const eventOn = !!(s.game_event_until && new Date(s.game_event_until) > new Date());
     return { resetAt: s.game_reset_at || null, eventOn, eventUntil: eventOn ? s.game_event_until : null };
   }
-  const requireFull = [...requireVerified, (req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-    if (req.user.plan !== 'full') return fail(res, 403, 'Door Rush is part of Full Access.', 'GAME_FULL_ONLY');
-    next();
-  }];
+  const requirePlayer = [...requireVerified, (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }];
   const runLimiter = rateLimit({
     windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false,
     keyGenerator: (req) => `user:${req.user.id}`,
@@ -46,7 +43,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
            WHERE finished_at >= ${boardSince} GROUP BY user_id
          )
          SELECT b.user_id, b.score, u.name FROM best b JOIN users u ON u.id = b.user_id
-         WHERE u.banned_at IS NULL AND u.plan = 'full' ORDER BY b.score DESC, u.name LIMIT 10`,
+         WHERE u.banned_at IS NULL ORDER BY b.score DESC, u.name LIMIT 10`,
         [resetAt]
       ),
       pool.query(
@@ -64,7 +61,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
            SELECT user_id, max(score) AS score FROM game_runs WHERE finished_at >= ${SINCE.replace('$9', '$2')} GROUP BY user_id
          )
          SELECT count(*)::int + 1 AS rank FROM best b JOIN users u ON u.id = b.user_id
-         WHERE u.banned_at IS NULL AND u.plan = 'full' AND b.score > $1`,
+         WHERE u.banned_at IS NULL AND b.score > $1`,
         [week, resetAt]
       );
       rank = r.rank;
@@ -75,7 +72,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
       const { rows: [n] } = await pool.query(
         `WITH best AS (SELECT user_id, max(score) AS score FROM game_runs WHERE finished_at >= ${SINCE.replace('$9', '$2')} GROUP BY user_id)
          SELECT min(b.score)::int AS score FROM best b JOIN users u ON u.id = b.user_id
-         WHERE u.banned_at IS NULL AND u.plan = 'full' AND b.score > $1`,
+         WHERE u.banned_at IS NULL AND b.score > $1`,
         [week, resetAt]
       );
       nextUp = n.score;
@@ -108,27 +105,47 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
     };
   }
 
-  // What the game page should show. Free accounts only learn that it's locked.
-  app.get('/api/game/status', ...requireVerified, wrap(async (req, res) => {
+  // The prize and who's leading, for visitors without an account (they can play practice games).
+  app.get('/api/game/prize', wrap(async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    if (req.user.plan !== 'full') return res.json({ access: false });
+    const { resetAt, eventOn } = await gameSettings();
+    const [{ rows: [lead] }, { rows: [champ] }, { rows: [clock] }] = await Promise.all([
+      pool.query(`SELECT u.name, max(r.score)::int AS score FROM game_runs r JOIN users u ON u.id = r.user_id
+                  WHERE r.finished_at >= ${SINCE.replace('$9', '$1')} AND u.banned_at IS NULL GROUP BY u.id, u.name ORDER BY score DESC LIMIT 1`, [resetAt]),
+      pool.query(`SELECT p.score, u.name FROM game_prizes p LEFT JOIN users u ON u.id = p.user_id ORDER BY p.week_start DESC LIMIT 1`),
+      pool.query(`SELECT ${WEEK_START_SQL} + interval '7 days' AS ends`),
+    ]);
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+    res.json({
+      event: eventOn,
+      leader: lead ? { name: shortName(lead.name), score: lead.score } : null,
+      prize: {
+        through: PRICING.passEndLabel(PRICING.passEnds(PRICING.passEnds(today))),
+        weekEnds: clock.ends,
+        lastChampion: champ ? { name: shortName(champ.name || 'Someone'), score: champ.score } : null,
+      },
+    });
+  }));
+
+  // What the game page shows a logged-in player.
+  app.get('/api/game/status', ...requirePlayer, wrap(async (req, res) => {
     const { eventOn, eventUntil } = await gameSettings();
     res.json({ access: true, name: req.user.name.split(' ')[0], event: eventOn, eventUntil, ...(await standings(req.user.id)) });
   }));
 
-  app.get('/api/game/client.js', ...requireFull, (req, res) => {
+  app.get('/api/game/client.js', (req, res) => {
     res.type('application/javascript').send(CLIENT);
   });
 
   // Each game gets a one-time ticket, so a score has to come from a game that really ran that long.
-  app.post('/api/game/start', ...requireFull, runLimiter, wrap(async (req, res) => {
+  app.post('/api/game/start', ...requirePlayer, runLimiter, wrap(async (req, res) => {
     pool.query(`DELETE FROM game_runs WHERE finished_at IS NULL AND started_at < now() - interval '1 day'`).catch(() => {});
     const ticket = crypto.randomBytes(24).toString('base64url');
     await pool.query('INSERT INTO game_runs (ticket, user_id) VALUES ($1, $2)', [ticket, req.user.id]);
     res.status(201).json({ ticket });
   }));
 
-  app.post('/api/game/finish', ...requireFull, wrap(async (req, res) => {
+  app.post('/api/game/finish', ...requirePlayer, wrap(async (req, res) => {
     const { ticket, score, guests } = req.body || {};
     if (typeof ticket !== 'string' || !Number.isInteger(score) || !Number.isInteger(guests) || score < 0 || guests < 0) {
       return fail(res, 400, "That score couldn't be read.");

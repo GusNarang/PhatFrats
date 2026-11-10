@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Door Rush · PhatFrats</title>
-<meta name="description" content="Door Rush, the PhatFrats arcade game for Full Access members.">
+<meta name="description" content="Door Rush, the PhatFrats arcade game. Free for everyone, with a free semester of Full Access for the top score each week.">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
 <meta name="theme-color" content="#0b1026">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -86,17 +86,6 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
   <div class="top"><a class="logo" href="/"><span>Phat</span>Frats</a><a class="btn" href="/">Back to the map</a></div>
   <p id="loading" class="note">Loading…</p>
 
-  <section class="gate" id="login" hidden>
-    <h1>Door Rush</h1>
-    <p>The PhatFrats arcade game for Full Access members. Log in first, then come back here.</p>
-    <a class="btn gold" href="/">Log in</a>
-  </section>
-
-  <section class="gate" id="locked" hidden>
-    <h1>Door Rush</h1>
-    <p>Sort a growing line of guests into the right parties, spot the crashers and climb the weekly leaderboard. Door Rush is included with Full Access, <b id="price"></b> a <span id="term"></span>.</p>
-    <a class="btn gold" href="/#plans">Get Full Access</a>
-  </section>
 
   <section id="play" hidden>
     <h1>Door Rush</h1>
@@ -174,7 +163,21 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
     if(!res.ok){ const err = new Error(data.error || "Something went wrong."); err.status = res.status; err.code = data.code; throw err; }
     return data;
   }
-  function show(id){ $("#loading").hidden = true; for(const v of ["login","locked","play"]) $("#"+v).hidden = v!==id; }
+  function show(id){ $("#loading").hidden = true; $("#"+id).hidden = false; }
+  // Practice mode, for visitors without a confirmed account: the game, the prize and the rules, but nothing saved.
+  function guestView(g, unconfirmed){
+    standings({ week:0, rank:null, nextUp:null, board:[], me:null, best:0, stats:{games:0,guests:0,week_games:0}, recent:[], prize:g.prize, event:g.event });
+    $("#prizeChips").innerHTML = [
+      g.leader ? '<span class="chip">👑 '+esc(g.leader.name)+' leads with '+num(g.leader.score)+'</span>' : '<span class="chip">👑 No leader yet. It could be you.</span>',
+      g.prize.lastChampion ? '<span class="chip">🏆 Last week: '+esc(g.prize.lastChampion.name)+' · '+num(g.prize.lastChampion.score)+'</span>' : '',
+      g.event ? '<span class="chip hot">⚡ Event week: double points</span>' : '',
+    ].join('');
+    const cta = unconfirmed ? '<a class="btn gold" href="/">Confirm your email</a>' : '<a class="btn gold" href="/">Sign up free</a> <a class="btn" href="/">Log in</a>';
+    const why = unconfirmed ? "Confirm your Penn State email to save scores and compete for the prize." : "You're playing practice games. Sign up free with your Penn State email to save scores, climb the board and win the prize.";
+    $("#raceText").innerHTML = esc(why) + '<span style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+cta+'</span>';
+    $("#board").innerHTML = '<li class="empty" style="display:block">Log in to see the full leaderboard and your rank.</li>';
+    $("#statsTitle").closest(".card").hidden = true;
+  }
   const TROPHIES = [[5000,"🥉","Bronze"],[15000,"🥈","Silver"],[30000,"🥇","Gold"],[60000,"💎","Diamond"]];
   let lastRank = null, weekEnds = null;
   function standings(s){
@@ -210,7 +213,7 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
       'The prize is Full Access through '+esc(p.through)+'. It adds to any pass you already have and never shortens it.',
       'Ties go to whoever reached the score first.',
       'Scores have to come from real games. Impossible scores aren\'t saved, and cheaters are removed from the board.',
-      'Door Rush is part of Full Access, so you need it to play and win.',
+      'Anyone can play. To save scores and win, you need a free PhatFrats account with a confirmed Penn State email.',
     ].map(x=>'<li>'+x+'</li>').join("");
 
     // Trophies for your best score ever, and your numbers.
@@ -243,11 +246,19 @@ kbd{font:500 12px var(--mono);color:var(--muted);margin-left:4px}@media(hover:no
   (async function(){
     let status;
     try{ status = await api("/api/game/status"); }
-    catch(err){ if(err.status===401 || err.code==="EMAIL_NOT_VERIFIED"){ show("login"); return; } $("#loading").textContent = err.message; return; }
-    if(!status.access){
-      $("#price").textContent = PF_PRICING.money(PF_PRICING.current());
-      $("#term").textContent = PF_PRICING.term;
-      show("locked"); return;
+    catch(err){
+      if(err.status!==401 && err.code!=="EMAIL_NOT_VERIFIED"){ $("#loading").textContent = err.message; return; }
+      // No confirmed account: practice games for anyone.
+      const g = await api("/api/game/prize");
+      await loadClient();
+      $("#hello").textContent = "Grab the door and try it out. Practice games are free for everyone.";
+      guestView(g, err.code==="EMAIL_NOT_VERIFIED"); show("play");
+      window.PFDoorRush.mount($("#game"), {
+        event: !!g.event,
+        start: async ()=> "practice",
+        finish: async ()=>{ throw new Error(err.code==="EMAIL_NOT_VERIFIED" ? "Practice game. Confirm your email to save scores." : "Practice game. Sign up free to save your score and win the prize."); },
+      });
+      return;
     }
     await loadClient();
     $("#hello").textContent = "You're on the door tonight, "+status.name+". Don't let the line reach you.";
