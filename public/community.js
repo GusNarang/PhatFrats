@@ -338,8 +338,14 @@
   }
 
   // ---------- welcome pop-up ----------
-  // Shown once, the first time someone is logged in on this browser. They can open it again from their profile.
-  const WELCOME_KEY = 'pf_welcome_v1';
+  // Shown once per visit: each time the site is opened, and again after every log in. Refreshing or moving
+  // around the site during the same visit doesn't bring it back. People who already paid for Full Access
+  // don't get it automatically, since it's about getting Full Access; anyone can open it from their profile.
+  const WELCOME_KEY = 'pf_welcome_visit';
+  const visit = {
+    get() { try { return sessionStorage.getItem(WELCOME_KEY); } catch (e) { return null; } },
+    set(v) { try { if (v) sessionStorage.setItem(WELCOME_KEY, v); else sessionStorage.removeItem(WELCOME_KEY); } catch (e) {} },
+  };
   async function openWelcome() {
     closePanels();
     let p = null;
@@ -368,7 +374,7 @@
       </div>
 
       <div class="pf-note"><b>🏆 Win Door Rush, win a free semester</b>
-        <p style="margin:6px 0 0;color:var(--muted)">Each week (Monday to Sunday), the top Door Rush score wins Full Access through <b>${esc(nextTerm)}</b>. The prize is given automatically every Monday, with a notification and a champion badge. Door Rush is free for everyone; play it from <a href="/game">Game</a> in the menu.</p>
+        <p style="margin:6px 0 0;color:var(--muted)">Each week (Monday to Sunday), the top Door Rush score wins Full Access through <b>${esc(nextTerm)}</b>. The prize is given automatically every Monday, with a notification and a champion badge. Door Rush is free for everyone; play it from <a href="/game">Door Rush Game</a> in the menu.</p>
       </div>
 
       <div class="pf-note"><b>👯 Add your friends</b>
@@ -391,8 +397,8 @@
       <div class="dlg-actions"><button class="btn" type="button" data-welcome-done>Let's go</button></div>
     </div>`;
     dlg.querySelector('[data-welcome-done]').addEventListener('click', () => dlg.close());
-    // Counted as seen as soon as it shows, so it never pops up twice.
-    store.set(WELCOME_KEY, '1');
+    // Counted as seen for this visit as soon as it shows, so it doesn't pop up twice in one visit.
+    visit.set(String(S().state.user.email));
     if (!dlg.open) dlg.showModal();
   }
 
@@ -454,12 +460,19 @@
     // The bell is redrawn with the header, so its number is put back after each redraw.
     const auth = $('#authArea');
     // Logging in later (without a reload) also starts the bell.
-    let started = false;
+    let started = false, wasIn = false;
     const kick = () => {
+      const user = S().state.user;
       if (!started && $('#bellBtn')) {
         started = true; loadNotes(); setInterval(() => { if (!document.hidden) loadNotes(); }, 60000);
-        // First time logged in on this browser (including right after signing up): the welcome pop-up.
-        if (!store.get(WELCOME_KEY) && !params.get('group')) setTimeout(openWelcome, 900);
+      }
+      // Logged out (after being logged in on this page): the next log in counts as a new visit.
+      // The moment before the account loads looks logged out too, so that alone doesn't count.
+      if (!user) { if (wasIn) { visit.set(null); wasIn = false; } }
+      // Logged in and not seen yet this visit (and not a paid pass): the welcome pop-up.
+      else if ((wasIn = true) && $('#bellBtn') && visit.get() !== String(user.email) && !(user.plan === 'full' && !user.trial) && !params.get('group')) {
+        visit.set(String(user.email));
+        setTimeout(() => { if (S().state.user && !document.querySelector('dialog[open]')) openWelcome(); }, 900);
       }
       paintBell();
     };

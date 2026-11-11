@@ -148,7 +148,8 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
   // Vercel's scheduler calls this every Monday. With CRON_SECRET set in Vercel, only the scheduler can call it;
   // without it, anyone could trigger it, which is harmless because each week's prize is given once, to the right person.
   function mountCron(app) {
-    app.get('/api/cron/door-rush-prize', wrap(async (req, res) => {
+    // Rate limited too, so nobody can call it over and over to load the database.
+    app.get('/api/cron/door-rush-prize', limiter(20, 'Too many tries.'), wrap(async (req, res) => {
       const secret = process.env.CRON_SECRET;
       if (secret && req.get('authorization') !== `Bearer ${secret}`) return fail(res, 401, 'Not allowed.');
       res.set('Cache-Control', 'no-store');

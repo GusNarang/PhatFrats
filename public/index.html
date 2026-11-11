@@ -1045,13 +1045,15 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     tapeBase = html;
     track.dataset.w = want;
     track.innerHTML = html;
-    const one = track.scrollWidth || 1;
-    const reps = Math.max(1, Math.ceil(want / one));
+    // If the tape is ever measured while hidden (width 0), don't repeat it hundreds of times.
+    const one = track.scrollWidth;
+    const reps = one > 50 ? Math.max(1, Math.ceil(want / one)) : 4;
     const copy = html.repeat(reps);
     track.innerHTML = copy + copy;
-    track.style.setProperty("--tape-time", Math.round(one * reps / 60) + "s");
+    track.style.setProperty("--tape-time", (one > 50 ? Math.round(one * reps / 60) : 40) + "s");
   }
-  window.addEventListener("resize", ()=>{ const b = tapeBase; tapeBase = ""; fillTape(b); });
+  // Phones fire resize when the address bar slides while scrolling; only a real width change refills the tape.
+  window.addEventListener("resize", ()=>fillTape(tapeBase));
   function renderHero(){
     $("#statChapters").textContent = CHAPTERS.length;
     $("#statMapped").textContent = CHAPTERS.filter(c=>c.x!=null).length;
@@ -1768,7 +1770,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   }catch(e){}
   api("/api/me").then(data=>{
     state.checkout = !!data.checkout;
-    if(!data.user){ renderAll(); finishCheckout(); openDemoLogin(); return; }
+    // Nobody logged in: the next log in is a new visit, so the welcome pop-up shows again then.
+    if(!data.user){ try{ sessionStorage.removeItem("pf_welcome_visit"); }catch(e){} renderAll(); finishCheckout(); openDemoLogin(); return; }
     enterAccount(data); renderAll();
     if(state.pending) openVerify();
     finishCheckout();
