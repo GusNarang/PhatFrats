@@ -90,7 +90,9 @@ nav.links::-webkit-scrollbar{display:none}
 @media (max-width:1180px){#authArea .plan-badge{display:none}header.top nav.links a{padding-inline:3px}}
 nav.links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:clamp(.8rem,1.1vw,1rem);white-space:nowrap;line-height:1.2;padding:4px clamp(4px,.6vw,9px)}
 nav.links a:hover{color:var(--ink)}
-@media (max-width:760px){nav.links{display:none}.top .wrap{justify-content:space-between}}
+/* Below 1000px the full menu can't fit on one row next to the account buttons, so it's hidden,
+   like on phones: every section is still reachable from the page itself. */
+@media (max-width:1000px){nav.links{display:none}.top .wrap{justify-content:space-between}}
 
 .btn{
   font:inherit;font-weight:800;cursor:pointer;border:0;border-radius:999px;
