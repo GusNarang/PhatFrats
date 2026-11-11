@@ -119,7 +119,7 @@
       <li>Your guest's details are deleted two days after the party.</li></ul>`],
 
     ['Fun extras', 'game', '🕹️', 'Door Rush and the weekly prize', 'Play free, win a free semester', `
-      <p><b>Door Rush</b> is the PhatFrats game. Open it from <b>Game</b> in the menu.</p>
+      <p><b>Door Rush</b> is the PhatFrats game. Open it from <b>Door Rush Game</b> in the menu.</p>
       <ul><li>Guests walk up the street. Send each to the right party before they reach the red line: <b>★ → Neon</b>, <b>● → Chill</b>, <b>◆ → Costume</b>.</li>
       <li>Hooded crashers with a red ✕: hit <b>Bounce</b>.</li>
       <li>3 mistakes and the doors close. Streaks, 👑 VIPs and the Hype meter boost your score.</li></ul>
