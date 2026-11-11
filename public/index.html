@@ -81,11 +81,14 @@ header.top{
   padding-left:max(16px, env(safe-area-inset-left, 0px));
   padding-right:max(16px, env(safe-area-inset-right, 0px));
 }
-.top .wrap{display:flex;align-items:center;gap:20px;padding-block:10px}
-.logo-sm{font-family:var(--display);font-size:1.35rem;color:var(--ink);text-decoration:none;text-shadow:2px 2px 0 var(--pink)}
+.top .wrap{display:flex;align-items:center;gap:clamp(12px,1.6vw,24px);padding-block:10px;max-width:1360px}
+.logo-sm{font-family:var(--display);font-size:1.35rem;color:var(--ink);text-decoration:none;text-shadow:2px 2px 0 var(--pink);flex:none}
 .logo-sm span{color:var(--gold)}
-nav.links{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
-nav.links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:.95rem;white-space:nowrap}
+#authArea{flex:none}
+nav.links{display:flex;flex:1 1 auto;min-width:0;justify-content:space-evenly;align-items:center;gap:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+nav.links::-webkit-scrollbar{display:none}
+@media (max-width:1180px){#authArea .plan-badge{display:none}header.top nav.links a{padding-inline:3px}}
+nav.links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:clamp(.8rem,1.1vw,1rem);white-space:nowrap;line-height:1.2;padding:4px clamp(4px,.6vw,9px)}
 nav.links a:hover{color:var(--ink)}
 @media (max-width:760px){nav.links{display:none}.top .wrap{justify-content:space-between}}
 
