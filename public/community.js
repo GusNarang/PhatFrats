@@ -382,7 +382,7 @@
           <li><b>3 mistakes</b> (wrong door, a crasher gets in, too slow, or bouncing a real guest) and the doors close.</li>
           <li>From level 3 the <b>doors switch places</b>, so watch the labels.</li>
           <li>Streaks raise your multiplier up to <b>x5</b>. 👑 VIPs are worth <b>triple</b>. Fill the Hype meter for 6 seconds of <b>double points</b>.</li>
-          <li>Every 40 correct guests wins back a lost wristband (up to 3).</li>
+          <li>Every 60 correct guests wins back a lost wristband (up to 3).</li>
           <li>Keys: ← ↑ → to send, ↓ or Space to bounce. On a phone, use the big buttons.</li>
           <li>The leaderboard resets Monday at midnight. Scores have to come from real games; impossible scores aren't saved.</li>
         </ul>

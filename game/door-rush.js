@@ -10,7 +10,7 @@
   const SLOTS = [88, 240, 392];
   const SKINS = ['#f4cda8', '#d9a06f', '#a96f43', '#6d4428', '#f0bd96'];
   const HAIR = ['#20130d', '#5d3518', '#d7a83c', '#a43f2f', '#111827', '#8b5cf6'];
-  const HYPE_FULL = 12, HYPE_SECONDS = 6, GUESTS_PER_LEVEL = 12;
+  const HYPE_FULL = 12, HYPE_SECONDS = 6, GUESTS_PER_LEVEL = 10;
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Door Rush skins, a Full Access perk. Looks only: the doors, guests and scoring are the same for everyone.
   const THEMES = {
@@ -83,8 +83,8 @@
       };
     }
     const mult = () => Math.min(5, 1 + Math.floor(g.streak / 5));
-    const speed = () => (108 + g.level * 18) * (g.hypeLeft > 0 ? .72 : 1);
-    const spawnGap = () => Math.max(.44, 1.28 - g.level * .085);
+    const speed = () => (122 + g.level * 22) * (g.hypeLeft > 0 ? .8 : 1);
+    const spawnGap = () => Math.max(.4, 1.16 - g.level * .095);
     const front = () => g.guests.filter((x) => !x.leaving).sort((a, b) => a.y - b.y)[0];
 
     function say(text, x, y, c) { g.words.push({ text, x, y, c, life: .85 }); }
@@ -102,10 +102,10 @@
     }
 
     function addGuest() {
-      const canCrash = g.level >= 2 && Math.random() < Math.min(.3, .1 + g.level * .022);
+      const canCrash = g.level >= 2 && Math.random() < Math.min(.36, .12 + g.level * .03);
       g.guests.push({
         type: canCrash ? -1 : Math.floor(Math.random() * 3),
-        vip: !canCrash && Math.random() < .08,
+        vip: !canCrash && Math.random() < .06,
         y: SPAWN_Y, x: 240 + rand(-8, 8), step: rand(0, 6.28),
         skin: pick(SKINS), hair: pick(HAIR), leaving: null,
       });
@@ -123,7 +123,7 @@
       g.score += points; g.right++; g.streak++;
       say(`${text} +${num(points)}`, slotX, guest.y - 34, guest.vip ? '#ffd23f' : '#ffffff');
       tone(guest.vip ? 880 : 420 + Math.min(g.streak, 30) * 18, .07);
-      if (g.right % 40 === 0 && g.lives < 3) { g.lives++; showBanner('EXTRA WRISTBAND!'); tone(1040, .18, 'triangle', .05); }
+      if (g.right % 60 === 0 && g.lives < 3) { g.lives++; showBanner('EXTRA WRISTBAND!'); tone(1040, .18, 'triangle', .05); }
       if (g.hypeLeft <= 0 && ++g.hype >= HYPE_FULL) {
         g.hype = 0; g.hypeLeft = HYPE_SECONDS; showBanner('HYPE MODE · DOUBLE POINTS');
         burst(240, 280, '#ff3fa4', 45); burst(240, 280, '#35e0ff', 45);
