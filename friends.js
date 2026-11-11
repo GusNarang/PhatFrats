@@ -5,6 +5,7 @@
 // keep a party's crowd private so it never shows on anyone's friends board.
 const crypto = require('crypto');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { PgStore, nameFor } = require('./rate-store.js');
 const partyList = require('./party-list.js');
 const CHAPTERS = require('./public/chapters.js');
 const { FULL_SQL } = require('./plan-sql.js');
@@ -16,6 +17,7 @@ const ID = /^\d{1,18}$/;
 module.exports = function mountFriends(app, { pool, wrap, fail, requireVerified, community, WEEK_START_SQL, ops }) {
   const limiter = (limit, message) => rateLimit({
     windowMs: 60 * 60 * 1000, limit, standardHeaders: 'draft-7', legacyHeaders: false,
+    store: new PgStore(pool, nameFor('friends', limit, message)), passOnStoreError: true,
     keyGenerator: (req) => (req.user ? 'u:' + req.user.id : 'ip:' + ipKeyGenerator(req.ip)),
     message: { error: message, code: 'RATE_LIMITED' },
   });

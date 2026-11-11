@@ -412,3 +412,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_counted_at TIMESTAMPTZ;
 -- Friends who were already counted before this column existed (every confirmed referral so far).
 UPDATE users SET referral_counted_at = email_verified_at
   WHERE referral_counted_at IS NULL AND referred_by IS NOT NULL AND email_verified_at IS NOT NULL;
+
+-- Rate limit counts, shared by every server copy (see rate-store.js). Old rows are cleared out now and then.
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key      TEXT PRIMARY KEY,
+  hits     INTEGER NOT NULL DEFAULT 0,
+  reset_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rate_limits_reset_idx ON rate_limits (reset_at);

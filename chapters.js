@@ -2,6 +2,7 @@
 // - leaders post and edit parties, answer students' invite requests, and manage the member list;
 // - every brother can personally invite people to the chapter's parties by Penn State email.
 const { rateLimit } = require('express-rate-limit');
+const { PgStore, nameFor } = require('./rate-store.js');
 // The IFC chapters, plus practice chapters for trying the portal.
 const IDENTITY = require('./data/chapter-identity.js');
 const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
@@ -58,6 +59,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   }];
   const perUser = (limit, message) => rateLimit({
     windowMs: 60 * 1000, limit, standardHeaders: 'draft-7', legacyHeaders: false,
+    store: new PgStore(pool, nameFor('chapters', limit, message)), passOnStoreError: true,
     keyGenerator: (req) => `user:${req.user.id}`,
     message: { error: message, code: 'RATE_LIMITED' },
   });

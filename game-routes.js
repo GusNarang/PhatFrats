@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { rateLimit } = require('express-rate-limit');
+const { PgStore, nameFor } = require('./rate-store.js');
 const PRICING = require('./public/pricing.js');
 const { FULL_SQL } = require('./plan-sql.js');
 
@@ -24,6 +25,7 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
   const requirePlayer = [...requireVerified, (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }];
   const runLimiter = rateLimit({
     windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false,
+    store: new PgStore(pool, 'game-runs'), passOnStoreError: true,
     keyGenerator: (req) => `user:${req.user.id}`,
     message: { error: 'Too many games at once. Wait a minute.', code: 'RATE_LIMITED' },
   });
@@ -108,8 +110,9 @@ module.exports = function gameRoutes(app, { pool, wrap, fail, requireVerified, W
   }
 
   // The prize and who's leading, for visitors without an account (they can play practice games).
+  // The same for every visitor (this week's leader and last week's champion), so it's cached briefly at the edge.
   app.get('/api/game/prize', wrap(async (req, res) => {
-    res.set('Cache-Control', 'no-store');
+    res.set('Cache-Control', 'public, max-age=20, s-maxage=20, stale-while-revalidate=40');
     const { resetAt, eventOn } = await gameSettings();
     const [{ rows: [lead] }, { rows: [champ] }, { rows: [clock] }] = await Promise.all([
       pool.query(`SELECT u.name, max(r.score)::int AS score FROM game_runs r JOIN users u ON u.id = r.user_id

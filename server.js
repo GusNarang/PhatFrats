@@ -10,6 +10,7 @@ const payments = require('./payments.js');
 const guests = require('./guests.js');
 const phatbot = require('./ai.js');
 const PRICING = require('./public/pricing.js');
+const { PgStore, nameFor } = require('./rate-store.js');
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Copy .env.example to .env and add your Neon connection string.');
@@ -323,13 +324,28 @@ const requireVerified = [requireUser, (req, res, next) => {
   if (!req.user.email_verified_at) return fail(res, 403, 'Confirm your email to do that.', 'EMAIL_NOT_VERIFIED');
   next();
 }];
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { error: 'Too many attempts. Wait 15 minutes and try again.', code: 'RATE_LIMITED' },
-});
+// Log in, sign up, codes and passwords. Counts are shared by every server copy (in the database), in two layers:
+// 20 tries per 15 minutes for one account (its email, or the session) from one network stops password
+// guessing, and 200 per network covers a whole dorm on one campus Wi-Fi address while still stopping a spammer.
+const authTarget = (req) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase().slice(0, 120) : '';
+  if (email) return 'e:' + email;
+  const tok = readSessionToken(req);
+  return tok ? 's:' + hashToken(tok).slice(0, 24) : 'anon';
+};
+const authLimiter = [
+  rateLimit({
+    windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-7', legacyHeaders: false, passOnStoreError: true,
+    store: new PgStore(pool, 'auth-net'),
+    message: { error: 'Too many attempts from this network. Wait 15 minutes and try again.', code: 'RATE_LIMITED' },
+  }),
+  rateLimit({
+    windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, passOnStoreError: true,
+    store: new PgStore(pool, 'auth'),
+    keyGenerator: (req) => ipKeyGenerator(req.ip) + '|' + authTarget(req),
+    message: { error: 'Too many attempts. Wait 15 minutes and try again.', code: 'RATE_LIMITED' },
+  }),
+];
 
 const BANNED_MESSAGE = 'This account has been suspended. If you think that is a mistake, email the PhatFrats team.';
 const cleanEmail = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
@@ -497,7 +513,8 @@ app.get('/api/teaser', wrap(async (req, res) => {
   const s = await ops.settings();
   const { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo });
   const pct = (p) => Math.min(100, Math.round(p.going / p.cap * 100));
-  res.set('Cache-Control', 'public, max-age=60');
+  // The same for every visitor, so Vercel's edge answers most requests without the database.
+  res.set('Cache-Control', 'public, max-age=30, s-maxage=30, stale-while-revalidate=60');
   res.json({
     count: parties.length,
     filling: parties.filter((p) => pct(p) >= 80).length,
@@ -585,6 +602,7 @@ app.post('/api/requests/guest/remove', requireVerified, wrap(async (req, res) =>
 const chatLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 10,
+  store: new PgStore(pool, 'chat'), passOnStoreError: true,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: "You're sending messages too fast. Wait a moment.", code: 'RATE_LIMITED' },
@@ -653,6 +671,12 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
         [visitor, ref]
       );
     }
+    // Who's online and what they're looking at only feeds the control room's live radar. With nobody watching
+    // it (the Live tab marks itself as watched), it isn't saved: a busy night would otherwise be a database
+    // write from every open tab every minute and a half.
+    const s = await ops.settings();
+    const watched = s.radar_watch && Date.now() - Date.parse(s.radar_watch) < 5 * 60 * 1000;
+    if (!watched) return res.status(204).end();
     const path = typeof req.body.path === 'string' ? req.body.path.slice(0, 40) : '/';
     const looking = typeof req.body.looking === 'string' && /^(house:\d{1,4}|h\d{1,18}|p\d{1,3})$/.test(req.body.looking) ? req.body.looking : null;
     await pool.query(

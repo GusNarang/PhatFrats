@@ -46,6 +46,7 @@
   }
   window.PF_PING = ping;
   setTimeout(ping, 1500);
-  setInterval(ping, 45000);
+  // Every minute and a half is enough for the radar, and the server ignores it unless the radar is open.
+  setInterval(ping, 90000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) ping(); });
 })();

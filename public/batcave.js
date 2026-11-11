@@ -73,7 +73,7 @@
   <div id="pageLive" role="tabpanel" aria-labelledby="tab-live" hidden>
     <section class="tiles" id="liveTiles" aria-label="Right now"></section>
     <div class="grid">
-      <section class="card"><div class="chart-head"><h2 style="margin:0">Live radar</h2><span class="updated">Houses people are looking at in the last 3 minutes</span></div>
+      <section class="card"><div class="chart-head"><h2 style="margin:0">Live radar</h2><span class="updated">Houses people are looking at in the last 3 minutes. Fills in within 2 minutes of opening this tab.</span></div>
         <div class="radar" id="radar"><div class="sweep"></div></div></section>
       <section class="card"><h2>Live ticker</h2><div class="ticker" id="ticker"></div></section>
     </div>

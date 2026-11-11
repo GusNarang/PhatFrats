@@ -2,6 +2,7 @@
 // referrals, group plans, the Door Rush weekly prize, safety reports, the contact form and the Weekend Drop.
 const crypto = require('crypto');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { PgStore, nameFor } = require('./rate-store.js');
 const PRICING = require('./public/pricing.js');
 const partyList = require('./party-list.js');
 
@@ -19,6 +20,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
   const chapterName = (id) => CHAPTERS.find((c) => c.id === Number(id))?.name || 'a chapter';
   const limiter = (limit, message) => rateLimit({
     windowMs: 60 * 60 * 1000, limit, standardHeaders: 'draft-7', legacyHeaders: false,
+    store: new PgStore(pool, nameFor('community', limit, message)), passOnStoreError: true,
     keyGenerator: (req) => (req.user ? 'u:' + req.user.id : 'ip:' + ipKeyGenerator(req.ip)),
     message: { error: message, code: 'RATE_LIMITED' },
   });

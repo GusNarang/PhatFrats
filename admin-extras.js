@@ -33,11 +33,18 @@ module.exports = function adminExtras(app, { pool, wrap, fail, requireUser, ops,
   }
 
   // ---------- public: the beacon banner and the presence ping ----------
+  // Every page asks for the banner, so the active announcement is kept for 15 seconds per server copy
+  // instead of read each time. A new or cleared announcement reaches everyone within 15 seconds.
+  let beaconCache = null;
   app.get('/api/beacon', wrap(async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    const { rows: [a] } = await pool.query(
-      `SELECT id, text, tone, audience FROM announcements WHERE active AND (ends_at IS NULL OR ends_at > now()) ORDER BY id DESC LIMIT 1`
-    );
+    if (!beaconCache || Date.now() - beaconCache.at > 15000) {
+      const { rows } = await pool.query(
+        `SELECT id, text, tone, audience FROM announcements WHERE active AND (ends_at IS NULL OR ends_at > now()) ORDER BY id DESC LIMIT 1`
+      );
+      beaconCache = { at: Date.now(), row: rows[0] };
+    }
+    const a = beaconCache.row;
     if (!a) return res.json({ beacon: null });
     if (a.audience !== 'all') {
       const token = (req.headers.cookie || '').match(/(?:^|;\s*)pf_session=([^;]+)/);
@@ -61,9 +68,11 @@ module.exports = function adminExtras(app, { pool, wrap, fail, requireUser, ops,
   // ---------- Live: radar, ticker, beacon, lockdown, spotlight ----------
   app.get('/api/admin/live', requireAdmin, wrap(async (req, res) => {
     const s = await ops.settings();
+    // Tells the site someone is watching the radar, so open pages start reporting in (once a minute is enough).
+    if (!s.radar_watch || Date.now() - Date.parse(s.radar_watch) > 60 * 1000) await ops.setSetting('radar_watch', new Date().toISOString());
     const [online, looking, feed, beacon] = await Promise.all([
       pool.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE path LIKE '/game%')::int AS gaming,
-                    count(*) FILTER (WHERE path LIKE '/frats%')::int AS frats FROM site_presence WHERE last_seen > now() - interval '2 minutes'`),
+                    count(*) FILTER (WHERE path LIKE '/frats%')::int AS frats FROM site_presence WHERE last_seen > now() - interval '3 minutes'`),
       pool.query(`SELECT looking_at, count(*)::int AS n FROM site_presence
                   WHERE last_seen > now() - interval '3 minutes' AND looking_at IS NOT NULL GROUP BY looking_at`),
       pool.query(`SELECT id, kind, text, created_at FROM activity_events ORDER BY id DESC LIMIT 40`),
@@ -95,6 +104,7 @@ module.exports = function adminExtras(app, { pool, wrap, fail, requireUser, ops,
   app.post('/api/admin/announcement', requireAdmin, wrap(async (req, res) => {
     const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, 200) : '';
     await pool.query('UPDATE announcements SET active = FALSE WHERE active');
+    beaconCache = null;
     if (!text) return res.json({ ok: true });
     const tone = ['gold', 'pink', 'cyan', 'red'].includes(req.body?.tone) ? req.body.tone : 'gold';
     const audience = ['all', 'free', 'full', 'leaders'].includes(req.body?.audience) ? req.body.audience : 'all';
