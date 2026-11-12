@@ -102,7 +102,7 @@ function create({ pool, wrap, fail, requireUser, requireVerified, ops, community
           session.metadata.agreed_at ? new Date(session.metadata.agreed_at) : new Date()]
       );
       if (t) {
-        community.notify(userId, 'ticket', `🎟️ Your ticket for ${party.title} is ready. Your code is ${t.code}. Show it at the door with your Penn State ID.`, { link: '/?party=' + partyId })
+        community.notify(userId, 'ticket', `🎟️ Your ticket for ${party.title} is ready. Your code is ${t.code}. Show it at the door with your Penn State ID.`, { sms: true, link: '/?party=' + partyId })
           .catch((err) => console.error('Ticket note failed:', err.message));
         ops.activity('sale', `${dollars(t.amount_cents)} ticket sold for ${party.title}${t.livemode ? '' : ' (test)'}`);
         return t;
@@ -127,7 +127,7 @@ function create({ pool, wrap, fail, requireUser, requireVerified, ops, community
         if (t.payment_intent && stripe()) await stripe().refunds.create({ payment_intent: t.payment_intent, refund_application_fee: true }, { stripeAccount: t.stripe_account });
         await pool.query(`UPDATE tickets SET status = 'refunded', refunded_at = now() WHERE id = $1`, [t.id]);
         done++;
-        if (t.user_id) community.notify(t.user_id, 'ticket', `💸 ${t.title} was ${reason}, so your ${dollars(t.amount_cents)} ticket has been refunded to your card. It can take 5 to 10 days to show up.`, {})
+        if (t.user_id) community.notify(t.user_id, 'ticket', `💸 ${t.title} was ${reason}, so your ${dollars(t.amount_cents)} ticket has been refunded to your card. It can take 5 to 10 days to show up.`, { sms: true })
           .catch(() => {});
       } catch (err) {
         console.error('Ticket refund failed:', t.id, err.message);

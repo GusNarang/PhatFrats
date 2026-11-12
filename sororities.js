@@ -10,9 +10,12 @@ const IDENTITY = require('./data/sorority-identity.js');
 const EMOJIS = ['💗', '🎀', '🌸', '🌹', '🌷', '🦋', '✨', '💎', '👑', '🕊️', '🦁', '🦉', '⚓', '🔑', '🌙', '⭐', '🐢', '🐼', '🐬', '🏹', '🪁', '🐚', '🌻', '🍒'];
 
 const sororityById = new Map(SORORITIES.map((s) => [s.id, s]));
+const sms = require('./sms.js');
+const SITE_URL = process.env.SITE_URL || 'https://phat-frats.vercel.app';
 const chapterById = new Map(CHAPTERS.map((c) => [c.id, c]));
 
 function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, hashPassword, verifyPassword }) {
+  const smsBox = sms.create({ pool });
   const idParam = (v) => (/^\d{1,18}$/.test(String(v)) ? String(v) : null);
   const memberOf = async (userId) => {
     const { rows: [m] } = await pool.query('SELECT sorority_id, role FROM sorority_members WHERE user_id = $1', [userId]);
@@ -390,6 +393,19 @@ function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, h
            FROM sorority_members m WHERE m.sorority_id = ANY($5::int[])`,
           [chapter, party.title, when, '/?party=' + partyId, newIds]
         );
+        // And a text to every sister with a confirmed phone. A big batch finishes from the outbox over the next few minutes.
+        if (sms.enabled()) {
+          const { rows: sisters } = await pool.query(
+            `SELECT m.user_id, m.sorority_id, u.phone FROM sorority_members m JOIN users u ON u.id = m.user_id
+             WHERE m.sorority_id = ANY($1::int[]) AND u.phone IS NOT NULL AND u.phone_verified_at IS NOT NULL AND u.sms_opt_in AND u.banned_at IS NULL`,
+            [newIds]
+          );
+          await smsBox.queue(sisters.map((s) => ({
+            userId: s.user_id, phone: s.phone, kind: 'sorority',
+            body: `PhatFrats: 💌 ${chapter} invited ${sororityById.get(s.sorority_id)?.name || 'your sorority'} to ${party.title} (${when}, ${party.time}). Every sister is on the list. Bring your PSU ID. ${SITE_URL}/?party=${partyId} Reply STOP to opt out.`,
+          })));
+          await smsBox.drain({ max: 40, ms: 6000 });
+        }
       }
       res.status(201).json({ ok: true, invited: newIds.length, already: ids.length - newIds.length });
     }));

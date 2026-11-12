@@ -712,11 +712,13 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     <div class="field" id="nameField"><label for="loginName">Your name</label><input class="input" id="loginName" autocomplete="name" placeholder="Nittany Lion"></div>
     <div class="field"><label for="loginEmail">Penn State email</label><input class="input" id="loginEmail" type="email" autocomplete="username" placeholder="abc1234@psu.edu"></div>
     <div class="field"><label for="loginPassword">Password</label><input class="input" id="loginPassword" type="password" autocomplete="current-password"></div>
+    <div class="field" id="phoneField"><label for="loginPhone">Mobile number <span class="muted" style="font-weight:400;font-size:.85rem">Your invite details and confirmations come by text.</span></label><input class="input" id="loginPhone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(814) 555-0123"></div>
     <fieldset class="pass-choice" id="passChoice">
       <legend>Your pass</legend>
       <label class="pass-opt"><input type="radio" name="pass" id="passFree" checked><span><b>Free</b><small>See the map and request an invite to one party per week.</small></span></label>
       <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · <span class="js-price">$4.99</span> a semester</b><small>Sign up free first, then get Full Access from Passes in one click.</small></span></label>
     </fieldset>
+    <label class="check" id="smsAgreeRow"><input type="checkbox" id="smsAgree"> <span>Text me my invite details and confirmations (about 1 to 10 texts a week). Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. <a href="/about#texts" target="_blank" rel="noopener">Texting terms</a></span></label>
     <label class="check" id="signupAgreeRow"><input type="checkbox" id="signupAgree"> <span>I'm 18 or older and agree to the <a href="/about#terms" target="_blank" rel="noopener">Terms and party disclaimer</a>. PhatFrats only lists parties. It doesn't host, run or supervise them and isn't responsible for what happens at them. I go at my own risk.</span></label>
     <button class="btn ghost small verify-resend" type="button" id="forgotBtn">Forgot password?</button>
     <p class="err" id="loginErr" role="alert"></p>
@@ -831,6 +833,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <script src="/guide.js"></script>
 <script src="/premium.js"></script>
 <script src="/tickets.js"></script>
+<script src="/phone.js"></script>
 <script>
 (function(){
   // ---------- data ----------
@@ -907,6 +910,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     state.early = verified ? (data.early || null) : null;
     setParties(verified ? data.parties : [], verified ? data.days : []);
     if(verified && window.PFTickets) setTimeout(()=>window.PFTickets.start(), 0);
+    if(verified && window.PFPhone) setTimeout(()=>window.PFPhone.nudge(), 4000);
   }
   async function logOut(){
     await api("/api/logout", {});
@@ -1519,6 +1523,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     $("#nameField").hidden = !signup;
     $("#passChoice").hidden = !signup;
     $("#signupAgreeRow").hidden = !signup;
+    $("#phoneField").hidden = !signup;
+    $("#smsAgreeRow").hidden = !signup;
     $("#forgotBtn").hidden = signup;
     $("#loginTitle").textContent = signup ? "Get on the map" : "Welcome back";
     $("#loginSubmit").textContent = signup ? "Create my account" : "Log in";
@@ -1545,8 +1551,10 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     e.preventDefault();
     const signup = authMode === "signup";
     const body = {email:$("#loginEmail").value, password:$("#loginPassword").value};
+    if(signup && !/^\D*1?\D*(\d\D*){10}$/.test($("#loginPhone").value)){ $("#loginErr").textContent = "Add your US mobile number, like (814) 555-0123, so we can text you your invites."; return; }
+    if(signup && !$("#smsAgree").checked){ $("#loginErr").textContent = "Tick the box to get your invite details and confirmations by text."; return; }
     if(signup && !$("#signupAgree").checked){ $("#loginErr").textContent = "Tick the box to agree to the terms and party disclaimer."; return; }
-    if(signup){ body.name = $("#loginName").value; body.agree = true; const ref = window.PFCommunity && window.PFCommunity.referral(); if(ref) body.ref = ref; }
+    if(signup){ body.name = $("#loginName").value; body.agree = true; body.phone = $("#loginPhone").value; body.smsConsent = true; const ref = window.PFCommunity && window.PFCommunity.referral(); if(ref) body.ref = ref; }
     const btn = $("#loginSubmit");
     btn.disabled = true; $("#loginErr").textContent = "";
     try {
@@ -1633,6 +1641,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       const data = await api("/api/verify", {code:$("#verifyCode").value});
       enterAccount(data);
       verifyDlg.close(); renderAll();
+      if(window.PFPhone && state.user && !state.user.phoneVerified && state.user.textsReady) setTimeout(()=>window.PFPhone.open(), 1200);
       toast(state.user.trial ? "You're in, " + state.user.name.split(" ")[0] + "! 🎉 Your first weekend has Full Access free: unlimited invites through Sunday." : "You're in, " + state.user.name.split(" ")[0] + ". The map is live.", 7000);
       document.getElementById("map").scrollIntoView();
     } catch(err){

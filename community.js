@@ -16,7 +16,7 @@ const TOP_PLACES = 10;
 const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date());
 const endOfDay = (iso) => `(($${iso}::date + 1)::timestamp AT TIME ZONE '${ZONE}')`;
 
-function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_START_SQL, CHAPTERS }) {
+function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_START_SQL, CHAPTERS, smsBox }) {
   const chapterName = (id) => CHAPTERS.find((c) => c.id === Number(id))?.name || 'a chapter';
   const limiter = (limit, message) => rateLimit({
     windowMs: 60 * 60 * 1000, limit, standardHeaders: 'draft-7', legacyHeaders: false,
@@ -31,14 +31,29 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     await mailer.sendMail({ from: `"PhatFrats" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`, to, subject, text });
   }
   // Puts a note in someone's bell, and emails them too unless they turned emails off.
-  async function notify(userId, kind, text, { email = true, link = null } = {}) {
+  // sms: an invite detail or confirmation. It goes by text to a confirmed phone, instead of email. Without a confirmed
+  // phone (or with texts off, or texting not set up on the site), it falls back to email if `email` allows.
+  async function notify(userId, kind, text, { email = true, link = null, sms = false } = {}) {
     await pool.query('INSERT INTO notifications (user_id, kind, text, link) VALUES ($1, $2, $3, $4)', [userId, kind, text.slice(0, 240), link]);
+    if (sms && smsBox) {
+      const phone = (await smsBox.textable([userId])).get(String(userId));
+      if (phone) {
+        await smsBox.queue([{ userId, phone, kind, body: smsBody(text, link) }]);
+        await smsBox.drain({ max: 5, ms: 5000 });
+        return;
+      }
+    }
     if (!email) return;
     const { rows: [u] } = await pool.query('SELECT email, email_opt_in FROM users WHERE id = $1 AND banned_at IS NULL', [userId]);
     if (!u || !u.email_opt_in) return;
     sendMail(u.email, text.length > 70 ? 'News from PhatFrats' : text, `${text}\n\nOpen PhatFrats: ${SITE_URL}${link || ''}\n\nTo stop these emails, open your profile on PhatFrats and switch off email updates.`)
       .catch((err) => console.error('Notification email failed:', err.message));
   }
+
+  // A text: the message, a link back, and the opt-out line carriers require.
+  const smsBody = (text, link) => `PhatFrats: ${text}${link ? ` ${SITE_URL}${link}` : ''} Reply STOP to opt out.`;
+  // " (Saturday, November 14, 9:00 PM)" for a party row with day and start_time.
+  const whenOf = (r) => (r.day ? ` (${partyList.dayLabel(r.day).long}, ${r.start_time})` : '');
 
   // ---------- passes as rewards ----------
   // Extends someone's Full Access through a date. Never shortens a pass, and never touches a pass with no end.
@@ -217,17 +232,17 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     // A leader's answer reaches the student's bell (and inbox) right away.
     app.post('/api/chapter/requests/:id', (req, res, next) => {
       if (req.body?.status === 'approved' || req.body?.status === 'waitlist') after(res, async () => {
-        const { rows: [r] } = await pool.query(`SELECT r.user_id, hp.title, hp.chapter_id FROM invite_requests r JOIN hosted_parties hp ON 'h' || hp.id = r.party_id WHERE r.id = $1`, [req.params.id]);
+        const { rows: [r] } = await pool.query(`SELECT r.user_id, r.party_id, hp.title, hp.chapter_id, to_char(hp.party_date, 'YYYY-MM-DD') AS day, hp.start_time FROM invite_requests r JOIN hosted_parties hp ON 'h' || hp.id = r.party_id WHERE r.id = $1`, [req.params.id]);
         if (!r) return;
-        if (req.body.status === 'approved') await notify(r.user_id, 'approved', `✅ You're on the list for ${r.title} at ${chapterName(r.chapter_id)}!`, { link: '/#parties' });
-        else await notify(r.user_id, 'waitlist', `${chapterName(r.chapter_id)} waitlisted you for ${r.title}. It's packed, but spots open up.`, { email: false });
+        if (req.body.status === 'approved') await notify(r.user_id, 'approved', `✅ You're on the list for ${r.title} at ${chapterName(r.chapter_id)}${whenOf(r)}! Bring your PSU ID.`, { link: '/?party=' + r.party_id, sms: true });
+        else await notify(r.user_id, 'waitlist', `${chapterName(r.chapter_id)} waitlisted you for ${r.title}${whenOf(r)}. It's packed, but spots open up.`, { email: false, link: '/?party=' + r.party_id, sms: true });
       });
       next();
     });
     app.post('/api/chapter/guests/:id', (req, res, next) => {
       if (req.body?.status === 'approved') after(res, async () => {
         const { rows: [g] } = await pool.query('SELECT g.sponsor_id, g.name, hp.title FROM outside_guests g JOIN hosted_parties hp ON hp.id = g.party_id WHERE g.id = $1', [req.params.id]);
-        if (g) await notify(g.sponsor_id, 'guest', `Your guest ${g.name} is on the list for ${g.title}.`, { email: false });
+        if (g) await notify(g.sponsor_id, 'guest', `Your guest ${g.name} is on the list for ${g.title}.`, { email: false, sms: true });
       });
       next();
     });
@@ -235,7 +250,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
       after(res, async () => {
         const { rows: [u] } = await pool.query('SELECT id FROM users WHERE email = $1', [String(req.body?.email || '').trim().toLowerCase()]);
         const party = await partyList.findParty(pool, 'h' + String(req.body?.partyId || '').replace(/^h/, ''), { includeTest: true, includePrivate: true });
-        if (u && party) await notify(u.id, 'invited', `💌 ${req.user.name.split(' ')[0]} invited you to ${party.title}. You're on the list!`, { email: false });
+        if (u && party) await notify(u.id, 'invited', `💌 ${req.user.name.split(' ')[0]} invited you to ${party.title} (${partyList.dayLabel(party.day).long}, ${party.time}). You're on the list! Bring your PSU ID.`, { email: false, link: '/?party=' + party.id, sms: true });
       });
       next();
     });

@@ -8,6 +8,7 @@ const IDENTITY = require('./data/chapter-identity.js');
 const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
 const partyList = require('./party-list.js');
 const { TERMS_VERSION } = require('./terms.js');
+const sms = require('./sms.js');
 
 const chapterById = new Map(CHAPTERS.map((c) => [c.id, c]));
 const VIBES = ['neon', 'theme', 'day', 'chill', 'formal', 'charity'];
@@ -480,6 +481,11 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
        ON CONFLICT (user_id, party_id) DO UPDATE SET status = 'approved', invited_by = EXCLUDED.invited_by`,
       [email, 'h' + partyId, req.user.id]
     );
+    // Someone with a confirmed phone gets the invite by text instead (see the 'invited' note in community.js).
+    const { rows: [textable] } = await pool.query(
+      'SELECT 1 FROM users WHERE email = $1 AND phone_verified_at IS NOT NULL AND sms_opt_in AND banned_at IS NULL', [email]
+    );
+    if (textable && sms.enabled()) return res.status(201).json({ ok: true, emailed: false, texted: true });
     let emailed = true;
     try {
       await sendInviteEmail({ to: email, brother: req.user.name, chapter: chapterById.get(req.member.chapter_id), party });

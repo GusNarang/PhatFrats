@@ -128,8 +128,13 @@ const publicUser = (u) => ({
   bonusInvites: u.bonus_invites || 0,
 });
 // Party details only ever leave the server for a logged-in account with a confirmed email.
+// The account's phone and text settings, added to its payload. The full number is only ever shown to its owner.
+async function phoneInfo(userId) {
+  const { rows: [p] } = await pool.query('SELECT phone, phone_verified_at, sms_opt_in FROM users WHERE id = $1', [userId]);
+  return { phone: sms.pretty(p?.phone), phoneVerified: !!p?.phone_verified_at, texts: !!p?.sms_opt_in, textsReady: sms.enabled() };
+}
 async function accountPayload(user) {
-  if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [], checkout: payments.enabled() };
+  if (!user.email_verified_at) return { user: { ...publicUser(user), ...(await phoneInfo(user.id)) }, requests: [], parties: [], days: [], checkout: payments.enabled() };
   const requests = await listRequests(user);
   const s = await ops.settings();
   let { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo, viewerId: user.id });
@@ -152,7 +157,7 @@ async function accountPayload(user) {
   // Ticketed events: price, cause and tickets left, only while ticketing is on and the chapter can take payments.
   const ticketInfo = await tickets.publicInfo(parties.map((p) => p.id));
   parties.forEach((p) => { const t = ticketInfo.get(p.id); if (t) Object.assign(p, t); });
-  return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days, early, saved: saved.map((r) => r.party_id) };
+  return { user: { ...publicUser(user), ...(await phoneInfo(user.id)) }, requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days, early, saved: saved.map((r) => r.party_id) };
 }
 
 // ---------- email confirmation codes ----------
@@ -304,8 +309,12 @@ app.use(express.json({ limit: '10kb' }));
 const ops = require('./ops.js').create({ pool, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 ops.mountActivity(app);
 ops.mountAdminLog(app);
+// Texts: invite details and confirmations go to a confirmed phone by text (sms.js).
+const sms = require('./sms.js');
+const smsBox = sms.create({ pool });
 // Saved parties, the bell, badges, referrals, groups, the Door Rush prize, reports and the contact form.
 const community = require('./community.js').create({
+  smsBox,
   pool, wrap: (fn) => (req, res, next) => fn(req, res, next).catch(next), fail: (res, status, error, code) => res.status(status).json({ error, code }),
   requireUser: (req, res, next) => requireUser(req, res, next),
   mailer, IS_PROD, ops, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')],
@@ -370,12 +379,16 @@ app.post('/api/signup', authLimiter, wrap(async (req, res) => {
     return fail(res, 400, 'Use a password with at least 8 characters.');
   }
   if (req.body?.agree !== true) return fail(res, 400, 'Tick the box to agree to the terms and party disclaimer.', 'TERMS');
+  // Invite details and confirmations come by text, so every account gives a mobile number and agrees to texts.
+  const phone = sms.normalize(req.body?.phone);
+  if (!phone) return fail(res, 400, 'Add your US mobile number, like (814) 555-0123, so we can text you your invites.', 'PHONE');
+  if (req.body?.smsConsent !== true) return fail(res, 400, 'Tick the box to get your invite details and confirmations by text.', 'SMS_CONSENT');
   const passwordHash = await hashPassword(password);
   // New accounts are always free. Only a confirmed payment may set plan = 'full'.
   const { rows } = await pool.query(
-    `INSERT INTO users (email, name, password_hash, terms_version, terms_at) VALUES ($1, $2, $3, $4, now())
+    `INSERT INTO users (email, name, password_hash, terms_version, terms_at, phone, sms_opt_in, sms_consent_at) VALUES ($1, $2, $3, $4, now(), $5, TRUE, now())
      ON CONFLICT (email) DO NOTHING RETURNING id, name, email, plan, email_verified_at, role`,
-    [email, name, passwordHash, require('./terms.js').TERMS_VERSION]
+    [email, name, passwordHash, require('./terms.js').TERMS_VERSION, phone]
   );
   if (!rows[0]) return fail(res, 409, 'That email already has an account. Log in instead.', 'EMAIL_TAKEN');
   await startSession(res, rows[0].id);
@@ -499,6 +512,74 @@ app.post('/api/verify/resend', authLimiter, requireUser, wrap(async (req, res) =
   if (codeStatus === 'throttled') return fail(res, 429, 'A code just went out. Check your spam folder, or wait a minute before asking for another.', 'CODE_THROTTLED');
   if (codeStatus === 'failed') return fail(res, 502, "We couldn't send your code just now. Try again in a moment.", 'CODE_NOT_SENT');
   res.json({ codeStatus });
+}));
+
+// ---------- phone numbers ----------
+// Sets (or changes) the account's mobile number and texts it a 6-digit code. Changing it un-confirms the old one.
+async function sendPhoneCode(user, phone) {
+  if (!sms.enabled()) return 'unavailable';
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  const { rows } = await pool.query(
+    `INSERT INTO phone_codes (user_id, phone, code_hash, expires_at) VALUES ($1, $2, $3, now() + make_interval(mins => $4))
+     ON CONFLICT (user_id) DO UPDATE SET phone = EXCLUDED.phone, code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0, last_sent_at = now(),
+       sent_in_window = CASE WHEN phone_codes.window_started_at < now() - interval '1 hour' THEN 1 ELSE phone_codes.sent_in_window + 1 END,
+       window_started_at = CASE WHEN phone_codes.window_started_at < now() - interval '1 hour' THEN now() ELSE phone_codes.window_started_at END
+     WHERE phone_codes.last_sent_at < now() - interval '1 minute'
+       AND (phone_codes.window_started_at < now() - interval '1 hour' OR phone_codes.sent_in_window < $5)
+     RETURNING user_id`,
+    [user.id, phone, hashCode(user.id, 'phone:' + phone + ':' + code), CODE_MINUTES, CODES_PER_HOUR]
+  );
+  if (!rows[0]) return 'throttled';
+  try {
+    await sms.sendNow(phone, `PhatFrats: your code is ${code}. It expires in ${CODE_MINUTES} minutes. Reply STOP to opt out.`);
+    return 'sent';
+  } catch (err) {
+    console.error('Phone code text failed:', err.message);
+    await pool.query("UPDATE phone_codes SET last_sent_at = now() - interval '2 minutes' WHERE user_id = $1", [user.id]);
+    return 'failed';
+  }
+}
+const PHONE_MSG = { throttled: 'A code just went out. Wait a minute before asking for another.', failed: "We couldn't text that number just now. Check it and try again.", unavailable: "Texts aren't switched on yet, so we'll keep emailing you for now." };
+app.post('/api/phone', authLimiter, ...requireVerified, wrap(async (req, res) => {
+  const phone = sms.normalize(req.body?.phone);
+  if (!phone) return fail(res, 400, 'Enter a US mobile number, like (814) 555-0123.', 'PHONE');
+  if (req.body?.smsConsent !== true) return fail(res, 400, 'Tick the box to get your invite details and confirmations by text.', 'SMS_CONSENT');
+  const { rows: [taken] } = await pool.query('SELECT 1 FROM users WHERE phone = $1 AND phone_verified_at IS NOT NULL AND id <> $2', [phone, req.user.id]);
+  if (taken) return fail(res, 409, 'That number is already confirmed on another PhatFrats account.', 'PHONE_TAKEN');
+  const { rows: [cur] } = await pool.query('SELECT phone, phone_verified_at FROM users WHERE id = $1', [req.user.id]);
+  if (cur.phone !== phone || !cur.phone_verified_at) {
+    await pool.query('UPDATE users SET phone = $2, phone_verified_at = NULL, sms_opt_in = TRUE, sms_consent_at = now() WHERE id = $1', [req.user.id, phone]);
+  }
+  if (cur.phone === phone && cur.phone_verified_at) return res.json({ codeStatus: 'verified', ...(await phoneInfo(req.user.id)) });
+  const codeStatus = await sendPhoneCode(req.user, phone);
+  if (codeStatus === 'throttled') return fail(res, 429, PHONE_MSG.throttled, 'CODE_THROTTLED');
+  if (codeStatus === 'failed') return fail(res, 502, PHONE_MSG.failed, 'CODE_NOT_SENT');
+  res.json({ codeStatus, ...(await phoneInfo(req.user.id)) });
+}));
+app.post('/api/phone/verify', authLimiter, ...requireVerified, wrap(async (req, res) => {
+  const code = typeof req.body?.code === 'string' ? req.body.code.replace(/\D/g, '') : '';
+  if (code.length !== 6) return fail(res, 400, 'Enter the 6-digit code we texted you.');
+  const { rows: [c] } = await pool.query(
+    `UPDATE phone_codes SET attempts = attempts + 1 WHERE user_id = $1 AND expires_at > now() AND attempts < $2 RETURNING phone, code_hash`,
+    [req.user.id, CODE_MAX_ATTEMPTS]
+  );
+  if (!c) return fail(res, 400, 'That code has expired or had too many tries. Text yourself a new one.', 'CODE_EXPIRED');
+  const ok = crypto.timingSafeEqual(Buffer.from(c.code_hash), Buffer.from(hashCode(req.user.id, 'phone:' + c.phone + ':' + code)));
+  if (!ok) return fail(res, 400, "That code doesn't match. Check your texts and try again.", 'CODE_WRONG');
+  try {
+    await pool.query('UPDATE users SET phone = $2, phone_verified_at = now(), sms_opt_in = TRUE WHERE id = $1', [req.user.id, c.phone]);
+  } catch (err) {
+    if (err.code === '23505') return fail(res, 409, 'That number is already confirmed on another PhatFrats account.', 'PHONE_TAKEN');
+    throw err;
+  }
+  await pool.query('DELETE FROM phone_codes WHERE user_id = $1', [req.user.id]);
+  res.json(await phoneInfo(req.user.id));
+}));
+// Texts on or off. Off means invite details and confirmations come by email instead.
+app.post('/api/phone/texts', ...requireVerified, wrap(async (req, res) => {
+  const on = req.body?.on !== false;
+  await pool.query('UPDATE users SET sms_opt_in = $2, sms_consent_at = CASE WHEN $2 THEN now() ELSE sms_consent_at END WHERE id = $1', [req.user.id, on]);
+  res.json(await phoneInfo(req.user.id));
 }));
 
 app.post('/api/logout', wrap(async (req, res) => {
@@ -669,7 +750,10 @@ const hitLimiter = rateLimit({
   windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false,
   keyGenerator: (req) => (typeof req.body?.v === 'string' ? 'v:' + req.body.v.slice(0, 40) : 'ip:' + ipKeyGenerator(req.ip)),
 });
+// Texts that couldn't go out right away (a big sorority invite, a retry) are sent from here, at most every 30 seconds.
+let lastDrain = 0;
 app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
+  if (Date.now() - lastDrain > 30000) { lastDrain = Date.now(); smsBox.drain({ max: 30, ms: 4000 }).catch((err) => console.error('Text outbox failed:', err.message)); }
   const visitor = typeof req.body?.v === 'string' && /^[a-z0-9]{8,40}$/.test(req.body.v) ? req.body.v : null;
   if (visitor) {
     // A page view counts once; pings from an open page only keep the live radar current.

@@ -118,11 +118,15 @@
       <b>Saved parties</b>
       <div style="margin:6px 0 14px">${saved.length ? saved.map((x) => `<div class="pf-note">${esc(x.title)} <small>${esc(S().whenText(x))}</small> <button class="btn small" type="button" data-open-party="${esc(x.id)}">Open</button></div>`).join('') : '<p class="muted" style="margin:0">Tap ♡ on a party to save it. You\'ll get an alert when it starts filling up.</p>'}</div>
       <b>Settings</b>
-      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="pfEmailOpt" ${p.emailUpdates ? 'checked' : ''}> Email me when I'm on a list, win a prize, or the Weekend Drop goes live</label>
+      <div class="pf-note" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>📱 ${st.user.phone ? esc(st.user.phone) + (st.user.phoneVerified ? ' <small>Confirmed</small>' : ' <small>Not confirmed yet</small>') : 'No phone number yet'}</span><button class="btn ghost small" type="button" data-ph-open>${st.user.phoneVerified ? 'Change' : st.user.phone ? 'Confirm' : 'Add'}</button></div>
+      ${st.user.phoneVerified ? `<label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin-bottom:8px"><input type="checkbox" id="pfTextOpt" ${st.user.texts ? 'checked' : ''}> Text me my invite details and confirmations (instead of email)</label>` : ''}
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="pfEmailOpt" ${p.emailUpdates ? 'checked' : ''}> Email me news: prizes, followed houses and the Weekend Drop${st.user.phoneVerified && st.user.texts ? '' : ', plus my invites until my phone is confirmed'}</label>
       <p style="margin:14px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost small" type="button" data-welcome>🎁 Free Full Access and Door Rush rules</button><button class="btn ghost small" type="button" data-guide>📖 Site guide</button></p>
       <p style="margin:14px 0 0;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span class="plan-badge${st.user.plan === 'full' ? ' full' : ''}">${st.user.trial ? 'Free weekend' : st.user.plan === 'full' ? 'Full Access' : 'Free plan'}</span><button class="btn ghost small" type="button" data-logout>Log out</button></p>
       ${installHint()}`;
     document.body.appendChild(panel);
+    const textOpt = panel.querySelector('#pfTextOpt');
+    if (textOpt) textOpt.addEventListener('change', (e) => S().api('/api/phone/texts', { on: e.target.checked }).then((r) => { Object.assign(st.user, { texts: r.texts }); S().toast(e.target.checked ? 'Invite texts on.' : 'Invite texts off. They come by email instead.'); }).catch((err) => S().toast(err.message)));
     panel.querySelector('#pfEmailOpt').addEventListener('change', (e) => S().api('/api/profile/email', { on: e.target.checked }).then(() => S().toast(e.target.checked ? 'Email updates on.' : 'Email updates off.')).catch((err) => S().toast(err.message)));
   }
 

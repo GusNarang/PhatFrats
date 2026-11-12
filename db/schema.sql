@@ -555,3 +555,39 @@ CREATE TABLE IF NOT EXISTS chapter_rsvps (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (party_id, user_id)
 );
+
+-- ---------- Texts ----------
+-- Every account gives a US mobile number at sign-up and agrees to texts about its invites and tickets.
+-- Once the number is confirmed with a texted code, invite details and confirmations go by text instead of email.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sms_opt_in BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sms_consent_at TIMESTAMPTZ;
+-- One confirmed account per phone number.
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_verified_idx ON users (phone) WHERE phone_verified_at IS NOT NULL;
+-- Codes that confirm a phone number. Same shape as email_codes, plus the number being confirmed.
+CREATE TABLE IF NOT EXISTS phone_codes (
+  user_id           BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  phone             TEXT NOT NULL,
+  code_hash         TEXT NOT NULL,
+  expires_at        TIMESTAMPTZ NOT NULL,
+  attempts          SMALLINT NOT NULL DEFAULT 0,
+  last_sent_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_in_window    SMALLINT NOT NULL DEFAULT 1
+);
+-- Texts waiting to go out (see sms.js). Sent rows are kept a week for troubleshooting, then cleared.
+CREATE TABLE IF NOT EXISTS sms_outbox (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  phone      TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT '',
+  attempts   SMALLINT NOT NULL DEFAULT 0,
+  claimed_at TIMESTAMPTZ,
+  sent_at    TIMESTAMPTZ,
+  failed_at  TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sms_outbox_waiting_idx ON sms_outbox (id) WHERE sent_at IS NULL AND failed_at IS NULL;

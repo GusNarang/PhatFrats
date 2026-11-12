@@ -979,7 +979,7 @@ textarea{min-height:96px;resize:vertical}
       if(!email) throw new Error("Enter their Penn State email.");
       const r = await api("/api/chapter/invites", {partyId:$("#invParty").value, email});
       $("#invEmail").value = "";
-      say($("#inviteMsg"), r.emailed ? "Invite sent to "+email+"." : "Invite saved for "+email+", but the email didn't send. Let them know yourself.", "ok");
+      say($("#inviteMsg"), r.texted ? "Invite sent to "+email+". They'll get it by text." : r.emailed ? "Invite sent to "+email+"." : "Invite saved for "+email+", but the email didn't send. Let them know yourself.", "ok");
       burst(30);
       await load();
       $("#invEmail").focus();
