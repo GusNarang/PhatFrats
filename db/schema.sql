@@ -520,3 +520,25 @@ CREATE TABLE IF NOT EXISTS sorority_invites (
 CREATE INDEX IF NOT EXISTS sorority_invites_sorority_idx ON sorority_invites(sorority_id);
 -- Which sorority invite put a sister on a party's list, so turning the invite down takes her spot back off.
 ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS via_sorority INTEGER;
+
+-- Each sorority's page, set by its chairs: tagline, story, colors, a house emoji and a pinned note to sisters.
+CREATE TABLE IF NOT EXISTS sorority_profiles (
+  sorority_id     INTEGER PRIMARY KEY,
+  tagline         TEXT NOT NULL DEFAULT '',
+  about           TEXT NOT NULL DEFAULT '',
+  color1          TEXT,
+  color2          TEXT,
+  emoji           TEXT,
+  announcement    TEXT NOT NULL DEFAULT '',
+  announcement_at TIMESTAMPTZ,
+  announcement_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  updated_by      BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Sisters tapping "I'm going" on a frat invite, so the house can see who's in.
+CREATE TABLE IF NOT EXISTS sorority_rsvps (
+  invite_id  BIGINT NOT NULL REFERENCES sorority_invites(id) ON DELETE CASCADE,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (invite_id, user_id)
+);

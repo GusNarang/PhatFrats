@@ -5,6 +5,9 @@
 const SORORITIES = require('./public/sororities.js');
 const partyList = require('./party-list.js');
 const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
+const IDENTITY = require('./data/sorority-identity.js');
+// The house emojis chairs can pick for their page. It floats in the banner and rains down with the confetti.
+const EMOJIS = ['💗', '🎀', '🌸', '🌹', '🌷', '🦋', '✨', '💎', '👑', '🕊️', '🦁', '🦉', '⚓', '🔑', '🌙', '⭐', '🐢', '🐼', '🐬', '🏹', '🪁', '🐚', '🌻', '🍒'];
 
 const sororityById = new Map(SORORITIES.map((s) => [s.id, s]));
 const chapterById = new Map(CHAPTERS.map((c) => [c.id, c]));
@@ -62,8 +65,23 @@ function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, h
       [sororityId, partyId, userId]
     );
   }
+  // The sorority's look: national colors and facts, plus whatever its chairs customized.
+  async function identity(sid) {
+    const base = IDENTITY[sid] || { colors: [] };
+    const { rows: [p] } = await pool.query(
+      `SELECT sp.*, u.name AS announcement_name FROM sorority_profiles sp LEFT JOIN users u ON u.id = sp.announcement_by WHERE sp.sorority_id = $1`, [sid]
+    );
+    const custom = !!(p && p.color1 && p.color2);
+    return {
+      colors: base.colors, kind: base.kind || 'Sorority', founded: base.founded || null, flower: base.flower || '', symbol: base.symbol || '',
+      theme: custom ? [p.color1, p.color2] : base.colors.map((c) => c.hex), customColors: custom,
+      tagline: p?.tagline || '', about: p?.about || '', emoji: p?.emoji || '',
+      announcement: p?.announcement ? { text: p.announcement, at: p.announcement_at, by: p.announcement_name || 'A chair' } : null,
+    };
+  }
+
   // A sorority's upcoming invites, with the party and how many sisters are on its list so far.
-  async function invitesFor(sororityId) {
+  async function invitesFor(sororityId, userId = null) {
     const { rows } = await pool.query(
       `SELECT si.id, si.status, si.note, si.created_at, 'h' || hp.id AS party_id, hp.title, hp.chapter_id, hp.vibe, hp.start_time,
          to_char(hp.party_date, 'YYYY-MM-DD') AS day, hp.invite_only, u.name AS by_name,
@@ -73,7 +91,17 @@ function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, h
        ORDER BY hp.party_date, hp.id`,
       [sororityId, partyList.todayISO()]
     );
+    // Who tapped "I'm going" on each invite (current sisters only).
+    const { rows: going } = rows.length ? await pool.query(
+      `SELECT v.invite_id, v.user_id, u.name FROM sorority_rsvps v JOIN users u ON u.id = v.user_id
+       JOIN sorority_members m ON m.user_id = v.user_id AND m.sorority_id = $2
+       WHERE v.invite_id = ANY($1::bigint[]) ORDER BY v.created_at`,
+      [rows.map((r) => r.id), sororityId]
+    ) : { rows: [] };
+    const goingFor = (id) => going.filter((g) => String(g.invite_id) === String(id));
     return rows.map((r) => ({
+      going: goingFor(r.id).length, goingMe: goingFor(r.id).some((g) => String(g.user_id) === String(userId)),
+      goingNames: goingFor(r.id).slice(0, 12).map((g) => g.name.split(' ')[0]),
       id: String(r.id), status: r.status, note: r.note, sent: r.created_at, partyId: r.party_id, title: r.title,
       chapter: chapterById.get(r.chapter_id)?.name || 'A chapter', gl: chapterById.get(r.chapter_id)?.gl || '',
       day: r.day, dayText: partyList.dayLabel(r.day).long, time: r.start_time, vibe: r.vibe, inviteOnly: r.invite_only,
@@ -104,7 +132,9 @@ function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, h
       res.json({
         me, sororities,
         membership: { sorority: sororities.find((s) => s.id === sid), role: member.role, adminView: !!member.admin },
-        invites: await invitesFor(sid),
+        invites: await invitesFor(sid, req.user.id),
+        identity: await identity(sid),
+        emojis: EMOJIS,
         sisters: sisters.map((s) => ({
           id: String(s.id), name: s.name, role: s.role, joined: s.joined_at, you: String(s.id) === String(req.user.id),
           ...(chair ? { email: s.email } : {}),
@@ -147,7 +177,58 @@ function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, h
       if (req.sister.admin) return fail(res, 400, "You're viewing this sorority as the admin, so there's nothing to leave.");
       await pool.query('DELETE FROM sorority_members WHERE user_id = $1', [req.user.id]);
       await dropSpots(req.sister.sorority_id, { userId: req.user.id });
+      await pool.query('DELETE FROM sorority_rsvps WHERE user_id = $1', [req.user.id]);
       res.json({ ok: true });
+    }));
+
+    // Sisters tap "I'm going" (or take it back) on one of their sorority's invites.
+    app.post('/api/sorority/invites/:id/rsvp', ...requireSister, wrap(async (req, res) => {
+      const id = idParam(req.params.id);
+      if (!id) return fail(res, 400, 'That invite id is not valid.');
+      if (req.sister.admin) return fail(res, 400, "You're viewing this sorority as the admin, so you can't RSVP.");
+      const { rows: [inv] } = await pool.query(
+        `SELECT si.status FROM sorority_invites si JOIN hosted_parties hp ON hp.id = si.party_id
+         WHERE si.id = $1 AND si.sorority_id = $2 AND hp.status = 'live' AND hp.party_date >= $3::date`,
+        [id, req.sister.sorority_id, partyList.todayISO()]
+      );
+      if (!inv) return fail(res, 404, "That invite isn't one of your sorority's, or the party is over.");
+      if (inv.status !== 'active') return fail(res, 400, 'Your chairs turned this invite down.', 'DECLINED');
+      if (req.body?.going === false) await pool.query('DELETE FROM sorority_rsvps WHERE invite_id = $1 AND user_id = $2', [id, req.user.id]);
+      else await pool.query('INSERT INTO sorority_rsvps (invite_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, req.user.id]);
+      const { rows: [n] } = await pool.query('SELECT count(*)::int AS n FROM sorority_rsvps WHERE invite_id = $1', [id]);
+      res.json({ ok: true, going: n.n });
+    }));
+
+    // Chairs make the page their own: tagline, story, colors, house emoji and a note pinned for every sister.
+    app.post('/api/sorority/profile', ...requireChair, wrap(async (req, res) => {
+      const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+      const hex = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null);
+      const reset = req.body?.resetColors === true;
+      const c1 = reset ? null : hex(req.body?.color1), c2 = reset ? null : hex(req.body?.color2);
+      if (!reset && (req.body?.color1 || req.body?.color2) && (!c1 || !c2)) return fail(res, 400, 'Pick both colors.');
+      const emoji = EMOJIS.includes(req.body?.emoji) ? req.body.emoji : null;
+      const sid = req.sister.sorority_id;
+      const { rows: [old] } = await pool.query('SELECT announcement FROM sorority_profiles WHERE sorority_id = $1', [sid]);
+      const note = req.body?.announcement === undefined ? (old?.announcement || '') : str(req.body.announcement, 240);
+      const noteChanged = note !== (old?.announcement || '');
+      await pool.query(
+        `INSERT INTO sorority_profiles (sorority_id, tagline, about, color1, color2, emoji, announcement, announcement_at, announcement_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 = '' THEN NULL ELSE now() END, CASE WHEN $7 = '' THEN NULL ELSE $8::bigint END, $8)
+         ON CONFLICT (sorority_id) DO UPDATE SET tagline = EXCLUDED.tagline, about = EXCLUDED.about, color1 = EXCLUDED.color1,
+           color2 = EXCLUDED.color2, emoji = EXCLUDED.emoji, updated_by = EXCLUDED.updated_by, updated_at = now(),
+           announcement = EXCLUDED.announcement,
+           announcement_at = CASE WHEN $9 THEN EXCLUDED.announcement_at ELSE sorority_profiles.announcement_at END,
+           announcement_by = CASE WHEN $9 THEN EXCLUDED.announcement_by ELSE sorority_profiles.announcement_by END`,
+        [sid, str(req.body?.tagline, 90), str(req.body?.about, 700), c1, c2, emoji, note, req.user.id, noteChanged]
+      );
+      // A new pinned note pings every sister's bell.
+      if (noteChanged && note) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, kind, text, link) SELECT user_id, 'sorority', $2, '/sororities' FROM sorority_members WHERE sorority_id = $1 AND user_id <> $3`,
+          [sid, ('📣 ' + (sororityById.get(sid)?.gl || '') + ': ' + note).slice(0, 240), req.user.id]
+        );
+      }
+      res.json({ identity: await identity(sid) });
     }));
 
     // Chairs turn a frat's invite down for the whole house, or take it back.
@@ -184,6 +265,7 @@ function create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, h
       const { rowCount } = await pool.query('DELETE FROM sorority_members WHERE user_id = $1 AND sorority_id = $2', [id, req.sister.sorority_id]);
       if (!rowCount) return fail(res, 404, "That person isn't in your sorority.");
       await dropSpots(req.sister.sorority_id, { userId: id });
+      await pool.query('DELETE FROM sorority_rsvps WHERE user_id = $1', [id]);
       res.json({ ok: true });
     }));
 
