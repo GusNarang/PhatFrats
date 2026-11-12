@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhatFrats for Sororities</title>
+<meta name="description" content="Get your sorority on the list: frat invites to your whole sorority, in one place.">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+<meta name="theme-color" content="#0b1026">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --night:#0b1026; --night-2:#131b40; --night-3:#1b2556;
+  --ink:#f5f2ff; --muted:#b4b9e0; --line:rgba(190,200,255,.18);
+  --pink:#ff3fa4; --cyan:#35e0ff; --gold:#ffd23f; --lime:#9dff4a; --violet:#b48cff; --orange:#ff8a3d; --red:#ff5d6c;
+  --display:"Bungee","Impact","Arial Black",sans-serif;
+  --body:"Bricolage Grotesque",system-ui,sans-serif;
+  --mono:"DM Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--night);color:var(--ink);font:17px/1.55 var(--body);min-height:100vh}
+a{color:var(--cyan)}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 72px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.logo{font:400 22px var(--display);color:var(--ink);text-decoration:none}
+.logo span{color:var(--gold)}
+h1{font:400 clamp(28px,6vw,44px)/1.05 var(--display);margin:0 0 8px;color:var(--gold);text-shadow:3px 3px 0 var(--pink)}
+h2{font:400 20px var(--display);margin:0 0 14px}
+h3{font-size:19px;margin:0 0 4px}
+.lead{font-size:19px;color:var(--muted);margin:0 0 20px;max-width:60ch}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.card{background:var(--night-2);border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:16px}
+.btn{font:700 16px var(--body);border-radius:999px;border:2px solid var(--line);background:var(--night-3);color:var(--ink);padding:11px 20px;min-height:46px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{border-color:var(--cyan)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--night)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.good{border-color:rgba(157,255,74,.6);color:#e2ffc9}
+.btn.danger{border-color:rgba(255,93,108,.6);color:#ffd0d5}
+.btn.slim{min-height:40px;padding:7px 14px;font-size:15px}
+.btn:disabled{opacity:.55;cursor:default}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+label{display:block;font-weight:700;margin:0 0 6px}
+.hint{display:block;font-weight:400;color:var(--muted);font-size:14px;margin-top:2px}
+input,select,textarea{width:100%;font:17px var(--body);background:var(--night);color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:11px 14px;min-height:48px}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan);outline:none}
+textarea{min-height:96px;resize:vertical}
+.field{margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+@media (max-width:620px){.grid2{grid-template-columns:1fr}}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:0 0 20px;padding:0;list-style:none;counter-reset:s}
+.steps li{background:var(--night-2);border:1px solid var(--line);border-radius:16px;padding:16px;counter-increment:s}
+.steps li::before{content:counter(s);display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--pink);color:#fff;font:400 16px var(--display);margin-bottom:8px}
+.chapter-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+/* Each chapter's page takes its own colors: --ch1 and --ch2 are its colors darkened for the banner,
+   --acc is a bright version for text and outlines on the dark page. */
+#viewChapter{--ch1:#3a1d6e;--ch2:#123a5c;--acc:var(--cyan)}
+#viewChapter h2{color:var(--acc)}
+.ch-hero{position:relative;overflow:hidden;border-radius:22px;padding:24px 22px 20px;margin-bottom:14px;background:linear-gradient(135deg,var(--ch1),var(--ch2));border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px -20px var(--acc)}
+.ch-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 20%,rgba(255,255,255,.16) 0 2px,transparent 3px) 0 0/28px 28px,linear-gradient(180deg,transparent 40%,rgba(11,16,38,.55));pointer-events:none}
+.ch-hero > *{position:relative}
+.ch-watermark{position:absolute!important;right:-10px;bottom:-34px;font:400 clamp(110px,26vw,210px)/1 var(--display);color:rgba(255,255,255,.09);letter-spacing:-.02em;pointer-events:none;white-space:nowrap}
+.ch-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ch-kind{font:500 12px var(--mono);text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,.85)}
+.ch-hero .gl{font-size:clamp(42px,9vw,66px);color:#fff;text-shadow:3px 3px 0 rgba(0,0,0,.35)}
+.ch-hero h1{color:#fff;text-shadow:3px 3px 0 rgba(0,0,0,.35);margin:6px 0 4px}
+.ch-tagline{font-size:20px;font-weight:700;margin:0 0 8px;color:#fff}
+.ch-facts{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;color:rgba(255,255,255,.9);font-size:15px}
+.ch-facts a{color:#fff}
+.ch-colors{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.ch-swatch{display:inline-flex;align-items:center;gap:8px;background:rgba(11,16,38,.45);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px 4px 5px;font-size:13px;font-weight:600}
+.ch-swatch i{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.75)}
+.ch-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.ch-stat{background:var(--night-2);border:1px solid var(--line);border-top:4px solid var(--acc);border-radius:14px;padding:12px 14px}
+.ch-stat b{display:block;font:800 30px/1.1 var(--body)}
+.ch-stat span{color:var(--muted);font-size:14px}
+.ch-feature{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;margin-bottom:6px}
+@media(max-width:700px){.ch-feature{grid-template-columns:1fr}}
+.ch-next{border-color:var(--acc);background:linear-gradient(160deg,color-mix(in srgb,var(--acc) 16%,var(--night-2)),var(--night-2))}
+.ch-next .count{font:400 26px var(--display);color:var(--acc)}
+.admin-note{background:rgba(255,210,63,.12);border:1px solid rgba(255,210,63,.5);color:#ffe9a3;border-radius:14px;padding:12px 16px;margin-bottom:14px;font-weight:600}
+.color-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.color-row input[type=color]{width:64px;height:48px;padding:4px;cursor:pointer}
+@media (prefers-reduced-motion:no-preference){.ch-hero{animation:chGlow 6s ease-in-out infinite alternate}@keyframes chGlow{to{box-shadow:0 18px 60px -14px var(--acc)}}}
+.gl{font:400 34px var(--display);color:var(--cyan);line-height:1}
+.badge{display:inline-block;font:500 13px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:4px 10px;border-radius:999px;border:1px solid var(--line)}
+.badge.leader{background:var(--gold);color:var(--night);border-color:var(--gold)}
+.badge.full{background:var(--gold);color:var(--night);border-color:var(--gold)}
+.badge.live{background:rgba(157,255,74,.15);color:var(--lime);border-color:rgba(157,255,74,.4)}
+.badge.cancelled{background:rgba(255,93,108,.15);color:#ffc0c6;border-color:rgba(255,93,108,.4)}
+.badge.past{color:var(--muted)}
+.badge.count{background:var(--pink);color:#fff;border-color:var(--pink);padding:1px 8px;margin-left:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.tabs button{font:700 16px var(--body);background:transparent;border:2px solid transparent;color:var(--muted);border-radius:999px;padding:9px 16px;min-height:44px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--night-3);border-color:var(--acc,var(--cyan));color:var(--ink)}
+.party{border:1px solid var(--line);border-left:6px solid var(--c, var(--cyan));border-radius:14px;padding:16px;margin-bottom:12px;background:var(--night)}
+.party .when{font:500 14px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.party p{margin:6px 0}
+.meter{height:10px;border-radius:999px;background:var(--night-3);overflow:hidden;margin:10px 0 4px}
+.meter i{display:block;height:100%;background:var(--c, var(--cyan))}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:12px 0}
+.row:last-child{border-bottom:0}
+.row .who{min-width:0;flex:1 1 220px}
+.row .who b{display:block;overflow-wrap:anywhere}
+.row .who span{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.note{background:var(--night);border-radius:10px;padding:8px 10px;margin-top:6px;font-size:15px;color:var(--muted)}
+.empty{color:var(--muted);padding:12px 0}
+.notice{border-radius:14px;padding:14px 16px;margin-bottom:16px;font-weight:600}
+.notice.err{background:rgba(255,93,108,.12);border:1px solid rgba(255,93,108,.45);color:#ffd0d5}
+.notice.ok{background:rgba(157,255,74,.1);border:1px solid rgba(157,255,74,.4);color:#e2ffc9}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--night-3);border:2px solid var(--cyan);border-radius:999px;padding:12px 20px;font-weight:700;box-shadow:0 8px 30px rgba(0,0,0,.45);max-width:calc(100% - 32px);text-align:center;z-index:5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.loading{color:var(--muted);padding:40px 0;text-align:center}
+.check-row{display:flex;gap:12px;align-items:flex-start;cursor:pointer;background:var(--night);border:2px solid var(--line);border-radius:12px;padding:12px 14px}
+.check-row input{width:22px;height:22px;min-height:0;margin:2px 0 0;flex:none;accent-color:var(--gold)}
+.badge.guests{background:rgba(53,224,255,.12);color:var(--cyan);border-color:rgba(53,224,255,.4)}
+.badge.outside{background:rgba(180,140,255,.15);color:var(--violet);border-color:rgba(180,140,255,.45)}
+@media (prefers-reduced-motion:no-preference){.btn,.tabs button{transition:border-color .15s,background .15s}}
+</style>
+<style>
+#viewSorority{--ch1:#5c1446;--ch2:#2a1d6e;--acc:var(--pink)}
+#viewSorority h2{color:var(--acc)}
+.badge.chair{background:var(--pink);color:#fff;border-color:var(--pink)}
+.badge.declined{background:rgba(255,93,108,.15);color:#ffc0c6;border-color:rgba(255,93,108,.4)}
+.invite{border:1px solid var(--line);border-left:6px solid var(--c,var(--pink));border-radius:14px;padding:16px;margin-bottom:12px;background:var(--night)}
+.invite.declined{opacity:.7}
+.invite .when{font:500 14px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.invite h3{margin:6px 0 2px}
+.invite p{margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="logo" href="/"><span>Phat</span>Frats</a>
+    <div class="btn-row"><a class="btn slim" href="/frats">For frats</a><a class="btn slim" href="/">Back to the party map</a></div>
+  </div>
+
+  <main id="main">
+    <p class="loading" id="loading">Loading…</p>
+
+    <!-- Not logged in -->
+    <section id="viewLogin" hidden>
+      <h1>For sororities</h1>
+      <p class="lead">When a fraternity invites your sorority to a party, every sister is on the list. No requests, no waiting.</p>
+      <ol class="steps">
+        <li><b>Log in</b><br><span class="muted">Use your own PhatFrats account. Sign up with your Penn State email if you don't have one.</span></li>
+        <li><b>Sign in to your sorority</b><br><span class="muted">Sisters use the sister password from their chair. Chairs use their chair sign-in.</span></li>
+        <li><b>Get the invites</b><br><span class="muted">Frat invites to your sorority show up here and on your party map, with you already on the list.</span></li>
+      </ol>
+      <div class="card">
+        <p style="margin-top:0">Log in on the main site first, then come back to this page.</p>
+        <a class="btn primary" href="/">Log in or sign up</a>
+      </div>
+    </section>
+
+    <!-- Logged in, not in a sorority yet -->
+    <section id="viewJoin" hidden>
+      <h1>Sign in to your sorority</h1>
+      <p class="lead" id="joinHello"></p>
+      <div class="grid2" style="gap:16px;align-items:start">
+        <div class="card" style="margin:0">
+          <h2>Sister sign-in</h2>
+          <p class="muted" style="margin-top:0">For sisters. Every frat invite to your sorority puts you on the list.</p>
+          <form id="joinForm" novalidate>
+            <div id="joinMsg" role="alert"></div>
+            <div class="field"><label for="joinSorority">Your sorority</label><select id="joinSorority" required></select></div>
+            <div class="field"><label for="joinPw">Sister password <span class="hint">Your chair has it.</span></label><input id="joinPw" type="password" autocomplete="off" required></div>
+            <button class="btn primary" type="submit">Sign in as a sister</button>
+          </form>
+        </div>
+        <div class="card" style="margin:0;border-color:rgba(255,63,164,.45)">
+          <h2 style="color:var(--pink)">Chair sign-in</h2>
+          <p class="muted" style="margin-top:0">For presidents and social chairs. See every invite, turn one down for the house, and manage your sisters.</p>
+          <form id="chairForm" novalidate>
+            <div id="chairMsg" role="alert"></div>
+            <div class="field"><label for="chairSorority">Your sorority</label><select id="chairSorority" required></select></div>
+            <div class="field"><label for="chairPw">Chair password <span class="hint">From PhatFrats.</span></label><input id="chairPw" type="password" autocomplete="off" required></div>
+            <button class="btn primary" type="submit">Sign in as chair</button>
+          </form>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Sorority not set up yet?</h3>
+        <p class="muted" style="margin-bottom:0">Chairs can contact PhatFrats from the <a href="/about#contact">About page</a> to get a chair password. Once you're signed in as chair, set the sister password from Settings and share it with your sisters.</p>
+      </div>
+    </section>
+
+    <!-- In a sorority -->
+    <section id="viewSorority" hidden>
+      <div class="admin-note" id="adminNote" hidden>You're viewing this sorority as the PhatFrats admin, with everything a chair can do. Keep the control room open in its own tab while you work here.</div>
+      <header class="ch-hero">
+        <span class="ch-watermark" aria-hidden="true" id="soWater"></span>
+        <div class="ch-top"><span class="ch-kind">Penn State sorority</span><span id="soRole"></span></div>
+        <div class="gl" id="soGl"></div>
+        <h1 id="soName"></h1>
+        <p class="ch-facts" id="soFacts"></p>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="Sorority sections" id="tabs"></div>
+
+      <div role="tabpanel" id="panel-invites" aria-labelledby="tab-invites">
+        <div class="card">
+          <h2>Frat invites</h2>
+          <p class="muted" style="margin-top:0" id="invHint"></p>
+          <div id="inviteList"></div>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-sisters" aria-labelledby="tab-sisters" hidden>
+        <div class="card">
+          <h2>Sisters on PhatFrats</h2>
+          <p class="muted small" style="margin-top:0" id="sisterHint"></p>
+          <div id="sisterList"></div>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
+        <div class="card" id="pwCard" hidden>
+          <h2>Sorority passwords</h2>
+          <p class="muted" style="margin-top:0">The sister password lets sisters join. The chair password signs someone in as a chair, so only share it with people who run the sorority. Changing a password doesn't remove anyone, so also remove people who left from the Sisters tab.</p>
+          <form id="pwForm" novalidate>
+            <div id="pwMsg" role="alert"></div>
+            <div class="field"><label for="pwKind">Which password</label><select id="pwKind"><option value="sister">Sister password</option><option value="chair">Chair password</option></select></div>
+            <div class="field"><label for="newPw">New password <span class="hint">At least 8 characters.</span></label><input id="newPw" type="text" autocomplete="off" minlength="8" required></div>
+            <button class="btn primary" type="submit">Change password</button>
+          </form>
+        </div>
+        <div class="card" id="upgradeCard" hidden>
+          <h2>Chair sign-in</h2>
+          <p class="muted" style="margin-top:0">Running the sorority? Enter the chair password to become a chair.</p>
+          <form id="upgradeForm" novalidate>
+            <div id="upgradeMsg" role="alert"></div>
+            <div class="field"><label for="upgradePw">Chair password</label><input id="upgradePw" type="password" autocomplete="off" required></div>
+            <button class="btn primary" type="submit">Sign in as chair</button>
+          </form>
+        </div>
+        <div class="card" id="leaveCard">
+          <h2>Leave sorority</h2>
+          <p class="muted" style="margin-top:0">You'll stop getting your sorority's frat invites. You can rejoin with the sister password.</p>
+          <button class="btn danger" type="button" id="leaveBtn">Leave sorority</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="/beacon.js" defer></script>
+<script>
+(function(){
+  const $ = (s)=>document.querySelector(s);
+  const esc = (s)=>String(s ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const VIBES = { neon:"var(--pink)", theme:"var(--violet)", day:"var(--gold)", chill:"var(--cyan)", formal:"var(--orange)", charity:"var(--lime)" };
+  const shortDate = (d)=> new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"America/New_York"});
+  let toastTimer;
+  function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true,3500); }
+  const say = (el, msg, kind="err")=>{ el.innerHTML = msg ? '<div class="notice '+kind+'">'+esc(msg)+'</div>' : ""; };
+
+  // The admin opens a sorority from the control room with ?sorority=ID.
+  const q = new URLSearchParams(location.search).get("sorority") || "";
+  const viewAs = /^\d{1,4}$/.test(q) ? q : "";
+  async function api(path, body){
+    let res;
+    const extra = viewAs ? {"X-PF-Sorority": viewAs} : {};
+    try{ res = await fetch(path, body===undefined ? {cache:"no-store", headers:extra} : {method:"POST", headers:{"Content-Type":"application/json", ...extra}, body:JSON.stringify(body)}); }
+    catch(e){ throw new Error("Can't reach PhatFrats. Check your connection and try again."); }
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){ const err = new Error(data.error || "Something went wrong. Try again."); err.status=res.status; err.code=data.code; throw err; }
+    return data;
+  }
+
+  const state = { data:null, tab:"invites" };
+  const chair = ()=> state.data?.membership?.role === "chair";
+  function show(view){
+    $("#loading").hidden = true;
+    for(const v of ["viewLogin","viewJoin","viewSorority"]) $("#"+v).hidden = v!==view;
+  }
+  async function load(){
+    try{ state.data = await api("/api/sorority/me"); }
+    catch(err){
+      if(err.status===401 || err.code==="EMAIL_NOT_VERIFIED"){ show("viewLogin"); return; }
+      $("#loading").textContent = err.message; return;
+    }
+    if(!state.data.membership){ renderJoin(); show("viewJoin"); return; }
+    render(); show("viewSorority");
+  }
+
+  // ---------- joining ----------
+  function renderJoin(){
+    const d = state.data;
+    $("#joinHello").textContent = "Hi "+d.me.name.split(" ")[0]+". Sisters and chairs sign in separately. Pick the one that's you.";
+    const options = (key)=> '<option value="">Choose your sorority</option>' + d.sororities
+      .map(s=>'<option value="'+s.id+'"'+(s[key]?'':' disabled')+'>'+esc(s.gl+"  "+s.name)+(s[key]?'':' (not set up yet)')+'</option>').join("");
+    $("#joinSorority").innerHTML = options("ready");
+    $("#chairSorority").innerHTML = options("chairReady");
+  }
+  function signIn(form, msg, path, sel, pw, done){
+    $(form).addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const btn = $(form+" button"); btn.disabled = true; say($(msg), "");
+      try{
+        const id = sel ? Number($(sel).value) : state.data.membership.sorority.id;
+        if(!id) throw new Error("Pick your sorority.");
+        if(!$(pw).value) throw new Error("Enter the password.");
+        await api(path, {sororityId:id, password:$(pw).value});
+        $(pw).value = ""; toast(done); await load();
+      }catch(err){ say($(msg), err.message); }
+      finally{ btn.disabled = false; }
+    });
+  }
+  signIn("#joinForm", "#joinMsg", "/api/sorority/join", "#joinSorority", "#joinPw", "You're in!");
+  signIn("#chairForm", "#chairMsg", "/api/sorority/chair-login", "#chairSorority", "#chairPw", "Signed in as chair.");
+  signIn("#upgradeForm", "#upgradeMsg", "/api/sorority/chair-login", null, "#upgradePw", "You're now a chair.");
+
+  // ---------- the sorority ----------
+  function render(){
+    const d = state.data, m = d.membership;
+    document.title = m.sorority.name+" · PhatFrats";
+    $("#adminNote").hidden = !m.adminView;
+    $("#soWater").textContent = m.sorority.gl;
+    $("#soGl").textContent = m.sorority.gl;
+    $("#soName").textContent = m.sorority.name;
+    $("#soRole").innerHTML = m.adminView ? '<span class="badge chair">Admin view</span>' : chair() ? '<span class="badge chair">Chair</span>' : '<span class="badge">Sister</span>';
+    const active = d.invites.filter(i=>i.status==="active").length;
+    $("#soFacts").innerHTML = '<span>'+d.sisters.length+' sister'+(d.sisters.length===1?'':'s')+' on PhatFrats</span><span>'+active+' upcoming invite'+(active===1?'':'s')+'</span>';
+    renderTabs(); renderInvites(); renderSisters();
+    $("#pwCard").hidden = !chair();
+    $("#upgradeCard").hidden = chair() || m.adminView;
+    $("#leaveCard").hidden = !!m.adminView;
+  }
+  function renderTabs(){
+    const tabs = [{k:"invites", label:"Frat invites"}, {k:"sisters", label:"Sisters"}, {k:"settings", label:"Settings"}];
+    $("#tabs").innerHTML = tabs.map(t=>'<button type="button" role="tab" id="tab-'+t.k+'" aria-controls="panel-'+t.k+'" aria-selected="'+(t.k===state.tab)+'" tabindex="'+(t.k===state.tab?0:-1)+'" data-tab="'+t.k+'">'+esc(t.label)+'</button>').join("");
+    for(const t of tabs) $("#panel-"+t.k).hidden = t.k!==state.tab;
+  }
+  $("#tabs").addEventListener("click", (e)=>{ const b=e.target.closest("[data-tab]"); if(b){ state.tab=b.dataset.tab; renderTabs(); $("#tab-"+state.tab).focus(); } });
+
+  function renderInvites(){
+    const d = state.data;
+    $("#invHint").textContent = chair()
+      ? "When a fraternity invites your sorority, every sister is on that party's list and sees it on her party map. Turn an invite down and everyone comes off the list."
+      : "When a fraternity invites your sorority, you're on the list. Open the party on the map to see the details. Bring your PSU ID.";
+    $("#inviteList").innerHTML = d.invites.length ? d.invites.map(i=>{
+      const declined = i.status==="declined";
+      const btn = !chair() ? '' : declined
+        ? '<button class="btn slim good" type="button" data-accept="'+i.id+'">Accept again</button>'
+        : '<button class="btn slim danger" type="button" data-decline="'+i.id+'">Turn down for the house</button>';
+      return '<article class="invite'+(declined?' declined':'')+'" style="--c:'+(VIBES[i.vibe]||"var(--pink)")+'">'
+        + '<div class="btn-row" style="justify-content:space-between"><span class="when">'+esc(i.dayText)+' · '+esc(i.time)+'</span>'
+        + (declined ? '<span class="badge declined">Turned down</span>' : '<span class="badge live">You\'re on the list</span>')+'</div>'
+        + '<h3>'+esc(i.title)+'</h3>'
+        + '<p class="muted small">From '+esc(i.gl+' '+i.chapter)+', sent by '+esc(i.by)+' on '+shortDate(i.sent)+(i.inviteOnly?' · <span class="badge guests">🔒 Invite-only</span>':'')+'</p>'
+        + (i.note ? '<div class="note">'+esc(i.note)+'</div>' : '')
+        + '<p class="small muted">'+(declined ? 'Nobody from your sorority is on the list.' : i.onList+' sister'+(i.onList===1?'':'s')+' on the list so far. Sisters are added as they open PhatFrats.')+'</p>'
+        + '<div class="btn-row">'+(declined ? '' : '<a class="btn slim" href="/?party='+esc(i.partyId)+'">See the party</a>')+btn+'</div>'
+        + '</article>';
+    }).join("") : '<p class="empty">No frat invites yet. When a fraternity invites your sorority to a party, it shows up here.</p>';
+  }
+  $("#inviteList").addEventListener("click", async (e)=>{
+    const dec = e.target.closest("[data-decline]"), acc = e.target.closest("[data-accept]");
+    if(!dec && !acc) return;
+    if(dec && !confirm("Turn this invite down for your whole sorority? Every sister comes off this party's list. You can accept it again later.")) return;
+    const b = dec || acc; b.disabled = true;
+    try{
+      await api("/api/sorority/invites/"+(dec ? dec.dataset.decline+"/decline" : acc.dataset.accept+"/accept"), {});
+      toast(dec ? "Invite turned down." : "Invite accepted. Sisters are back on the list.");
+      await load();
+    }catch(err){ toast(err.message); b.disabled = false; }
+  });
+
+  function renderSisters(){
+    $("#sisterHint").textContent = chair()
+      ? "Everyone who joined with the sister password. Make someone a chair so they can manage invites and sisters."
+      : "Everyone in your sorority who's on PhatFrats.";
+    $("#sisterList").innerHTML = state.data.sisters.length ? state.data.sisters.map(s=>{
+      const btns = [];
+      if(chair() && !s.you){
+        btns.push(s.role==="chair"
+          ? '<button class="btn slim" type="button" data-role="sister" data-sid="'+s.id+'">Make sister</button>'
+          : '<button class="btn slim" type="button" data-role="chair" data-sid="'+s.id+'">Make chair</button>');
+        btns.push('<button class="btn slim danger" type="button" data-remove="'+s.id+'">Remove</button>');
+      }
+      return '<div class="row"><div class="who"><b>'+esc(s.name)+(s.you?' (you)':'')+' '+(s.role==="chair"?'<span class="badge chair">Chair</span>':'')+'</b>'
+        + '<span>'+(s.email?esc(s.email)+' · ':'')+'Joined '+shortDate(s.joined)+'</span></div>'
+        + (btns.length ? '<div class="btn-row">'+btns.join("")+'</div>' : '') + '</div>';
+    }).join("") : '<p class="empty">Nobody has joined yet. Share the sister password with your sisters.</p>';
+  }
+  $("#sisterList").addEventListener("click", async (e)=>{
+    const r = e.target.closest("[data-role]"), x = e.target.closest("[data-remove]");
+    if(!r && !x) return;
+    const id = r ? r.dataset.sid : x.dataset.remove, s = state.data.sisters.find(v=>v.id===id);
+    if(x && !confirm("Remove "+s.name+" from the sorority? She comes off every frat invite's list. She can rejoin with the sister password, so change it if she shouldn't.")) return;
+    (r||x).disabled = true;
+    try{
+      if(r) await api("/api/sorority/members/"+id+"/role", {role:r.dataset.role});
+      else await api("/api/sorority/members/"+id+"/remove", {});
+      toast(r ? s.name+" is now a "+r.dataset.role+"." : s.name+" was removed.");
+      await load();
+    }catch(err){ toast(err.message); (r||x).disabled = false; }
+  });
+
+  $("#pwForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = $("#pwForm button"); btn.disabled = true; say($("#pwMsg"), "");
+    try{
+      await api("/api/sorority/password", {kind:$("#pwKind").value, password:$("#newPw").value});
+      $("#newPw").value = ""; say($("#pwMsg"), "Password changed. Share it with the people who need it.", "ok");
+    }catch(err){ say($("#pwMsg"), err.message); }
+    finally{ btn.disabled = false; }
+  });
+  $("#leaveBtn").addEventListener("click", async ()=>{
+    if(!confirm("Leave "+state.data.membership.sorority.name+"? You'll come off the list for its frat invites.")) return;
+    try{ await api("/api/sorority/leave", {}); toast("You left the sorority."); await load(); }
+    catch(err){ toast(err.message); }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

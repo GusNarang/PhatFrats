@@ -8,6 +8,7 @@
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/frats", "destination": "/frats.html" },
+    { "source": "/sororities", "destination": "/sororities.html" },
     { "source": "/game", "destination": "/game.html" },
     { "source": "/about", "destination": "/about.html" }
   ]

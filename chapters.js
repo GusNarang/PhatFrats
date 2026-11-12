@@ -16,7 +16,7 @@ const PSU_EMAIL = /^[a-z0-9._%+-]+@psu\.edu$/;
 const INVITES_PER_BROTHER_PER_PARTY = 20;
 const SITE_URL = process.env.SITE_URL || 'https://phat-frats.vercel.app';
 
-module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests, tickets }) {
+module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests, tickets, sororities }) {
   const memberOf = async (userId) => {
     const { rows: [m] } = await pool.query('SELECT chapter_id, role FROM chapter_members WHERE user_id = $1', [userId]);
     return m || null;
@@ -564,4 +564,6 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   }));
   // Ticketed events: payouts, selling tickets for an event, and checking tickets at the door.
   if (tickets) tickets.mount(app, { requireMember, requireLeader });
+  // Group invites to whole sororities (sororities.js).
+  if (sororities) sororities.mountChapter(app, { requireMember, requireLeader });
 };

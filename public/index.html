@@ -88,11 +88,11 @@ header.top{
 nav.links{display:flex;flex:1 1 auto;min-width:0;justify-content:space-evenly;align-items:center;gap:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
 nav.links::-webkit-scrollbar{display:none}
 @media (max-width:1180px){#authArea .plan-badge{display:none}header.top nav.links a{padding-inline:3px}}
-nav.links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:clamp(.8rem,1.1vw,1rem);white-space:nowrap;line-height:1.2;padding:4px clamp(4px,.6vw,9px)}
+nav.links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:clamp(.74rem,1vw,1rem);white-space:nowrap;line-height:1.2;padding:4px clamp(3px,.45vw,9px)}
 nav.links a:hover{color:var(--ink)}
-/* Below 1000px the full menu can't fit on one row next to the account buttons, so it's hidden,
+/* Below 1040px the full menu can't fit on one row next to the account buttons, so it's hidden,
    like on phones: every section is still reachable from the page itself. */
-@media (max-width:1000px){nav.links{display:none}.top .wrap{justify-content:space-between}}
+@media (max-width:1040px){nav.links{display:none}.top .wrap{justify-content:space-between}}
 
 .btn{
   font:inherit;font-weight:800;cursor:pointer;border:0;border-radius:999px;
@@ -501,6 +501,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <a href="#safety">Party smart</a>
       <a href="/game">Door Rush Game</a>
       <a href="/frats">For frats</a>
+      <a href="/sororities">For sororities</a>
     </nav>
     <div id="authArea"></div>
   </div>
@@ -689,6 +690,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <span class="fl"><span>Phat</span>Frats</span>
       <p class="made">Designed and built by <strong class="builder">Agastya Narang</strong></p>
       <p><a href="/frats" style="color:var(--gold);font-weight:700">In a fraternity? Post your parties on PhatFrats</a></p>
+      <p><a href="/sororities" style="color:var(--pink);font-weight:700">In a sorority? Get your whole house on the list</a></p>
       <p><a href="/about" style="color:var(--cyan);font-weight:700">About PhatFrats &amp; contact us</a></p>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">

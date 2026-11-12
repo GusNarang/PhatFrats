@@ -249,6 +249,8 @@ async function listRequests(user) {
        WHERE invite_requests.status <> 'approved'`,
     [user.id, user.email, user.plan === 'full']
   );
+  // A frat's group invite to her sorority puts a sister on that party's list too.
+  await sororities.claim(user);
   const pending = await pool.query(
     `SELECT id, party_id FROM invite_requests
      WHERE user_id = $1 AND status = 'pending' AND party_id NOT LIKE 'h%' AND created_at < now() - interval '4 seconds'`,
@@ -704,6 +706,9 @@ const tickets = require('./tickets.js').create({
 });
 ticketWebhook = tickets.webhookHandler;
 tickets.mountAdmin(app);
+// Sororities: sisters and chairs, and frats' group invites to whole sororities. See sororities.js.
+const sororities = require('./sororities.js').create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, hashPassword, verifyPassword });
+sororities.mount(app);
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
@@ -716,12 +721,13 @@ const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload,
 stripeWebhook = pay.webhookHandler;
 pay.mountRoutes(app);
 require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL, ops });
-require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests, tickets });
+require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests, tickets, sororities });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/frats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'frats.html')));
+app.get('/sororities', (req, res) => res.sendFile(path.join(__dirname, 'public', 'sororities.html')));
 app.get('/game', (req, res) => res.sendFile(path.join(__dirname, 'public', 'game.html')));
 app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')));
 

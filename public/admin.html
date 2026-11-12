@@ -147,6 +147,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     <button type="button" role="tab" id="tab-live" aria-controls="pageLive" aria-selected="false" data-page="live">Live</button>
     <button type="button" role="tab" id="tab-money" aria-controls="pageMoney" aria-selected="false" data-page="money">Money</button>
     <button type="button" role="tab" id="tab-frats" aria-controls="pageFrats" aria-selected="false" data-page="frats">Frats</button>
+    <button type="button" role="tab" id="tab-sororities" aria-controls="pageSororities" aria-selected="false" data-page="sororities">Sororities</button>
     <button type="button" role="tab" id="tab-fame" aria-controls="pageFame" aria-selected="false" data-page="fame">Fame</button>
     <button type="button" role="tab" id="tab-log" aria-controls="pageLog" aria-selected="false" data-page="log">Log</button>
   </nav>
@@ -257,6 +258,23 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
         <table>
           <thead><tr><th>Chapter</th><th>Status</th><th>Leaders</th><th class="num">Brothers</th><th class="num">Parties</th><th>Requests</th><th class="num">Brother invites</th><th>Fill</th><th>Last party posted</th><th class="num" style="text-align:right">Actions</th></tr></thead>
           <tbody id="chapters"><tr><td colspan="10" class="skeleton">Loading chapters…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="pageSororities" role="tabpanel" aria-labelledby="tab-sororities" hidden>
+    <section class="tiles" id="sororityTiles" aria-label="Sorority numbers"></section>
+    <section class="card" aria-labelledby="sororitiesTitle">
+      <div class="table-head">
+        <h2 id="sororitiesTitle" style="margin:0">Sororities <span class="updated" id="sororityCount"></span></h2>
+        <div class="filters"><input type="search" id="sororitySearch" placeholder="Search sororities or chairs" aria-label="Search sororities"></div>
+      </div>
+      <p class="updated" style="margin:4px 0 12px">Set a chair password and send it to the sorority's president or social chair. Chairs set the sister password for their sisters. Frats invite whole sororities from their Invite people tab.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Sorority</th><th>Status</th><th>Chairs</th><th class="num">Sisters</th><th class="num">Upcoming invites</th><th>Frat invites</th><th class="num" style="text-align:right">Actions</th></tr></thead>
+          <tbody id="sororities"><tr><td colspan="7" class="skeleton">Loading sororities…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -642,7 +660,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   $("#chapterSearch").addEventListener("input", (e)=>{ state.chQ = e.target.value; renderChapters(); });
 
   // Switching pages. The choice stays in the address (#frats), so Refresh keeps you where you were.
-  const PAGES = ["overview","live","money","frats","fame","log"];
+  const PAGES = ["overview","live","money","frats","sororities","fame","log"];
   const pageEl = (p)=> document.getElementById("page"+p[0].toUpperCase()+p.slice(1));
   function showPage(page){
     state.page = PAGES.includes(page) && pageEl(page) ? page : "overview";
@@ -650,6 +668,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     for(const p of PAGES){ const el = pageEl(p); if(el) el.hidden = p!==state.page; }
     history.replaceState(null, "", state.page==="overview" ? location.pathname : "#"+state.page);
     if(window.PFCave) window.PFCave.onPage(state.page);
+    if(window.PFSororityAdmin) window.PFSororityAdmin.onPage(state.page);
   }
   document.querySelector(".pages").addEventListener("click", (e)=>{ const b = e.target.closest("[data-page]"); if(b) showPage(b.dataset.page); });
   document.querySelector(".pages").addEventListener("keydown", (e)=>{
@@ -695,7 +714,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
   });
 
   $("#search").addEventListener("input", (e)=>{ state.q = e.target.value; renderUsers(); });
-  $("#refresh").addEventListener("click", ()=>{ load(); if(window.PFCave) window.PFCave.onPage(state.page, true); });
+  $("#refresh").addEventListener("click", ()=>{ load(); if(window.PFCave) window.PFCave.onPage(state.page, true); if(window.PFSororityAdmin) window.PFSororityAdmin.onPage(state.page, true); });
   // Shared with the Batcave pages (batcave.js).
   window.PFAdmin = { api, toast, esc, int, money, smallMoney, dateFmt, ago, drawBars, segButtons, load, showPage, state,
     findUser: (q)=>{ showPage("overview"); state.q = q; $("#search").value = q; state.filter = "all"; renderUsers(); $("#usersTitle").scrollIntoView({block:"start"}); } };
@@ -705,5 +724,6 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 })();
 </script>
 <script src="/batcave.js"></script>
+<script src="/admin-sororities.js"></script>
 </body>
 </html>

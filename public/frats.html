@@ -441,6 +441,7 @@ textarea{min-height:96px;resize:vertical}
 
 <script src="/beacon.js" defer></script>
 <script src="/tickets-leader.js"></script>
+<script src="/sorority-invites.js"></script>
 <script>
 (function(){
   const $ = (s)=>document.querySelector(s);
@@ -687,6 +688,7 @@ textarea{min-height:96px;resize:vertical}
     $("#allInvitesCard").hidden = !leader();
     renderTabs(); renderParties(); renderInvite(); renderGuests(); renderRequests(); renderGuestRequests(); renderMembers();
     if(window.PFTicketsLeader) window.PFTicketsLeader.render();
+    if(window.PFSororityInvites) window.PFSororityInvites.render();
     // A banned chapter: the reason, and no posting.
     if(state.data.membership.banned){ $("#chMsg").innerHTML = '<div class="notice err">🚫 '+esc(state.data.membership.banned)+'</div>'; $("#newPartyBtn").hidden = true; }
   }

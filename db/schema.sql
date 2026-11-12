@@ -488,3 +488,35 @@ ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms_by BIGINT REFEREN
 -- Invite-only parties: off the map, out of search and alerts, and closed to requests. Only people a brother
 -- or leader invites (and the chapter's own members) can see them.
 ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS invite_only BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ---------- Sororities ----------
+-- Sisters join their sorority with the sister password; chairs sign in with the chair password.
+-- sorority_id matches the ids in public/sororities.js. Only password hashes are stored.
+CREATE TABLE IF NOT EXISTS sorority_accounts (
+  sorority_id            INTEGER PRIMARY KEY,
+  sister_password_hash   TEXT,
+  chair_password_hash    TEXT,
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Each account can belong to one sorority.
+CREATE TABLE IF NOT EXISTS sorority_members (
+  user_id     BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  sorority_id INTEGER NOT NULL,
+  role        TEXT NOT NULL DEFAULT 'sister' CHECK (role IN ('chair', 'sister')),
+  joined_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sorority_members_sorority_idx ON sorority_members(sorority_id);
+-- A frat's group invite to a whole sorority: every sister is on the list. Chairs can turn it down for the house.
+CREATE TABLE IF NOT EXISTS sorority_invites (
+  id          BIGSERIAL PRIMARY KEY,
+  party_id    BIGINT NOT NULL REFERENCES hosted_parties(id) ON DELETE CASCADE,
+  sorority_id INTEGER NOT NULL,
+  invited_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  note        TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'declined')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (party_id, sorority_id)
+);
+CREATE INDEX IF NOT EXISTS sorority_invites_sorority_idx ON sorority_invites(sorority_id);
+-- Which sorority invite put a sister on a party's list, so turning the invite down takes her spot back off.
+ALTER TABLE invite_requests ADD COLUMN IF NOT EXISTS via_sorority INTEGER;
