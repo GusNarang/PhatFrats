@@ -476,3 +476,11 @@ CREATE TABLE IF NOT EXISTS chapter_bans (
   banned_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
   banned_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Proof of who accepted the site terms and party disclaimer (/about#terms), and which version.
+-- Students accept at sign-up; a chapter leader accepts the Host Agreement each time they post or edit a party.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_at      TIMESTAMPTZ;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms    TEXT;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms_at TIMESTAMPTZ;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms_by BIGINT REFERENCES users(id) ON DELETE SET NULL;

@@ -367,12 +367,13 @@ app.post('/api/signup', authLimiter, wrap(async (req, res) => {
   if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
     return fail(res, 400, 'Use a password with at least 8 characters.');
   }
+  if (req.body?.agree !== true) return fail(res, 400, 'Tick the box to agree to the terms and party disclaimer.', 'TERMS');
   const passwordHash = await hashPassword(password);
   // New accounts are always free. Only a confirmed payment may set plan = 'full'.
   const { rows } = await pool.query(
-    `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
+    `INSERT INTO users (email, name, password_hash, terms_version, terms_at) VALUES ($1, $2, $3, $4, now())
      ON CONFLICT (email) DO NOTHING RETURNING id, name, email, plan, email_verified_at, role`,
-    [email, name, passwordHash]
+    [email, name, passwordHash, require('./terms.js').TERMS_VERSION]
   );
   if (!rows[0]) return fail(res, 409, 'That email already has an account. Log in instead.', 'EMAIL_TAKEN');
   await startSession(res, rows[0].id);

@@ -273,6 +273,13 @@ textarea{min-height:96px;resize:vertical}
                 <span>Keep the crowd private<span class="hint">Students can show friends which parties they're going to. Switch this on and this party never shows on anyone's friends board.</span></span>
               </label>
             </div>
+            <div class="field host-agree">
+              <p class="hint" style="margin:0 0 8px"><b>Host Agreement.</b> By posting or editing this party, you confirm for your chapter that: your chapter alone hosts, runs and is responsible for this party, including safety, security, guests' conduct, capacity, alcohol and the law; you'll follow the law and all Penn State, IFC and national policies, including event registration and never serving anyone under 21; PhatFrats only lists the party and doesn't host, supervise, inspect or approve it; and your chapter releases PhatFrats and its creator from, and will defend, indemnify and hold them harmless against, any claim, loss or cost arising from the party. <a href="/about#terms" target="_blank" rel="noopener">Full terms</a></p>
+              <label class="check-row" for="pfAgree">
+                <input id="pfAgree" type="checkbox" required>
+                <span>I'm authorized to act for my chapter and I accept the Host Agreement for this party.</span>
+              </label>
+            </div>
             <div class="btn-row">
               <button class="btn primary" type="submit" id="partySave">Post party</button>
               <button class="btn" type="button" id="partyCancel">Cancel</button>
@@ -722,6 +729,7 @@ textarea{min-height:96px;resize:vertical}
     $("#pfDress").value = p?.dress || ""; $("#pfMusic").value = p?.music || "";
     $("#pfGuests").checked = !!p?.allowGuests;
     $("#pfHideFriends").checked = !!p?.hideFriends;
+    $("#pfAgree").checked = false;
     say($("#partyMsg"), "");
     $("#partyFormCard").hidden = false;
     $("#partyFormCard").scrollIntoView({block:"start"});
@@ -731,10 +739,11 @@ textarea{min-height:96px;resize:vertical}
   $("#partyCancel").addEventListener("click", ()=>{ $("#partyFormCard").hidden = true; });
   $("#partyForm").addEventListener("submit", async (e)=>{
     e.preventDefault();
+    if(!$("#pfAgree").checked){ say($("#partyMsg"), "Tick the box to accept the Host Agreement. Your chapter is responsible for this party, not PhatFrats."); return; }
     const btn = $("#partySave"); btn.disabled = true; say($("#partyMsg"), "");
     const body = { title:$("#pfTitle").value, date:$("#pfDate").value, time:$("#pfTime").value, vibe:$("#pfVibe").value,
       cap:Number($("#pfCap").value), blurb:$("#pfBlurb").value, dress:$("#pfDress").value, music:$("#pfMusic").value,
-      allowGuests:$("#pfGuests").checked, hideFriends:$("#pfHideFriends").checked };
+      allowGuests:$("#pfGuests").checked, hideFriends:$("#pfHideFriends").checked, agree:true };
     try{
       await api(state.editing ? "/api/chapter/parties/"+state.editing : "/api/chapter/parties", body);
       $("#partyFormCard").hidden = true;

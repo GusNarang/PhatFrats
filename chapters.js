@@ -7,6 +7,7 @@ const { PgStore, nameFor } = require('./rate-store.js');
 const IDENTITY = require('./data/chapter-identity.js');
 const CHAPTERS = [...require('./public/chapters.js'), ...require('./data/test-chapters.js')];
 const partyList = require('./party-list.js');
+const { TERMS_VERSION } = require('./terms.js');
 
 const chapterById = new Map(CHAPTERS.map((c) => [c.id, c]));
 const VIBES = ['neon', 'theme', 'day', 'chill', 'formal', 'charity'];
@@ -326,13 +327,19 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   }));
 
   // ---------- parties (leaders) ----------
+  // Every post and edit needs the leader to accept the Host Agreement (/about#terms): the chapter runs the
+  // party and is responsible for it, not PhatFrats. Who accepted, when and which version is kept on the party.
+  const HOST_TERMS_MSG = 'Tick the box to accept the Host Agreement. Your chapter is responsible for this party, not PhatFrats.';
+  const hostAgreed = (body) => body?.agree === true;
   app.post('/api/chapter/parties', ...requireLeader, wrap(async (req, res) => {
     const p = readParty(req.body);
     if (typeof p === 'string') return fail(res, 400, p);
+    if (!hostAgreed(req.body)) return fail(res, 400, HOST_TERMS_MSG, 'HOST_TERMS');
     const { rows: [row] } = await pool.query(
-      `INSERT INTO hosted_parties (chapter_id, title, party_date, start_time, vibe, blurb, dress, music, cap, created_by, allow_outside_guests, hide_friends)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-      [req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, req.user.id, p.allowGuests, p.hideFriends]
+      `INSERT INTO hosted_parties (chapter_id, title, party_date, start_time, vibe, blurb, dress, music, cap, created_by, allow_outside_guests, hide_friends,
+         host_terms, host_terms_at, host_terms_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), $10) RETURNING id`,
+      [req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, req.user.id, p.allowGuests, p.hideFriends, TERMS_VERSION]
     );
     res.status(201).json({ id: 'h' + row.id });
   }));
@@ -342,11 +349,13 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const p = readParty(req.body);
     if (!id) return fail(res, 400, 'That party id is not valid.');
     if (typeof p === 'string') return fail(res, 400, p);
+    if (!hostAgreed(req.body)) return fail(res, 400, HOST_TERMS_MSG, 'HOST_TERMS');
     const { rowCount } = await pool.query(
       `UPDATE hosted_parties SET title = $3, party_date = $4, start_time = $5, vibe = $6, blurb = $7, dress = $8, music = $9,
-         cap = $10, allow_outside_guests = $11, hide_friends = $12, updated_at = now()
+         cap = $10, allow_outside_guests = $11, hide_friends = $12, updated_at = now(),
+         host_terms = $13, host_terms_at = now(), host_terms_by = $14
        WHERE id = $1 AND chapter_id = $2`,
-      [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests, p.hideFriends]
+      [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests, p.hideFriends, TERMS_VERSION, req.user.id]
     );
     if (!rowCount) return fail(res, 404, "That party isn't one of your chapter's.");
     await pool.query('UPDATE friend_going SET party_day = $2 WHERE party_id = $1', ['h' + id, p.date]);

@@ -346,6 +346,9 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 .dlg-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .check{display:flex;gap:10px;align-items:flex-start;font-size:.88rem;color:var(--muted)}
 .check input{accent-color:var(--pink);margin-top:4px}
+.check a{color:var(--cyan)}
+.host-note{font-size:.8rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px;margin:4px 0 0}
+.host-note a{color:var(--cyan)}
 .toast{
   position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));translate:-50% 0;z-index:50;
   background:var(--lime);color:#122200;font-weight:800;padding:12px 20px;border-radius:999px;
@@ -690,6 +693,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <p>Concept prototype. Chapter names and addresses come from the Penn State IFC chapter list; the sample parties are fictional demo data, while parties marked "Posted by the house" come from the chapters themselves. Accounts and invite requests are stored in a Neon database.</p>
+      <p><b>Party disclaimer:</b> PhatFrats is only a listing site. Parties are hosted, run and controlled by the chapters that post them, which are solely responsible for them. PhatFrats doesn't host, supervise, inspect or serve alcohol at any party and isn't responsible for anything that happens at one. Attendance is at your own risk. <a href="/about#terms" style="color:var(--cyan)">Read the full terms</a>.</p>
       <p>PhatFrats is not affiliated with Penn State University or the Interfraternity Council. Street map from OpenStreetMap; house pins placed from the IFC-listed addresses.</p>
     </div>
   </div>
@@ -711,6 +715,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <label class="pass-opt"><input type="radio" name="pass" id="passFree" checked><span><b>Free</b><small>See the map and request an invite to one party per week.</small></span></label>
       <label class="pass-opt off"><input type="radio" name="pass" id="passFull" disabled><span><b>Full Access · <span class="js-price">$4.99</span> a semester</b><small>Sign up free first, then get Full Access from Passes in one click.</small></span></label>
     </fieldset>
+    <label class="check" id="signupAgreeRow"><input type="checkbox" id="signupAgree"> <span>I'm 18 or older and agree to the <a href="/about#terms" target="_blank" rel="noopener">Terms and party disclaimer</a>. PhatFrats only lists parties. It doesn't host, run or supervise them and isn't responsible for what happens at them. I go at my own risk.</span></label>
     <button class="btn ghost small verify-resend" type="button" id="forgotBtn">Forgot password?</button>
     <p class="err" id="loginErr" role="alert"></p>
     <div class="dlg-actions">
@@ -768,7 +773,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       <div class="field"><label for="invGuestName">Their full name</label><input class="input" id="invGuestName" maxlength="80" autocomplete="off" placeholder="First and last name"></div>
       <div class="field"><label for="invGuestContact">Their email or phone</label><input class="input" id="invGuestContact" maxlength="120" autocomplete="off" placeholder="name@gmail.com or (814) 555-1234"></div>
     </fieldset>
-    <label class="check"><input type="checkbox" id="invAgree"> I'll bring my PSU ID and follow the house rules.</label>
+    <label class="check"><input type="checkbox" id="invAgree"> <span>I'll bring my PSU ID and follow the house rules and the law. I understand the house runs this party, not PhatFrats, and I go at my own risk under the <a href="/about#terms" target="_blank" rel="noopener">party disclaimer</a>.</span></label>
     <p class="err" id="invErr"></p>
     <div class="dlg-actions">
       <button class="btn ghost" type="button" data-close>Cancel</button>
@@ -1288,7 +1293,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         (p.ticketed && window.PFTickets ? window.PFTickets.detail(p) : '') +
         (window.PFFriends ? window.PFFriends.detail(p) : '') +
         (window.PFCommunity ? window.PFCommunity.detailExtras(p) : '') +
-        (others.length ? '<p class="muted" style="font-size:.88rem">Also at this house: '+others.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a> ('+esc(dayOf(o.day).label)+')').join(", ")+'</p>' : '');
+        (others.length ? '<p class="muted" style="font-size:.88rem">Also at this house: '+others.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a> ('+esc(dayOf(o.day).label)+')').join(", ")+'</p>' : '') +
+        '<p class="host-note">'+esc(c.name)+' hosts and runs this party and is responsible for it. PhatFrats only lists it: we don&#39;t host, supervise, check or serve anything at any party, and we aren&#39;t responsible for what happens there. You go at your own risk. Never drink underage or drive after drinking. In an emergency, call 911. <a href="/about#terms">Party disclaimer</a></p>';
     } else {
       const c = byId[sel.id], ps = partiesFor(c.id);
       d.innerHTML =
@@ -1508,6 +1514,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     $("#tabSignup").setAttribute("aria-selected", String(signup));
     $("#nameField").hidden = !signup;
     $("#passChoice").hidden = !signup;
+    $("#signupAgreeRow").hidden = !signup;
     $("#forgotBtn").hidden = signup;
     $("#loginTitle").textContent = signup ? "Get on the map" : "Welcome back";
     $("#loginSubmit").textContent = signup ? "Create my account" : "Log in";
@@ -1534,7 +1541,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     e.preventDefault();
     const signup = authMode === "signup";
     const body = {email:$("#loginEmail").value, password:$("#loginPassword").value};
-    if(signup){ body.name = $("#loginName").value; const ref = window.PFCommunity && window.PFCommunity.referral(); if(ref) body.ref = ref; }
+    if(signup && !$("#signupAgree").checked){ $("#loginErr").textContent = "Tick the box to agree to the terms and party disclaimer."; return; }
+    if(signup){ body.name = $("#loginName").value; body.agree = true; const ref = window.PFCommunity && window.PFCommunity.referral(); if(ref) body.ref = ref; }
     const btn = $("#loginSubmit");
     btn.disabled = true; $("#loginErr").textContent = "";
     try {
@@ -1686,7 +1694,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
   });
   $("#inviteForm").addEventListener("submit", async e=>{
     e.preventDefault();
-    if(!$("#invAgree").checked){ $("#invErr").textContent = "Tick the box to agree to bring your PSU ID and follow house rules."; return; }
+    if(!$("#invAgree").checked){ $("#invErr").textContent = "Tick the box to agree to bring your PSU ID, follow the house rules, and the party disclaimer."; return; }
     const gName = $("#invGuestBox").hidden ? "" : $("#invGuestName").value.trim();
     const gContact = $("#invGuestBox").hidden ? "" : $("#invGuestContact").value.trim();
     if((gName || gContact) && !(gName && gContact)){ $("#invErr").textContent = "For an outside guest, add both their full name and their email or phone. Or clear both."; return; }
