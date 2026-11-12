@@ -542,3 +542,16 @@ CREATE TABLE IF NOT EXISTS sorority_rsvps (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (invite_id, user_id)
 );
+
+-- A frat page's house emoji, and a note its leaders pin for every brother.
+ALTER TABLE chapter_profiles ADD COLUMN IF NOT EXISTS emoji TEXT;
+ALTER TABLE chapter_profiles ADD COLUMN IF NOT EXISTS announcement TEXT NOT NULL DEFAULT '';
+ALTER TABLE chapter_profiles ADD COLUMN IF NOT EXISTS announcement_at TIMESTAMPTZ;
+ALTER TABLE chapter_profiles ADD COLUMN IF NOT EXISTS announcement_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+-- Brothers tapping "I'm in" on one of their chapter's parties, so everyone can see who's helping host.
+CREATE TABLE IF NOT EXISTS chapter_rsvps (
+  party_id   BIGINT NOT NULL REFERENCES hosted_parties(id) ON DELETE CASCADE,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (party_id, user_id)
+);

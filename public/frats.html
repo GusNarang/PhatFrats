@@ -123,6 +123,50 @@ textarea{min-height:96px;resize:vertical}
 .badge.guests{background:rgba(53,224,255,.12);color:var(--cyan);border-color:rgba(53,224,255,.4)}
 .badge.outside{background:rgba(180,140,255,.15);color:var(--violet);border-color:rgba(180,140,255,.45)}
 @media (prefers-reduced-motion:no-preference){.btn,.tabs button{transition:border-color .15s,background .15s}}
+/* The fun layer: house emoji, pinned note, countdown, "I'm in", brother cards, leaderboard and confetti. */
+#viewChapter{--c1:#3a1d6e;--c2:#123a5c}
+.fx-float{position:absolute!important;inset:0;pointer-events:none;overflow:hidden}
+.fx-float span{position:absolute;font-size:22px;opacity:.22;animation:fxFloat 14s linear infinite}
+@keyframes fxFloat{from{transform:translateY(40px) rotate(0)}to{transform:translateY(-260px) rotate(40deg)}}
+.fx-announce{display:flex;gap:14px;align-items:flex-start;border:2px solid var(--acc);border-radius:18px;padding:14px 18px;margin-bottom:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 18%,var(--night-2)),var(--night-2))}
+.fx-announce .mega{font-size:30px;line-height:1;animation:fxWiggle 2.4s ease-in-out infinite}
+@keyframes fxWiggle{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg) scale(1.08)}}
+.fx-announce p{margin:0;font-size:18px;font-weight:700;white-space:pre-line}
+.fx-announce small{color:var(--muted);font-size:13px}
+.fx-count{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0 10px;text-align:center}
+.fx-count div{background:var(--night);border:1px solid var(--line);border-radius:12px;padding:8px 4px}
+.fx-count b{display:block;font:400 28px/1.1 var(--display);color:var(--acc);font-variant-numeric:tabular-nums}
+.fx-count span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.in-btn{font:800 16px var(--body);border-radius:999px;border:2px solid var(--acc);background:transparent;color:var(--ink);padding:9px 18px;min-height:44px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.in-btn[aria-pressed="true"]{background:var(--acc);color:var(--night)}
+.in-btn:active{transform:scale(.96)}
+.stack{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 0}
+.stack .av{width:30px;height:30px;font-size:13px;margin-left:-8px;border:2px solid var(--night)}
+.stack .av:first-child{margin-left:0}
+.av{display:inline-grid;place-items:center;width:46px;height:46px;border-radius:50%;font-weight:800;color:#fff;flex:none;background:linear-gradient(135deg,var(--c1),var(--c2));text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.bro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.bro{background:var(--night);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;position:relative}
+.bro-head{display:flex;gap:12px;align-items:center;min-width:0}
+.bro b{display:block;overflow-wrap:anywhere}
+.bro span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.bro .crown{position:absolute;top:-10px;left:12px;font-size:20px}
+.lb{display:flex;flex-direction:column;gap:8px}
+.lb-row{display:flex;align-items:center;gap:12px;background:var(--night);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+.lb-row.me{border-color:var(--acc)}
+.lb-row .medal{font-size:24px;width:30px;text-align:center}
+.lb-row .bar{flex:1;height:10px;border-radius:999px;background:var(--night-3);overflow:hidden;min-width:60px}
+.lb-row .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--c1),var(--acc))}
+.lb-row b.n{font:400 22px var(--display);color:var(--acc);min-width:32px;text-align:right}
+.emoji-pick{display:flex;flex-wrap:wrap;gap:6px}
+.emoji-pick button{font-size:22px;width:46px;height:46px;border-radius:12px;border:2px solid var(--line);background:var(--night);cursor:pointer}
+.emoji-pick button[aria-pressed="true"]{border-color:var(--acc);background:var(--night-3);transform:scale(1.08)}
+.party{transition:transform .15s}
+.party:hover{transform:translateY(-2px)}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden}
+.confetti i{position:absolute;top:-24px;width:10px;height:14px;border-radius:2px;animation:fxFall linear forwards}
+.confetti i.e{width:auto;height:auto;font-style:normal;font-size:22px;background:none!important}
+@keyframes fxFall{to{transform:translate(var(--dx),110vh) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){.fx-float span,.fx-announce .mega{animation:none}.party{transition:none}}
 </style>
 </head>
 <body>
@@ -198,6 +242,7 @@ textarea{min-height:96px;resize:vertical}
     <section id="viewChapter" hidden>
       <div class="admin-note" id="adminNote" hidden>You're viewing this chapter as the PhatFrats admin, with everything a leader can do. Keep the control room open in its own tab while you work here.</div>
       <header class="ch-hero" id="chHero">
+        <div class="fx-float" id="chFloat" aria-hidden="true"></div>
         <div class="ch-watermark" id="chWatermark" aria-hidden="true"></div>
         <div class="ch-top"><span class="ch-kind" id="chKind"></span><span class="badge" id="chRole"></span></div>
         <div class="gl" id="chGl"></div>
@@ -206,6 +251,7 @@ textarea{min-height:96px;resize:vertical}
         <p class="ch-facts" id="chFacts"></p>
         <div class="ch-colors" id="chColors"></div>
       </header>
+      <div class="fx-announce" id="chAnnounce" hidden role="status"></div>
       <section class="ch-stats" id="chStats" aria-label="Chapter numbers"></section>
       <div class="ch-feature">
         <section class="card ch-next" id="chNext" aria-label="Next party"></section>
@@ -368,8 +414,14 @@ textarea{min-height:96px;resize:vertical}
       <!-- Members -->
       <div role="tabpanel" id="panel-members" aria-labelledby="tab-members" hidden>
         <div class="card">
-          <h2>Brothers on PhatFrats</h2>
+          <h2>🏆 Top inviters</h2>
+          <p class="muted small" style="margin-top:0">Who has put the most people on your lists. Bragging rights only.</p>
+          <div class="lb" id="leaderboard"></div>
+        </div>
+        <div class="card">
+          <h2>The brotherhood</h2>
           <p class="muted small" style="margin-top:0" id="memberHint"></p>
+          <div class="field" style="margin-bottom:12px"><label class="sr" for="broSearch">Find a brother</label><input id="broSearch" type="search" placeholder="Find a brother"></div>
           <div id="memberList"></div>
         </div>
       </div>
@@ -382,12 +434,20 @@ textarea{min-height:96px;resize:vertical}
           <form id="profileForm" novalidate>
             <div id="profileMsg" role="alert"></div>
             <div class="field">
+              <label for="pNote">📣 Note pinned for every brother <span class="hint">Shows at the top of the page and pings their bell. For example: "Set-up crew at the house by 8. Wristbands are in the office." Leave empty to unpin. Up to 240 characters.</span></label>
+              <textarea id="pNote" maxlength="240" style="min-height:70px"></textarea>
+            </div>
+            <div class="field">
               <label for="pTagline">Tagline <span class="hint">One line, up to 90 characters.</span></label>
               <input id="pTagline" maxlength="90" placeholder="For example: Brotherhood, service and the best tailgates on Fraternity Row">
             </div>
             <div class="field">
               <label for="pAbout">About the chapter <span class="hint">Your story, what you're known for, your philanthropy. Up to 700 characters.</span></label>
               <textarea id="pAbout" maxlength="700"></textarea>
+            </div>
+            <div class="field">
+              <span style="display:block;font-weight:700;margin-bottom:6px">House emoji <span class="hint">Floats in your banner and rains down with the confetti.</span></span>
+              <div class="emoji-pick" id="pEmoji" role="group" aria-label="House emoji"></div>
             </div>
             <div class="field">
               <span style="display:block;font-weight:700;margin-bottom:6px">Page colors <span class="hint" id="pColorHint"></span></span>
@@ -533,7 +593,7 @@ textarea{min-height:96px;resize:vertical}
       if(!$("#joinPw").value) throw new Error("Enter the chapter password.");
       await api("/api/chapter/join", {chapterId:Number($("#joinChapter").value), password:$("#joinPw").value});
       $("#joinPw").value = "";
-      toast("You're in!");
+      toast("Welcome to the brotherhood!");
       await load();
     }catch(err){ say($("#joinMsg"), err.message); }
     finally{ btn.disabled = false; }
@@ -587,7 +647,73 @@ textarea{min-height:96px;resize:vertical}
     el.style.setProperty("--ch1", banner(c1, .16));
     el.style.setProperty("--ch2", banner(c2, .5));
     el.style.setProperty("--acc", accentFrom(theme));
+    el.style.setProperty("--c1", hsl(c1).l > .6 ? mix(c1, NIGHT, .45) : c1);
+    el.style.setProperty("--c2", hsl(c2).l > .6 ? mix(c2, NIGHT, .45) : c2);
   }
+
+  // ---------- the fun layer ----------
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const initials = (n)=> n.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  const ago = (d)=>{ const m = Math.round((Date.now()-new Date(d))/60000); return m<1 ? "just now" : m<60 ? m+" min ago" : m<1440 ? Math.round(m/60)+" hr ago" : shortDate(d); };
+  const themeColors = ()=>{ const t = state.data?.identity?.theme || []; return t.length ? t : ["#ff3fa4","#35e0ff"]; };
+  // Confetti in the chapter's colors, with its house emoji mixed in.
+  function burst(n){
+    if(calm || !state.data?.identity) return;
+    const box = document.createElement("div"); box.className = "confetti"; box.setAttribute("aria-hidden","true");
+    const t = themeColors(), colors = [...t, accentFrom(t), "#ffffff"], emoji = state.data.identity.emoji;
+    for(let i=0;i<n;i++){
+      const p = document.createElement("i");
+      if(emoji && i % 6 === 0){ p.className = "e"; p.textContent = emoji; }
+      p.style.left = (Math.random()*100)+"vw";
+      p.style.background = colors[i % colors.length];
+      p.style.setProperty("--dx", (Math.random()*160-80)+"px");
+      p.style.setProperty("--r", (Math.random()*720-360)+"deg");
+      p.style.animationDuration = (1.8+Math.random()*1.6)+"s";
+      p.style.animationDelay = (Math.random()*.4)+"s";
+      box.appendChild(p);
+    }
+    document.body.appendChild(box);
+    setTimeout(()=>box.remove(), 4200);
+  }
+  window.PFChapter.burst = burst;
+  // When a party starts, from its day and "9:30 PM".
+  function startOf(p){
+    const m = /^(\d+):(\d+) (AM|PM)$/.exec(p.time||""); const h = m ? Number(m[1])%12 + (m[3]==="PM"?12:0) : 21;
+    return new Date(p.day+"T"+String(h).padStart(2,"0")+":"+(m?m[2]:"00")+":00");
+  }
+  let tick = null;
+  function startCountdown(p){
+    clearInterval(tick);
+    const at = startOf(p);
+    const draw = ()=>{
+      const ms = at - Date.now(), el = $("#chCount"); if(!el){ clearInterval(tick); return; }
+      if(ms <= 0){ el.innerHTML = '<div style="grid-column:1/-1"><b>🎉 It\'s on!</b><span>Doors are open</span></div>'; clearInterval(tick); return; }
+      const parts = [[Math.floor(ms/864e5),"days"],[Math.floor(ms/36e5)%24,"hrs"],[Math.floor(ms/6e4)%60,"min"],[Math.floor(ms/1e3)%60,"sec"]];
+      el.innerHTML = parts.map(x=>'<div><b>'+String(x[0]).padStart(2,"0")+'</b><span>'+x[1]+'</span></div>').join("");
+    };
+    draw(); if(!calm) tick = setInterval(draw, 1000);
+  }
+  function inButton(p){
+    if(state.data.membership.adminView || p.status!=="live" || p.past) return '';
+    return '<button class="in-btn" type="button" data-in="'+p.id+'" aria-pressed="'+!!p.brothersInMe+'">'+(p.brothersInMe ? "🙌 I'm in!" : "🙌 I'm in?")+'</button>';
+  }
+  function inBlock(p){
+    if(p.status!=="live" || p.past) return '';
+    if(!p.brothersIn) return '<p class="small muted" style="margin:6px 0">No brothers have said they\'re in yet.</p>';
+    const more = p.brothersIn - p.brothersInNames.length;
+    return '<div class="stack" aria-label="'+p.brothersIn+' brothers in">'+p.brothersInNames.map(n=>'<span class="av" title="'+esc(n)+'">'+esc(initials(n))+'</span>').join("")
+      + (more>0 ? '<span class="av">+'+more+'</span>' : '')+'<span class="small muted" style="margin-left:6px">'+esc(p.brothersInNames.slice(0,3).join(", "))+(p.brothersIn>3 ? ' and '+(p.brothersIn-3)+' more' : '')+' '+(p.brothersIn===1?'is':'are')+' in</span></div>';
+  }
+  document.addEventListener("click", async (e)=>{
+    const b = e.target.closest("[data-in]"); if(!b) return;
+    const p = partyById(b.dataset.in); if(!p) return;
+    const going = !p.brothersInMe; b.disabled = true;
+    try{
+      await api("/api/chapter/parties/"+p.id+"/rsvp", {in:going});
+      if(going){ burst(55); toast("🙌 You're in! Your brothers can see it."); } else toast("Took back your \"I'm in\".");
+      await load();
+    }catch(err){ toast(err.message); b.disabled = false; }
+  });
   function renderIdentity(){
     const d = state.data, m = d.membership, idn = d.identity;
     applyTheme(idn);
@@ -595,6 +721,9 @@ textarea{min-height:96px;resize:vertical}
     $("#chWatermark").textContent = m.chapter.gl;
     $("#chKind").textContent = m.chapter.test ? "Practice chapter" : (idn.kind || "Penn State IFC chapter");
     $("#chTagline").hidden = !idn.tagline; $("#chTagline").textContent = idn.tagline;
+    $("#chFloat").innerHTML = idn.emoji && !calm ? Array.from({length:9},(_,i)=>'<span style="left:'+(6+i*11)+'%;top:'+(60+(i%3)*14)+'%;animation-delay:-'+(i*1.6)+'s">'+esc(idn.emoji)+'</span>').join("") : "";
+    $("#chAnnounce").hidden = !idn.announcement;
+    if(idn.announcement) $("#chAnnounce").innerHTML = '<span class="mega" aria-hidden="true">📣</span><div><p>'+esc(idn.announcement.text)+'</p><small>Pinned by '+esc(idn.announcement.by)+' · '+esc(ago(idn.announcement.at))+'</small></div>';
     const facts = [];
     if(idn.founded) facts.push("Est. "+idn.founded.year+" · "+idn.founded.place);
     if(m.address) facts.push('<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(m.address+", State College, PA")+'" target="_blank" rel="noopener">'+esc(m.address)+'</a>');
@@ -605,12 +734,11 @@ textarea{min-height:96px;resize:vertical}
 
     const upcoming = d.parties.filter(p=>p.status==="live" && !p.past).sort((a,b)=>a.day.localeCompare(b.day));
     const onLists = upcoming.reduce((s,p)=>s+p.going,0);
-    const invites = d.members.reduce((s,x)=>s+x.invites,0);
     const stats = [
       [d.members.length, d.members.length===1 ? "brother on PhatFrats" : "brothers on PhatFrats"],
       [upcoming.length, upcoming.length===1 ? "party coming up" : "parties coming up"],
       [onLists, "people on your lists"],
-      [invites, invites===1 ? "brother invite sent" : "brother invites sent"],
+      [upcoming.reduce((s,p)=>s+(p.sororities||0),0), "sorority invites out"],
     ];
     $("#chStats").innerHTML = stats.map(s=>'<div class="ch-stat"><b>'+Number(s[0]).toLocaleString("en-US")+'</b><span>'+esc(s[1])+'</span></div>').join("");
 
@@ -619,12 +747,16 @@ textarea{min-height:96px;resize:vertical}
       const days = Math.round((Date.parse(next.day+"T12:00:00Z") - Date.parse(state.data.today+"T12:00:00Z"))/86400000);
       const when = days===0 ? "Tonight" : days===1 ? "Tomorrow" : "In "+days+" days";
       const pct = Math.min(100, Math.round(next.going/next.cap*100));
-      $("#chNext").innerHTML = '<h2 style="margin-bottom:4px">Next up</h2><div class="count">'+when+'</div>'
-        + '<h3 style="margin-top:6px">'+esc(next.title)+'</h3><p class="muted small" style="margin:0">'+esc(next.dayText)+' · '+esc(next.time)+' · '+esc(VIBES[next.vibe].label)+'</p>'
+      $("#chNext").innerHTML = '<h2 style="margin-bottom:4px">Next up · '+when+'</h2>'
+        + '<h3 style="margin-top:6px">'+esc(next.title)+'</h3><p class="muted small" style="margin:0">'+esc(next.dayText)+' · '+esc(next.time)+' · '+esc(VIBES[next.vibe].label)+(next.sororities ? ' · 💌 '+next.sororities+' sororit'+(next.sororities===1?'y':'ies')+' invited' : '')+'</p>'
+        + '<div class="fx-count" id="chCount" role="timer" aria-label="Time until the party"></div>'
+        + inBlock(next)
         + '<div class="meter" style="--c:var(--acc)" role="img" aria-label="'+next.going+' of '+next.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
         + '<p class="small muted" style="margin:0 0 10px">'+next.going+' of '+next.cap+' on the list'+(next.waiting ? ' · '+next.waiting+' waiting for an answer' : '')+'</p>'
-        + '<div class="btn-row"><button class="btn slim primary" type="button" data-invite="'+next.id+'">Invite people</button>'+(leader() && next.waiting ? '<button class="btn slim" type="button" data-requests="'+next.id+'">Answer requests</button>' : '')+'</div>';
+        + '<div class="btn-row">'+inButton(next)+'<button class="btn slim primary" type="button" data-invite="'+next.id+'">Invite people</button>'+(leader() && next.waiting ? '<button class="btn slim" type="button" data-requests="'+next.id+'">Answer requests</button>' : '')+'</div>';
+      startCountdown(next);
     } else {
+      clearInterval(tick);
       $("#chNext").innerHTML = '<h2>Next up</h2><p class="muted" style="margin-top:0">No parties on the calendar yet.</p>'
         + (leader() ? '<button class="btn primary slim" type="button" data-newparty>+ Post a party</button>' : '<p class="muted small" style="margin:0">Your chapter leader posts parties here, then everyone can invite people.</p>');
     }
@@ -647,6 +779,8 @@ textarea{min-height:96px;resize:vertical}
   function fillProfileForm(){
     const idn = state.data.identity;
     $("#pTagline").value = idn.tagline; $("#pAbout").value = idn.about;
+    $("#pNote").value = idn.announcement ? idn.announcement.text : "";
+    state.emoji = idn.emoji; renderEmoji();
     const theme = idn.theme.length ? idn.theme : ["#ff3fa4","#35e0ff"];
     $("#pColor1").value = theme[0]; $("#pColor2").value = theme[1] || theme[0];
     $("#pColorHint").textContent = idn.customColors ? "Custom colors are on." : idn.colors.length ? "Using your national colors." : "No national colors are on file, so pick your own.";
@@ -655,15 +789,20 @@ textarea{min-height:96px;resize:vertical}
   async function saveProfile(extra){
     say($("#profileMsg"), "");
     try{
-      const body = { tagline:$("#pTagline").value, about:$("#pAbout").value, ...(extra || {}) };
+      const body = { tagline:$("#pTagline").value, about:$("#pAbout").value, announcement:$("#pNote").value, emoji:state.emoji||"", ...(extra || {}) };
       if(!body.resetColors){ body.color1 = $("#pColor1").value; body.color2 = $("#pColor2").value; }
       const r = await api("/api/chapter/profile", body);
       state.data.identity = r.identity;
-      renderIdentity(); fillProfileForm();
-      say($("#profileMsg"), "Chapter page saved.", "ok");
+      renderIdentity(); fillProfileForm(); burst(45);
+      say($("#profileMsg"), "Chapter page saved. Your brothers see it now.", "ok");
     }catch(err){ say($("#profileMsg"), err.message); }
   }
   $("#profileForm").addEventListener("submit", (e)=>{ e.preventDefault(); saveProfile(); });
+  function renderEmoji(){
+    $("#pEmoji").innerHTML = '<button type="button" data-emoji="" aria-pressed="'+(!state.emoji)+'" title="None">∅</button>'
+      + (state.data.emojis||[]).map(e=>'<button type="button" data-emoji="'+esc(e)+'" aria-pressed="'+(state.emoji===e)+'">'+esc(e)+'</button>').join("");
+  }
+  $("#pEmoji").addEventListener("click", (e)=>{ const b = e.target.closest("[data-emoji]"); if(!b) return; state.emoji = b.dataset.emoji; renderEmoji(); });
   $("#pColorReset").addEventListener("click", ()=>saveProfile({resetColors:true}));
   // Changing a color previews it on the page right away.
   for(const id of ["pColor1","pColor2"]) $("#"+id).addEventListener("input", ()=>applyTheme({theme:[$("#pColor1").value, $("#pColor2").value]}));
@@ -715,8 +854,9 @@ textarea{min-height:96px;resize:vertical}
       + (window.PFTicketsLeader ? window.PFTicketsLeader.badge(p) : '')
       + (p.blurb ? '<p>'+esc(p.blurb)+'</p>' : '')
       + '<div class="meter" role="img" aria-label="'+p.going+' of '+p.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
-      + '<p class="small muted" style="margin-top:0">'+p.going+' of '+p.cap+' on the list ('+pct+'%)</p>'
-      + (btns.length ? '<div class="btn-row" style="margin-top:10px">'+btns.join("")+'</div>' : '')
+      + '<p class="small muted" style="margin-top:0">'+p.going+' of '+p.cap+' on the list ('+pct+'%)'+(p.sororities ? ' · 💌 '+p.sororities+' sororit'+(p.sororities===1?'y':'ies')+' invited' : '')+'</p>'
+      + inBlock(p)
+      + ((btns.length || inButton(p)) ? '<div class="btn-row" style="margin-top:10px">'+inButton(p)+btns.join("")+'</div>' : '')
       + '</article>';
   }
   function renderParties(){
@@ -757,6 +897,7 @@ textarea{min-height:96px;resize:vertical}
       await api(state.editing ? "/api/chapter/parties/"+state.editing : "/api/chapter/parties", body);
       $("#partyFormCard").hidden = true;
       toast(state.editing ? "Party updated." : "Party posted. It's on the map now.");
+      if(!state.editing) burst(80);
       await load();
     }catch(err){ say($("#partyMsg"), err.message); }
     finally{ btn.disabled = false; }
@@ -839,6 +980,7 @@ textarea{min-height:96px;resize:vertical}
       const r = await api("/api/chapter/invites", {partyId:$("#invParty").value, email});
       $("#invEmail").value = "";
       say($("#inviteMsg"), r.emailed ? "Invite sent to "+email+"." : "Invite saved for "+email+", but the email didn't send. Let them know yourself.", "ok");
+      burst(30);
       await load();
       $("#invEmail").focus();
     }catch(err){ say($("#inviteMsg"), err.message); }
@@ -910,7 +1052,14 @@ textarea{min-height:96px;resize:vertical}
     $("#memberHint").textContent = leader()
       ? "Everyone who joined with the chapter password. Make someone a leader so they can post parties and answer requests."
       : "Everyone in your chapter who's on PhatFrats.";
-    $("#memberList").innerHTML = state.data.members.map(m=>{
+    const ranked = [...state.data.members].sort((a,b)=>b.invites-a.invites).filter(m=>m.invites>0).slice(0,5);
+    const top = ranked[0] ? ranked[0].invites : 1, medals = ["🥇","🥈","🥉","4","5"];
+    $("#leaderboard").innerHTML = ranked.length ? ranked.map((m,i)=>'<div class="lb-row'+(m.you?' me':'')+'"><span class="medal">'+medals[i]+'</span><span class="av" style="width:36px;height:36px;font-size:14px">'+esc(initials(m.name))+'</span>'
+      + '<div style="min-width:0;flex:0 1 160px"><b style="overflow-wrap:anywhere">'+esc(m.name.split(" ")[0])+(m.you?' (you)':'')+'</b></div><span class="bar"><i style="width:'+Math.round(m.invites/top*100)+'%"></i></span><b class="n">'+m.invites+'</b></div>').join("")
+      : '<p class="empty">Nobody has sent an invite yet. First one gets the gold. 🥇</p>';
+    const q = (state.broQ||"").toLowerCase();
+    const list = state.data.members.filter(m=>!q || m.name.toLowerCase().includes(q));
+    $("#memberList").innerHTML = !list.length ? '<p class="empty">No brother matches that name.</p>' : '<div class="bro-grid">'+list.map(m=>{
       const btns = [];
       if(leader() && !m.you){
         btns.push(m.role==="leader"
@@ -918,11 +1067,13 @@ textarea{min-height:96px;resize:vertical}
           : '<button class="btn slim" type="button" data-role="leader" data-mid="'+m.id+'">Make leader</button>');
         btns.push('<button class="btn slim danger" type="button" data-remove="'+m.id+'">Remove</button>');
       }
-      return '<div class="row"><div class="who"><b>'+esc(m.name)+(m.you?' (you)':'')+' '+(m.role==="leader"?'<span class="badge leader">Leader</span>':'')+'</b>'
-        + '<span>'+(m.email?esc(m.email)+' · ':'')+'Joined '+shortDate(m.joined)+' · '+m.invites+' invite'+(m.invites===1?'':'s')+' sent</span></div>'
+      return '<div class="bro">'+(m.role==="leader"?'<span class="crown" aria-hidden="true">👑</span>':'')
+        + '<div class="bro-head"><span class="av">'+esc(initials(m.name))+'</span><div style="min-width:0"><b>'+esc(m.name)+(m.you?' (you)':'')+'</b>'
+        + '<span>'+(m.role==="leader"?'Leader · ':'')+(m.email?esc(m.email)+' · ':'')+'Joined '+shortDate(m.joined)+' · '+m.invites+' invite'+(m.invites===1?'':'s')+' sent</span></div></div>'
         + (btns.length ? '<div class="btn-row">'+btns.join("")+'</div>' : '') + '</div>';
-    }).join("");
+    }).join("")+'</div>';
   }
+  $("#broSearch").addEventListener("input", (e)=>{ state.broQ = e.target.value; renderMembers(); });
   $("#memberList").addEventListener("click", async (e)=>{
     const r = e.target.closest("[data-role]"), x = e.target.closest("[data-remove]");
     if(!r && !x) return;

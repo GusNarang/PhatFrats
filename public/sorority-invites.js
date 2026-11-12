@@ -79,6 +79,7 @@
       const n = all ? info.sororities.length : ids.length;
       if (!confirm('Invite ' + (all ? 'all ' + n + ' sororities' : n === 1 ? 'this sorority' : 'these ' + n + ' sororities') + ' to ' + p.title + '? Every sister goes on the list.')) return;
       const r = await C().api('/api/chapter/sorority-invites', { partyId: $('#soParty').value, sororityIds: ids, all, note: $('#soNote').value });
+      if (r.invited && C().burst) C().burst(70);
       C().toast(r.invited ? 'Invited ' + r.invited + ' sororit' + (r.invited === 1 ? 'y' : 'ies') + '.' + (r.already ? ' ' + r.already + ' already had an invite.' : '') : 'Those sororities already have an invite to this party.');
       await C().load();
     } catch (err) {

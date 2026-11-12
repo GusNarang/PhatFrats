@@ -11,6 +11,8 @@ const { TERMS_VERSION } = require('./terms.js');
 
 const chapterById = new Map(CHAPTERS.map((c) => [c.id, c]));
 const VIBES = ['neon', 'theme', 'day', 'chill', 'formal', 'charity'];
+// The house emojis leaders can pick for their chapter page. It floats in the banner and rains down with the confetti.
+const EMOJIS = ['🏛️', '🦅', '🐺', '🦁', '🐻', '🦬', '🐉', '🦈', '🐍', '⚡', '🔥', '⭐', '👑', '🛡️', '⚔️', '⚓', '🔑', '🏆', '🎯', '🏈', '🎸', '🎺', '🍀', '🎉'];
 const PSU_EMAIL = /^[a-z0-9._%+-]+@psu\.edu$/;
 // Keeps one brother from flooding inboxes, and the site's email account under its daily sending limit.
 const INVITES_PER_BROTHER_PER_PARTY = 20;
@@ -53,7 +55,10 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   // The chapter's look: national colors and founding, plus anything its leaders customized.
   async function chapterIdentity(id) {
     const base = IDENTITY[id] || { colors: [], founded: null };
-    const { rows: [p] } = await pool.query('SELECT tagline, about, color1, color2 FROM chapter_profiles WHERE chapter_id = $1', [id]);
+    const { rows: [p] } = await pool.query(
+      'SELECT cp.tagline, cp.about, cp.color1, cp.color2, cp.emoji, cp.announcement, cp.announcement_at, u.name AS announcement_name FROM chapter_profiles cp LEFT JOIN users u ON u.id = cp.announcement_by WHERE cp.chapter_id = $1',
+      [id]
+    );
     const custom = p && p.color1 && p.color2;
     return {
       colors: base.colors,
@@ -63,6 +68,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       kind: base.kind || '',
       tagline: p?.tagline || '',
       about: p?.about || '',
+      emoji: p?.emoji || '',
+      announcement: p?.announcement ? { text: p.announcement, at: p.announcement_at, by: p.announcement_name || 'A leader' } : null,
     };
   }
 
@@ -163,7 +170,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
            hp.ticketed, hp.ticket_cents, hp.ticket_kind, hp.ticket_cause,
            (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL AND r.status = 'pending')::int
              + (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'pending')::int AS waiting,
-           (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved')::int AS outside
+           (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved')::int AS outside,
+           (SELECT count(*) FROM sorority_invites si WHERE si.party_id = hp.id AND si.status = 'active')::int AS sororities
          FROM hosted_parties hp WHERE hp.chapter_id = $1 AND hp.party_date >= $2::date - 30
          ORDER BY hp.party_date DESC, hp.id DESC`,
         [ch, today]
@@ -190,6 +198,17 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       ),
     ]);
 
+    // Brothers who tapped "I'm in" on each party (current members only).
+    const { rows: ins } = await pool.query(
+      `SELECT v.party_id, v.user_id, u.name FROM chapter_rsvps v JOIN users u ON u.id = v.user_id
+       JOIN chapter_members m ON m.user_id = v.user_id AND m.chapter_id = $2
+       WHERE v.party_id = ANY($1::bigint[]) ORDER BY v.created_at`,
+      [parties.rows.map((p) => p.id), ch]
+    );
+    const brothersIn = (pid) => {
+      const list = ins.filter((v) => String(v.party_id) === String(pid));
+      return { brothersIn: list.length, brothersInMe: list.some((v) => String(v.user_id) === String(req.user.id)), brothersInNames: list.slice(0, 12).map((v) => v.name.split(' ')[0]) };
+    };
     const out = {
       me,
       chapters,
@@ -201,7 +220,9 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       identity: await chapterIdentity(ch),
       today,
       lastDay: partyList.addDays(today, partyList.DAYS_AHEAD),
+      emojis: EMOJIS,
       parties: parties.rows.map((p) => ({
+        sororities: p.sororities, ...brothersIn(p.id),
         id: 'h' + p.id, title: p.title, day: p.day, dayText: partyList.dayLabel(p.day).long, time: p.start_time, vibe: p.vibe,
         blurb: p.blurb, dress: p.dress, music: p.music, cap: p.cap, status: p.status, going: p.going, waiting: p.waiting,
         allowGuests: p.allow_outside_guests, hideFriends: p.hide_friends, inviteOnly: p.invite_only, outside: p.outside, past: p.day < today,
@@ -313,18 +334,36 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const reset = req.body?.resetColors === true;
     const c1 = reset ? null : hex(req.body?.color1), c2 = reset ? null : hex(req.body?.color2);
     if (!reset && (req.body?.color1 || req.body?.color2) && (!c1 || !c2)) return fail(res, 400, 'Pick both colors.');
+    const ch = req.member.chapter_id;
+    const { rows: [old] } = await pool.query('SELECT emoji, announcement FROM chapter_profiles WHERE chapter_id = $1', [ch]);
+    // Leaving out emoji or announcement keeps what's there.
+    const emoji = req.body?.emoji === undefined ? (old?.emoji || null) : (EMOJIS.includes(req.body.emoji) ? req.body.emoji : null);
+    const note = req.body?.announcement === undefined ? (old?.announcement || '') : str(req.body.announcement, 240);
+    const noteChanged = note !== (old?.announcement || '');
     await pool.query(
-      `INSERT INTO chapter_profiles (chapter_id, tagline, about, color1, color2, updated_by) VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO chapter_profiles (chapter_id, tagline, about, color1, color2, updated_by, emoji, announcement, announcement_at, announcement_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8 = '' THEN NULL ELSE now() END, CASE WHEN $8 = '' THEN NULL ELSE $6::bigint END)
        ON CONFLICT (chapter_id) DO UPDATE SET tagline = EXCLUDED.tagline, about = EXCLUDED.about,
-         color1 = EXCLUDED.color1, color2 = EXCLUDED.color2, updated_by = EXCLUDED.updated_by, updated_at = now()`,
-      [req.member.chapter_id, tagline, about, c1, c2, req.user.id]
+         color1 = EXCLUDED.color1, color2 = EXCLUDED.color2, updated_by = EXCLUDED.updated_by, updated_at = now(),
+         emoji = EXCLUDED.emoji, announcement = EXCLUDED.announcement,
+         announcement_at = CASE WHEN $9 THEN EXCLUDED.announcement_at ELSE chapter_profiles.announcement_at END,
+         announcement_by = CASE WHEN $9 THEN EXCLUDED.announcement_by ELSE chapter_profiles.announcement_by END`,
+      [ch, tagline, about, c1, c2, req.user.id, emoji, note, noteChanged]
     );
+    // A new pinned note pings every brother's bell.
+    if (noteChanged && note) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, kind, text, link) SELECT user_id, 'chapter', $2, '/frats' FROM chapter_members WHERE chapter_id = $1 AND user_id <> $3`,
+        [ch, ('📣 ' + (chapterById.get(ch)?.gl || '') + ': ' + note).slice(0, 240), req.user.id]
+      );
+    }
     res.json({ identity: await chapterIdentity(req.member.chapter_id) });
   }));
 
   app.post('/api/chapter/leave', ...requireMember, wrap(async (req, res) => {
     if (req.member.admin) return fail(res, 400, "You're viewing this chapter as the admin, so there's nothing to leave.");
     await pool.query('DELETE FROM chapter_members WHERE user_id = $1', [req.user.id]);
+    await pool.query('DELETE FROM chapter_rsvps WHERE user_id = $1', [req.user.id]);
     res.json({ ok: true });
   }));
 
@@ -366,6 +405,22 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     if (!rowCount) return fail(res, 404, "That party isn't one of your chapter's.");
     await pool.query('UPDATE friend_going SET party_day = $2 WHERE party_id = $1', ['h' + id, p.date]);
     res.json({ ok: true });
+  }));
+
+  // Brothers tap "I'm in" (or take it back) on one of their chapter's upcoming parties.
+  app.post('/api/chapter/parties/:id/rsvp', ...requireMember, wrap(async (req, res) => {
+    const id = partyIdParam(req.params.id);
+    if (!id) return fail(res, 400, 'That party id is not valid.');
+    if (req.member.admin) return fail(res, 400, "You're viewing this chapter as the admin, so you can't RSVP.");
+    const { rows: [p] } = await pool.query(
+      "SELECT 1 FROM hosted_parties WHERE id = $1 AND chapter_id = $2 AND status = 'live' AND party_date >= $3::date",
+      [id, req.member.chapter_id, partyList.todayISO()]
+    );
+    if (!p) return fail(res, 404, "That party isn't one of your chapter's upcoming parties.");
+    if (req.body?.in === false) await pool.query('DELETE FROM chapter_rsvps WHERE party_id = $1 AND user_id = $2', [id, req.user.id]);
+    else await pool.query('INSERT INTO chapter_rsvps (party_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, req.user.id]);
+    const { rows: [n] } = await pool.query('SELECT count(*)::int AS n FROM chapter_rsvps WHERE party_id = $1', [id]);
+    res.json({ ok: true, in: n.n });
   }));
 
   app.post('/api/chapter/parties/:id/status', ...requireLeader, wrap(async (req, res) => {
@@ -546,6 +601,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     if (id === String(req.user.id)) return fail(res, 400, 'To leave the chapter yourself, use Leave chapter.');
     const { rowCount } = await pool.query('DELETE FROM chapter_members WHERE user_id = $1 AND chapter_id = $2', [id, req.member.chapter_id]);
     if (!rowCount) return fail(res, 404, "That person isn't in your chapter.");
+    await pool.query('DELETE FROM chapter_rsvps WHERE user_id = $1', [id]);
     res.json({ ok: true });
   }));
 
