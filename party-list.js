@@ -73,6 +73,7 @@ async function hostedParties(pool, { today = todayISO() } = {}) {
      FROM hosted_parties hp
      WHERE hp.status = 'live' AND hp.party_date BETWEEN $1::date AND $1::date + $2::int
        AND hp.chapter_id <> ALL($3::int[])
+       AND NOT EXISTS (SELECT 1 FROM chapter_bans cb WHERE cb.chapter_id = hp.chapter_id)
      ORDER BY hp.party_date, hp.id`,
     [today, DAYS_AHEAD, TEST_CHAPTER_IDS]
   );
@@ -109,7 +110,8 @@ async function findParty(pool, id, { includeTest = false } = {}) {
   const { rows: [r] } = await pool.query(
     `SELECT hp.*, to_char(hp.party_date, 'YYYY-MM-DD') AS day, ${GOING_SQL} AS going FROM hosted_parties hp
      WHERE hp.id = $1 AND hp.status = 'live' AND hp.party_date BETWEEN $2::date AND $2::date + $3::int
-       AND ($4 OR hp.chapter_id <> ALL($5::int[]))`,
+       AND ($4 OR hp.chapter_id <> ALL($5::int[]))
+       AND NOT EXISTS (SELECT 1 FROM chapter_bans cb WHERE cb.chapter_id = hp.chapter_id)`,
     [id.slice(1), today, DAYS_AHEAD, includeTest, TEST_CHAPTER_IDS]
   );
   return r ? hostedRow(r) : null;

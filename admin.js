@@ -235,7 +235,8 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     const testIds = CHAPTERS.filter((c) => c.test).map((c) => c.id);
     const testIdSet = new Set(testIds);
     const [accts, members, parties, requests, invites, upcoming, series, brothers] = await Promise.all([
-      pool.query('SELECT chapter_id, updated_at, password_hash IS NOT NULL AS brother, leader_password_hash IS NOT NULL AS leader FROM chapter_accounts'),
+      pool.query(`SELECT a.chapter_id, a.updated_at, a.password_hash IS NOT NULL AS brother, a.leader_password_hash IS NOT NULL AS leader
+                  FROM chapter_accounts a`),
       pool.query(`SELECT m.chapter_id, m.role, m.joined_at, u.name, u.email FROM chapter_members m JOIN users u ON u.id = m.user_id
                   WHERE u.banned_at IS NULL ORDER BY u.name`),
       pool.query(`SELECT chapter_id,
@@ -282,6 +283,8 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     ]);
 
     const byChapter = (rows) => new Map(rows.map((r) => [r.chapter_id, r]));
+    const { rows: banRows } = await pool.query(`SELECT b.chapter_id, b.reason, b.banned_at, u.name AS by_name FROM chapter_bans b LEFT JOIN users u ON u.id = b.banned_by`);
+    const bans = byChapter(banRows);
     const acct = byChapter(accts.rows), pc = byChapter(parties.rows), rq = byChapter(requests.rows), iv = byChapter(invites.rows);
     const up = upcoming.rows.map((p) => ({
       id: 'h' + p.id, ch: p.chapter_id, title: p.title, day: p.day, time: p.start_time, vibe: p.vibe, cap: p.cap,
@@ -295,6 +298,7 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
       const cap = live.reduce((s, p) => s + p.cap, 0);
       return {
         id: c.id, name: c.name, gl: c.gl, test: !!c.test,
+        banned: bans.has(c.id) ? { reason: bans.get(c.id).reason, at: bans.get(c.id).banned_at, by: bans.get(c.id).by_name || 'An admin' } : null,
         ready: !!acct.get(c.id)?.brother, leaderReady: !!acct.get(c.id)?.leader, passwordSet: acct.get(c.id)?.updated_at || null,
         members: mine.length,
         leaders: mine.filter((m) => m.role === 'leader').map((m) => ({ name: m.name, email: m.email })),
@@ -358,6 +362,36 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     // Taking a ticketed event down refunds everyone who bought a ticket.
     const refunded = status === 'cancelled' && tickets ? await tickets.refundParty('h' + id, 'taken down') : 0;
     res.json({ ok: true, refunded });
+  }));
+
+  // Bans (suspends) a chapter: its parties come off the map, nobody can join it, its members can't use the chapter
+  // tools, and every ticket for its upcoming events is refunded. Members' own accounts are untouched.
+  app.post('/api/admin/chapters/:id/ban', requireAdmin, wrap(async (req, res) => {
+    const id = chapterParam(req);
+    if (!id) return fail(res, 404, 'That chapter is not on the list.');
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 200) : '';
+    if (reason.length < 3) return fail(res, 400, 'Give a short reason. Chapter members see it.');
+    await pool.query(
+      `INSERT INTO chapter_bans (chapter_id, reason, banned_by) VALUES ($1, $2, $3)
+       ON CONFLICT (chapter_id) DO UPDATE SET reason = EXCLUDED.reason, banned_by = EXCLUDED.banned_by, banned_at = now()`,
+      [id, reason, req.user.id]
+    );
+    let refunded = 0;
+    if (tickets) {
+      const { rows } = await pool.query(
+        `SELECT DISTINCT t.party_id FROM tickets t JOIN hosted_parties hp ON 'h' || hp.id = t.party_id
+         WHERE hp.chapter_id = $1 AND hp.party_date >= ${TODAY_SQL} AND t.status IN ('paid', 'used')`,
+        [id]
+      );
+      for (const r of rows) refunded += await tickets.refundParty(r.party_id, 'taken down');
+    }
+    res.json({ ok: true, refunded });
+  }));
+  app.post('/api/admin/chapters/:id/unban', requireAdmin, wrap(async (req, res) => {
+    const id = chapterParam(req);
+    if (!id) return fail(res, 404, 'That chapter is not on the list.');
+    await pool.query('DELETE FROM chapter_bans WHERE chapter_id = $1', [id]);
+    res.json({ ok: true });
   }));
 
   // Sets or replaces a chapter's brother (join) password, or with kind 'leader', its leader sign-in password.

@@ -73,7 +73,8 @@ function create({ pool, wrap, fail, requireUser, requireVerified, ops, community
     if (!partyList.isHostedId(hostedId)) return null;
     const { rows: [p] } = await pool.query(
       `SELECT hp.*, to_char(hp.party_date, 'YYYY-MM-DD') AS day,
-         (SELECT count(*) FROM tickets t WHERE t.party_id = 'h' || hp.id AND t.status IN ('paid', 'used'))::int AS sold
+         (SELECT count(*) FROM tickets t WHERE t.party_id = 'h' || hp.id AND t.status IN ('paid', 'used'))::int AS sold,
+         EXISTS (SELECT 1 FROM chapter_bans cb WHERE cb.chapter_id = hp.chapter_id) AS banned
        FROM hosted_parties hp WHERE hp.id = $1`,
       [hostedId.slice(1)]
     );
@@ -190,7 +191,7 @@ function create({ pool, wrap, fail, requireUser, requireVerified, ops, community
       if (await ops.paused('checkout')) return fail(res, 503, 'Checkout is paused for a little while. Check back soon.', 'PAUSED');
       if (req.body?.agree !== true) return fail(res, 400, 'Read and accept the ticket terms first.', 'TERMS');
       const party = await partyRow(String(req.body?.partyId || ''));
-      if (!party || !party.ticketed || party.status !== 'live' || party.day < partyList.todayISO()) return fail(res, 404, "Tickets for that event aren't on sale.");
+      if (!party || !party.ticketed || party.status !== 'live' || party.day < partyList.todayISO() || party.banned) return fail(res, 404, "Tickets for that event aren't on sale.");
       const payout = await refreshPayouts(await payoutsFor(party.chapter_id));
       if (!payout?.ready) return fail(res, 503, "This chapter can't take payments yet.", 'NOT_READY');
       if (party.sold >= party.cap) return fail(res, 409, 'Sold out.', 'SOLD_OUT');

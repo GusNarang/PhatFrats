@@ -492,7 +492,8 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
     $("#chapterCount").textContent = on+" of "+all.filter(c=>!c.test).length+" set up";
     if(!list.length){ $("#chapters").innerHTML = '<tr><td colspan="10" class="empty">No chapters match.</td></tr>'; return; }
     $("#chapters").innerHTML = list.map(c=>'<tr>'
-      + '<td class="who"><b>'+esc(c.gl+"  "+c.name)+'</b>'+(c.test?'<span>Practice chapter, never on the public map</span>':'')+'</td>'
+      + '<td class="who"><b>'+esc(c.gl+"  "+c.name)+'</b>'+(c.test?'<span>Practice chapter, never on the public map</span>':'')
+      + (c.banned ? '<span class="tag banned" style="background:rgba(255,93,108,.18);color:#ffb3bb;border-color:rgba(255,93,108,.5)">Banned</span><span class="reason">'+esc(c.banned.reason)+' · '+esc(c.banned.by)+', '+dateFmt(c.banned.at)+'</span>' : '')+'</td>'
       + '<td>'+(c.ready ? '<span class="tag full">Brothers can join</span>' : '<span class="tag">No brother password</span>')
       + (c.leaderReady ? '<span class="tag admin">Leader sign-in on</span>' : '<span class="tag">No leader password</span>')
       + (c.passwordSet ? '<span class="reason" style="color:var(--muted)">Changed '+dateFmt(c.passwordSet)+'</span>' : '')+'</td>'
@@ -505,9 +506,30 @@ dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
       + '<td>'+(c.lastPosted ? ago(c.lastPosted) : '<span class="updated">Never</span>')+'</td>'
       + '<td><div class="actions"><a class="btn small gold" href="/frats?chapter='+c.id+'" target="_blank" rel="noopener">Open page</a><button class="btn small" data-chpw="'+c.id+'">Brother password</button>'
       + '<button class="btn small" data-chlpw="'+c.id+'">Leader password</button>'
-      + '<button class="btn small good" data-chlead="'+c.id+'">Add leader</button></div></td></tr>').join("");
+      + '<button class="btn small good" data-chlead="'+c.id+'">Add leader</button>'
+      + (c.banned ? '<button class="btn small good" data-chunban="'+c.id+'">Unban</button>' : '<button class="btn small danger" data-chban="'+c.id+'">Ban chapter</button>')
+      + '</div></td></tr>').join("");
   }
   $("#chapters").addEventListener("click", async (e)=>{
+    // Ban or unban a chapter.
+    const ban = e.target.closest("[data-chban]"), unban = e.target.closest("[data-chunban]");
+    if(ban || unban){
+      const c = state.chapters.find(x=>String(x.id)===(ban ? ban.dataset.chban : unban.dataset.chunban));
+      try{
+        if(ban){
+          const reason = prompt("Ban "+c.name+" from PhatFrats?\n\nWhile banned: their parties come off the map, nobody can join the chapter, brothers and leaders can't use the chapter tools, and every ticket for their upcoming events is refunded. Members' own accounts are not affected.\n\nReason (chapter members will see it):");
+          if(reason===null) return;
+          const r = await api("/api/admin/chapters/"+c.id+"/ban", {reason});
+          toast("🚫 "+c.name+" is banned."+(r.refunded ? " "+r.refunded+" tickets refunded." : ""));
+        }else{
+          if(!confirm("Unban "+c.name+"? Their upcoming parties go back on the map and the chapter tools unlock.")) return;
+          await api("/api/admin/chapters/"+c.id+"/unban", {});
+          toast(c.name+" is unbanned.");
+        }
+        await load();
+      }catch(err){ toast(err.message); }
+      return;
+    }
     const pw = e.target.closest("[data-chpw]"), lpw = e.target.closest("[data-chlpw]"), ld = e.target.closest("[data-chlead]");
     const btn = pw || lpw || ld;
     if(!btn) return;

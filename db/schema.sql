@@ -467,3 +467,12 @@ CREATE TABLE IF NOT EXISTS tickets (
 -- One live ticket per person per event.
 CREATE UNIQUE INDEX IF NOT EXISTS tickets_one_per_person ON tickets (party_id, user_id) WHERE status IN ('paid', 'used');
 CREATE INDEX IF NOT EXISTS tickets_party_idx ON tickets (party_id);
+
+-- Chapters the site admin has banned (suspended) from PhatFrats. While banned, a chapter's parties are off
+-- the map, nobody can join it, and its members can't use the chapter tools. Unbanning deletes the row.
+CREATE TABLE IF NOT EXISTS chapter_bans (
+  chapter_id INTEGER PRIMARY KEY,
+  reason     TEXT NOT NULL DEFAULT '',
+  banned_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  banned_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

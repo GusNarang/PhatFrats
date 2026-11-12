@@ -34,9 +34,21 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     }
     req.member = adminView(req) || await memberOf(req.user.id);
     if (!req.member) return fail(res, 403, 'Join your chapter first.', 'NOT_A_MEMBER');
+    if (!req.member.admin) {
+      const ban = await banOf(req.member.chapter_id);
+      if (ban) return fail(res, 403, bannedMessage(ban), 'CHAPTER_BANNED');
+    }
     res.set('Cache-Control', 'no-store');
     next();
   })];
+  // A banned chapter: its row in chapter_bans, or null.
+  async function banOf(chapterId) {
+    const { rows: [b] } = await pool.query('SELECT reason, banned_at FROM chapter_bans WHERE chapter_id = $1', [chapterId]);
+    return b || null;
+  }
+  const bannedMessage = (b) => 'This chapter is suspended from PhatFrats' + (b.reason ? ': ' + b.reason : '.') +
+    (b.reason && !/[.!?]$/.test(b.reason) ? '.' : '') + ' Its parties are off the map and the chapter tools are locked. To appeal, contact the PhatFrats team from the About page.';
+
   // The chapter's look: national colors and founding, plus anything its leaders customized.
   async function chapterIdentity(id) {
     const base = IDENTITY[id] || { colors: [], founded: null };
@@ -124,10 +136,12 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       'SELECT chapter_id, password_hash IS NOT NULL AS brother, leader_password_hash IS NOT NULL AS leader FROM chapter_accounts'
     );
     const ready = new Map(setUp.map((r) => [r.chapter_id, r]));
+    const { rows: bans } = await pool.query('SELECT chapter_id FROM chapter_bans');
+    const bannedIds = new Set(bans.map((b) => b.chapter_id));
     // ready: brothers can join. leaderReady: the leader sign-in works.
     const chapters = CHAPTERS.map((c) => ({
       id: c.id, name: c.name, gl: c.gl, test: !!c.test,
-      ready: !!ready.get(c.id)?.brother, leaderReady: !!ready.get(c.id)?.leader,
+      ready: !!ready.get(c.id)?.brother && !bannedIds.has(c.id), leaderReady: !!ready.get(c.id)?.leader && !bannedIds.has(c.id),
     }));
     if (req.get('x-pf-chapter') && !adminView(req)) {
       return fail(res, 403, 'Open this chapter from the control room, and keep the control room open while you use it.', 'ADMIN_LOCKED');
@@ -179,6 +193,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       membership: {
         chapter: chapters.find((c) => c.id === ch), address: chapterById.get(ch)?.addr || '', role: member.role, adminView: !!member.admin,
         nick: chapterById.get(ch)?.nick || '', instagram: chapterById.get(ch)?.ig || '',
+        banned: member.admin ? null : await banOf(ch).then((b) => (b ? bannedMessage(b) : null)),
       },
       identity: await chapterIdentity(ch),
       today,
@@ -248,6 +263,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
     if (!chapterById.has(chapterId)) return fail(res, 400, 'Pick your chapter.');
     if (await memberOf(req.user.id)) return fail(res, 409, "You're already in a chapter. Leave it first to join another.", 'ALREADY_MEMBER');
+    const joinBan = await banOf(chapterId);
+    if (joinBan) return fail(res, 403, bannedMessage(joinBan), 'CHAPTER_BANNED');
     const { rows: [acct] } = await pool.query('SELECT password_hash FROM chapter_accounts WHERE chapter_id = $1', [chapterId]);
     if (!acct?.password_hash) return fail(res, 400, "Your chapter isn't set up on PhatFrats yet. Ask your chapter leader to contact PhatFrats.", 'CHAPTER_NOT_READY');
     if (!password || !(await verifyPassword(password, acct.password_hash))) {
@@ -262,6 +279,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const chapterId = Number(req.body?.chapterId);
     const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
     if (!chapterById.has(chapterId)) return fail(res, 400, 'Pick your chapter.');
+    const leadBan = await banOf(chapterId);
+    if (leadBan) return fail(res, 403, bannedMessage(leadBan), 'CHAPTER_BANNED');
     const { rows: [acct] } = await pool.query('SELECT leader_password_hash FROM chapter_accounts WHERE chapter_id = $1', [chapterId]);
     if (!acct?.leader_password_hash) {
       return fail(res, 400, "Leader sign-in isn't set up for this chapter yet. Contact PhatFrats to get your leader password.", 'LEADER_NOT_READY');
