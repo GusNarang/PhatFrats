@@ -234,7 +234,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     app.post('/api/chapter/invites', (req, res, next) => {
       after(res, async () => {
         const { rows: [u] } = await pool.query('SELECT id FROM users WHERE email = $1', [String(req.body?.email || '').trim().toLowerCase()]);
-        const party = await partyList.findParty(pool, 'h' + String(req.body?.partyId || '').replace(/^h/, ''), { includeTest: true });
+        const party = await partyList.findParty(pool, 'h' + String(req.body?.partyId || '').replace(/^h/, ''), { includeTest: true, includePrivate: true });
         if (u && party) await notify(u.id, 'invited', `💌 ${req.user.name.split(' ')[0]} invited you to ${party.title}. You're on the list!`, { email: false });
       });
       next();
@@ -247,7 +247,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     // Saved parties, for alerts when they start filling up.
     app.post('/api/saved', ...requireVerified, wrap(async (req, res) => {
       const id = req.body?.partyId;
-      if (typeof id !== 'string' || !(await partyList.findParty(pool, id))) return fail(res, 400, 'That party is not on the schedule.');
+      if (typeof id !== 'string' || !(await partyList.findParty(pool, id, { viewerId: req.user.id }))) return fail(res, 400, 'That party is not on the schedule.');
       if (req.body.on === false) await pool.query('DELETE FROM saved_parties WHERE user_id = $1 AND party_id = $2', [req.user.id, id]);
       else await pool.query('INSERT INTO saved_parties (user_id, party_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, id]);
       const { rows } = await pool.query('SELECT party_id FROM saved_parties WHERE user_id = $1', [req.user.id]);

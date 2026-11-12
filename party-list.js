@@ -58,24 +58,32 @@ const hostedRow = (r) => ({
   going: Math.min(r.going, r.cap),
   hosted: true,
   allowGuests: !!r.allow_outside_guests,
-  hideFriends: !!r.hide_friends,
+  hideFriends: !!r.hide_friends || !!r.invite_only,
+  inviteOnly: !!r.invite_only,
   postedAt: r.created_at,
 });
 
-// Early access: a chapter's new party is for Full Access only during its first 24 hours.
+// Invite-only parties only show to people already on their list (a brother's or leader's invite, or an approved
+// spot) and to the hosting chapter's own members. viewer is the SQL parameter holding the viewer's user id (or null).
+const VISIBLE_SQL = (viewer) => `(NOT hp.invite_only
+  OR EXISTS (SELECT 1 FROM invite_requests vr WHERE vr.party_id = 'h' || hp.id AND vr.user_id = ${viewer}::bigint AND vr.status = 'approved')
+  OR EXISTS (SELECT 1 FROM chapter_members vm WHERE vm.user_id = ${viewer}::bigint AND vm.chapter_id = hp.chapter_id))`;
+
+// Early access: a chapter's new party is for Full Access only during its first 24 hours. Invite-only parties skip it.
 const EARLY_HOURS = 24;
-const earlyUntil = (p) => (p && p.hosted && p.postedAt ? new Date(p.postedAt).getTime() + EARLY_HOURS * 3600 * 1000 : 0);
+const earlyUntil = (p) => (p && p.hosted && !p.inviteOnly && p.postedAt ? new Date(p.postedAt).getTime() + EARLY_HOURS * 3600 * 1000 : 0);
 const isEarly = (p, now = Date.now()) => earlyUntil(p) > now;
 
-async function hostedParties(pool, { today = todayISO() } = {}) {
+async function hostedParties(pool, { today = todayISO(), viewerId = null } = {}) {
   const { rows } = await pool.query(
     `SELECT hp.*, to_char(hp.party_date, 'YYYY-MM-DD') AS day, ${GOING_SQL} AS going
      FROM hosted_parties hp
      WHERE hp.status = 'live' AND hp.party_date BETWEEN $1::date AND $1::date + $2::int
        AND hp.chapter_id <> ALL($3::int[])
        AND NOT EXISTS (SELECT 1 FROM chapter_bans cb WHERE cb.chapter_id = hp.chapter_id)
+       AND ${VISIBLE_SQL('$4')}
      ORDER BY hp.party_date, hp.id`,
-    [today, DAYS_AHEAD, TEST_CHAPTER_IDS]
+    [today, DAYS_AHEAD, TEST_CHAPTER_IDS, viewerId]
   );
   return rows.map(hostedRow);
 }
@@ -93,17 +101,18 @@ function forgetOldGuests(pool) {
 }
 
 // The admin can hide the demo parties once real chapter parties are on the map.
-async function partiesForSite(pool, { hideDemo = false } = {}) {
+async function partiesForSite(pool, { hideDemo = false, viewerId = null } = {}) {
   const today = todayISO();
   forgetOldGuests(pool);
   const demo = hideDemo ? [] : DEMO.map((p) => ({ ...p, day: demoDate(p.day, today) }));
-  const parties = [...demo, ...(await hostedParties(pool, { today }))];
+  const parties = [...demo, ...(await hostedParties(pool, { today, viewerId }))];
   const days = [...new Set(parties.map((p) => p.day))].sort().map(dayLabel);
   return { parties, days };
 }
 
 // A party someone can still ask to go to, or null. Practice chapters' parties only count for their own brothers' invites.
-async function findParty(pool, id, { includeTest = false } = {}) {
+// Invite-only parties only count for a viewerId who can see them, or with includePrivate (the hosting chapter's own tools).
+async function findParty(pool, id, { includeTest = false, includePrivate = false, viewerId = null } = {}) {
   if (DEMO_BY_ID.has(id)) return DEMO_BY_ID.get(id);
   if (!isHostedId(id)) return null;
   const today = todayISO();
@@ -111,8 +120,9 @@ async function findParty(pool, id, { includeTest = false } = {}) {
     `SELECT hp.*, to_char(hp.party_date, 'YYYY-MM-DD') AS day, ${GOING_SQL} AS going FROM hosted_parties hp
      WHERE hp.id = $1 AND hp.status = 'live' AND hp.party_date BETWEEN $2::date AND $2::date + $3::int
        AND ($4 OR hp.chapter_id <> ALL($5::int[]))
-       AND NOT EXISTS (SELECT 1 FROM chapter_bans cb WHERE cb.chapter_id = hp.chapter_id)`,
-    [id.slice(1), today, DAYS_AHEAD, includeTest, TEST_CHAPTER_IDS]
+       AND NOT EXISTS (SELECT 1 FROM chapter_bans cb WHERE cb.chapter_id = hp.chapter_id)
+       AND ($6::boolean OR ${VISIBLE_SQL('$7')})`,
+    [id.slice(1), today, DAYS_AHEAD, includeTest, TEST_CHAPTER_IDS, includePrivate, viewerId]
   );
   return r ? hostedRow(r) : null;
 }

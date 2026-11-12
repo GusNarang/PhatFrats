@@ -262,6 +262,12 @@ textarea{min-height:96px;resize:vertical}
               </div>
             </div>
             <div class="field">
+              <label class="check-row" for="pfInviteOnly">
+                <input id="pfInviteOnly" type="checkbox">
+                <span>Invite-only party<span class="hint">Keeps the whole party private. It never shows on the map, and nobody can see it or request an invite. Only people a brother or leader invites from the Invite tab can see it. Your brothers always can.</span></span>
+              </label>
+            </div>
+            <div class="field">
               <label class="check-row" for="pfGuests">
                 <input id="pfGuests" type="checkbox">
                 <span>Allow outside guests<span class="hint">Each student or brother on the list can bring one person who isn't a Penn State student. You approve students' guests. Off means Penn State students only.</span></span>
@@ -703,7 +709,7 @@ textarea{min-height:96px;resize:vertical}
       + '<div class="btn-row" style="justify-content:space-between"><span class="when">'+esc(p.dayText)+' · '+esc(p.time)+'</span>'+status+'</div>'
       + '<h3 style="margin-top:6px">'+esc(p.title)+'</h3>'
       + '<p class="muted small">'+esc(v.label)+(p.dress?' · Dress: '+esc(p.dress):'')+(p.music?' · Music: '+esc(p.music):'')+'</p>'
-      + '<p class="small" style="margin:4px 0">'+(p.allowGuests ? '<span class="badge guests">Outside guests on · '+p.outside+' on the list</span>' : '<span class="badge past">Penn State students only</span>')+(p.hideFriends ? ' <span class="badge past">Crowd private</span>' : '')+'</p>'
+      + '<p class="small" style="margin:4px 0">'+(p.allowGuests ? '<span class="badge guests">Outside guests on · '+p.outside+' on the list</span>' : '<span class="badge past">Penn State students only</span>')+(p.inviteOnly ? ' <span class="badge guests">🔒 Invite-only · off the map</span>' : p.hideFriends ? ' <span class="badge past">Crowd private</span>' : '')+'</p>'
       + (window.PFTicketsLeader ? window.PFTicketsLeader.badge(p) : '')
       + (p.blurb ? '<p>'+esc(p.blurb)+'</p>' : '')
       + '<div class="meter" role="img" aria-label="'+p.going+' of '+p.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
@@ -729,6 +735,7 @@ textarea{min-height:96px;resize:vertical}
     $("#pfDress").value = p?.dress || ""; $("#pfMusic").value = p?.music || "";
     $("#pfGuests").checked = !!p?.allowGuests;
     $("#pfHideFriends").checked = !!p?.hideFriends;
+    $("#pfInviteOnly").checked = !!p?.inviteOnly;
     $("#pfAgree").checked = false;
     say($("#partyMsg"), "");
     $("#partyFormCard").hidden = false;
@@ -743,7 +750,7 @@ textarea{min-height:96px;resize:vertical}
     const btn = $("#partySave"); btn.disabled = true; say($("#partyMsg"), "");
     const body = { title:$("#pfTitle").value, date:$("#pfDate").value, time:$("#pfTime").value, vibe:$("#pfVibe").value,
       cap:Number($("#pfCap").value), blurb:$("#pfBlurb").value, dress:$("#pfDress").value, music:$("#pfMusic").value,
-      allowGuests:$("#pfGuests").checked, hideFriends:$("#pfHideFriends").checked, agree:true };
+      allowGuests:$("#pfGuests").checked, hideFriends:$("#pfHideFriends").checked, inviteOnly:$("#pfInviteOnly").checked, agree:true };
     try{
       await api(state.editing ? "/api/chapter/parties/"+state.editing : "/api/chapter/parties", body);
       $("#partyFormCard").hidden = true;

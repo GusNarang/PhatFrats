@@ -309,6 +309,7 @@ function create({ pool, wrap, fail, requireUser, requireVerified, ops, community
       const payout = await refreshPayouts(await payoutsFor(party.chapter_id));
       if (!payout?.ready) return fail(res, 400, 'Connect your chapter\'s payouts with Stripe first.', 'NOT_READY');
       if (party.status !== 'live' || party.day < partyList.todayISO()) return fail(res, 400, "Tickets can only be sold for an upcoming event that's on the map.");
+      if (party.invite_only) return fail(res, 400, "Invite-only parties can't sell tickets. Make the party open to everyone first.", 'INVITE_ONLY');
       const kind = KINDS[req.body?.kind] ? req.body.kind : null;
       if (!kind) return fail(res, 400, 'Choose what kind of event this is.');
       const cause = typeof req.body?.cause === 'string' ? req.body.cause.trim().slice(0, 80) : '';

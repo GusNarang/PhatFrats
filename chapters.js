@@ -110,6 +110,8 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       allowGuests: body?.allowGuests === true,
       // On means friends never see who's going to this party.
       hideFriends: body?.hideFriends === true,
+      // On means the party is off the map and closed to requests: only people brothers or leaders invite can see it.
+      inviteOnly: body?.inviteOnly === true,
     };
   }
 
@@ -157,7 +159,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const [parties, members, myInvites, myGuests] = await Promise.all([
       pool.query(
         `SELECT hp.id, hp.title, to_char(hp.party_date, 'YYYY-MM-DD') AS day, hp.start_time, hp.vibe, hp.blurb, hp.dress,
-           hp.music, hp.cap, hp.status, hp.allow_outside_guests, hp.hide_friends, ${partyList.GOING_SQL} AS going,
+           hp.music, hp.cap, hp.status, hp.allow_outside_guests, hp.hide_friends, hp.invite_only, ${partyList.GOING_SQL} AS going,
            hp.ticketed, hp.ticket_cents, hp.ticket_kind, hp.ticket_cause,
            (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL AND r.status = 'pending')::int
              + (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'pending')::int AS waiting,
@@ -202,7 +204,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       parties: parties.rows.map((p) => ({
         id: 'h' + p.id, title: p.title, day: p.day, dayText: partyList.dayLabel(p.day).long, time: p.start_time, vibe: p.vibe,
         blurb: p.blurb, dress: p.dress, music: p.music, cap: p.cap, status: p.status, going: p.going, waiting: p.waiting,
-        allowGuests: p.allow_outside_guests, hideFriends: p.hide_friends, outside: p.outside, past: p.day < today,
+        allowGuests: p.allow_outside_guests, hideFriends: p.hide_friends, inviteOnly: p.invite_only, outside: p.outside, past: p.day < today,
         ticketed: p.ticketed, price: p.ticket_cents, ticketKind: p.ticket_kind, cause: p.ticket_cause,
       })),
       members: members.rows.map((m) => ({
@@ -337,9 +339,9 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     if (!hostAgreed(req.body)) return fail(res, 400, HOST_TERMS_MSG, 'HOST_TERMS');
     const { rows: [row] } = await pool.query(
       `INSERT INTO hosted_parties (chapter_id, title, party_date, start_time, vibe, blurb, dress, music, cap, created_by, allow_outside_guests, hide_friends,
-         host_terms, host_terms_at, host_terms_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), $10) RETURNING id`,
-      [req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, req.user.id, p.allowGuests, p.hideFriends, TERMS_VERSION]
+         host_terms, host_terms_at, host_terms_by, invite_only)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), $10, $14) RETURNING id`,
+      [req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, req.user.id, p.allowGuests, p.hideFriends, TERMS_VERSION, p.inviteOnly]
     );
     res.status(201).json({ id: 'h' + row.id });
   }));
@@ -350,12 +352,16 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     if (!id) return fail(res, 400, 'That party id is not valid.');
     if (typeof p === 'string') return fail(res, 400, p);
     if (!hostAgreed(req.body)) return fail(res, 400, HOST_TERMS_MSG, 'HOST_TERMS');
+    if (p.inviteOnly) {
+      const { rows: [t] } = await pool.query('SELECT ticketed FROM hosted_parties WHERE id = $1 AND chapter_id = $2', [id, req.member.chapter_id]);
+      if (t?.ticketed) return fail(res, 400, "Ticketed events are open to everyone, so they can't be invite-only. Stop ticket sales first.", 'TICKETED');
+    }
     const { rowCount } = await pool.query(
       `UPDATE hosted_parties SET title = $3, party_date = $4, start_time = $5, vibe = $6, blurb = $7, dress = $8, music = $9,
          cap = $10, allow_outside_guests = $11, hide_friends = $12, updated_at = now(),
-         host_terms = $13, host_terms_at = now(), host_terms_by = $14
+         host_terms = $13, host_terms_at = now(), host_terms_by = $14, invite_only = $15
        WHERE id = $1 AND chapter_id = $2`,
-      [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests, p.hideFriends, TERMS_VERSION, req.user.id]
+      [id, req.member.chapter_id, p.title, p.date, p.time, p.vibe, p.blurb, p.dress, p.music, p.cap, p.allowGuests, p.hideFriends, TERMS_VERSION, req.user.id, p.inviteOnly]
     );
     if (!rowCount) return fail(res, 404, "That party isn't one of your chapter's.");
     await pool.query('UPDATE friend_going SET party_day = $2 WHERE party_id = $1', ['h' + id, p.date]);
@@ -396,7 +402,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     if (!partyId) return fail(res, 400, 'Pick a party.');
     if (!PSU_EMAIL.test(email)) return fail(res, 400, 'Use their Penn State email, like abc1234@psu.edu.');
-    const party = await partyList.findParty(pool, 'h' + partyId, { includeTest: true });
+    const party = await partyList.findParty(pool, 'h' + partyId, { includeTest: true, includePrivate: true });
     const { rows: [own] } = await pool.query('SELECT chapter_id FROM hosted_parties WHERE id = $1', [partyId]);
     if (!party || !own || own.chapter_id !== req.member.chapter_id) return fail(res, 400, "That party isn't open for invites. It may be cancelled or already over.");
     const { rows: [sent] } = await pool.query(
@@ -476,7 +482,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
   app.post('/api/chapter/guests', ...requireMember, inviteLimiter, wrap(async (req, res) => {
     const partyId = partyIdParam(req.body?.partyId);
     if (!partyId) return fail(res, 400, 'Pick a party.');
-    const party = await partyList.findParty(pool, 'h' + partyId, { includeTest: true });
+    const party = await partyList.findParty(pool, 'h' + partyId, { includeTest: true, includePrivate: true });
     const { rows: [own] } = await pool.query('SELECT chapter_id, allow_outside_guests FROM hosted_parties WHERE id = $1', [partyId]);
     if (!party || !own || own.chapter_id !== req.member.chapter_id) return fail(res, 400, "That party isn't open for invites. It may be cancelled or already over.");
     if (!own.allow_outside_guests) return fail(res, 403, "This party isn't taking outside guests. Your chapter leader can switch them on.", 'GUESTS_OFF');

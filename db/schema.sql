@@ -484,3 +484,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_at      TIMESTAMPTZ;
 ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms    TEXT;
 ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms_at TIMESTAMPTZ;
 ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS host_terms_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+
+-- Invite-only parties: off the map, out of search and alerts, and closed to requests. Only people a brother
+-- or leader invites (and the chapter's own members) can see them.
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS invite_only BOOLEAN NOT NULL DEFAULT FALSE;

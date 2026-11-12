@@ -16,7 +16,7 @@ function create({ pool, wrap, fail, community }) {
         (async () => {
           const { rows: [hp] } = await pool.query(
             `SELECT id, chapter_id, title, to_char(party_date, 'YYYY-MM-DD') AS day FROM hosted_parties
-             WHERE created_by = $1 AND created_at >= now() - interval '1 minute' ORDER BY id DESC LIMIT 1`,
+             WHERE NOT invite_only AND created_by = $1 AND created_at >= now() - interval '1 minute' ORDER BY id DESC LIMIT 1`,
             [req.user.id]
           );
           if (!hp || !chapterName(hp.chapter_id)) return; // practice chapters aren't on the public list
@@ -40,7 +40,7 @@ function create({ pool, wrap, fail, community }) {
     if (user.plan === 'full') return [];
     const { rows } = await pool.query(
       `SELECT 'h' || hp.id AS id FROM chapter_follows f JOIN hosted_parties hp ON hp.chapter_id = f.chapter_id
-       WHERE f.user_id = $1 AND hp.status = 'live' AND hp.created_at >= now() - interval '4 days'
+       WHERE f.user_id = $1 AND hp.status = 'live' AND NOT hp.invite_only AND hp.created_at >= now() - interval '4 days'
          AND NOT EXISTS (SELECT 1 FROM invite_requests r WHERE r.user_id = $1 AND r.party_id = 'h' || hp.id)
        ORDER BY hp.created_at DESC LIMIT 5`,
       [user.id]

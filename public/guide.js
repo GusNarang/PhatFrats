@@ -160,6 +160,7 @@
       <p>In a fraternity? Open <a href="/frats" style="color:var(--gold)">For frats</a> in the menu.</p>
       <ul><li><b>Brothers</b> join their chapter with the chapter password and can put friends on the list by email.</li>
       <li><b>Chapter leaders</b> sign in with the leader password to post parties, approve or waitlist requests, choose whether outside guests are allowed, and manage members.</li>
+      <li>Leaders can make a party <b>invite-only</b>. It stays off the map, nobody can request it, and only people a brother or leader invites can see it.</li>
       <li>Each chapter has its own page with its colors and story.</li></ul>`],
     ['More', 'faq', '❓', 'Quick answers', 'Common questions', `
       <p><b>Do I need a Penn State email?</b> Yes. That keeps PhatFrats just for students.</p>

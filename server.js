@@ -132,7 +132,7 @@ async function accountPayload(user) {
   if (!user.email_verified_at) return { user: publicUser(user), requests: [], parties: [], days: [], checkout: payments.enabled() };
   const requests = await listRequests(user);
   const s = await ops.settings();
-  let { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo });
+  let { parties, days } = await partyList.partiesForSite(pool, { hideDemo: !!s.hide_demo, viewerId: user.id });
   // Early access: Full Access sees a chapter's new party right away; everyone else 24 hours later.
   // A party someone was already invited to always shows.
   let early = null;
@@ -537,8 +537,9 @@ app.get('/api/requests', requireVerified, wrap(async (req, res) => {
 app.post('/api/requests', requireVerified, wrap(async (req, res) => {
   if (await ops.paused('requests')) return fail(res, 503, LOCKED.requests, 'PAUSED');
   const partyId = req.body?.partyId;
-  const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId) : null;
+  const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId, { viewerId: req.user.id }) : null;
   if (!party) return fail(res, 400, 'That party is not on the schedule.');
+  if (party.inviteOnly) return fail(res, 403, "This party is invite-only. Only the chapter's brothers can put you on the list.", 'INVITE_ONLY');
   if (req.user.plan !== 'full' && partyList.isEarly(party)) return fail(res, 403, 'This party is in Full Access early access. It opens to everyone 24 hours after it was posted.', 'EARLY_ACCESS');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
 
@@ -583,7 +584,7 @@ app.post('/api/requests', requireVerified, wrap(async (req, res) => {
 app.post('/api/requests/guest', requireVerified, wrap(async (req, res) => {
   if (await ops.paused('requests')) return fail(res, 503, LOCKED.requests, 'PAUSED');
   const partyId = req.body?.partyId;
-  const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId) : null;
+  const party = typeof partyId === 'string' ? await partyList.findParty(pool, partyId, { viewerId: req.user.id }) : null;
   if (!party || !party.hosted) return fail(res, 400, 'That party is not on the schedule.');
   if (!party.allowGuests) return fail(res, 403, "This party isn't taking outside guests.", 'GUESTS_OFF');
   const guest = guests.readGuest(req.body);

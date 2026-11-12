@@ -1263,6 +1263,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     // Ticketed events: a ticket is the spot on the list, so it replaces the request button.
     if(p.ticketed && window.PFTickets) return window.PFTickets.button(p, cls);
     const r = requestFor(p.id);
+    // Invite-only parties take no requests: only brothers' and leaders' invites.
+    if(!r && p.inviteOnly) return '<span class="status-pill st-locked">🔒 Invite-only</span>';
     if(!r && freeInviteUsed()) return '<button class="status-pill st-locked" type="button" data-out-of-invites="'+p.id+'" style="border:0;cursor:pointer;font:inherit">Invite used · Get another</button>';
     if(!r) return '<button class="btn '+(cls||"")+'" type="button" data-request="'+p.id+'">Request invite</button>';
     const map = {pending:["Requested · pending","st-pending"], approved:["You're on the list","st-approved"], waitlist:["Waitlisted","st-waitlist"]};
@@ -1287,7 +1289,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<div><span class="vibe-tag" style="--c:'+v.c+';color:'+v.c+'">'+esc(v.label)+'</span><h3 style="font-family:var(--display);font-weight:400;font-size:1.6rem;line-height:1.05;margin-top:4px">'+esc(p.title)+'</h3>' +
         '<p class="muted">Hosted by '+esc(c.name)+(c.nick?' ('+esc(c.nick)+')':'')+'</p></div>' +
         '<p>'+esc(p.blurb)+'</p>' +
-        '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>'+(p.ticketed ? 'Ticket + PSU ID' : 'Invite list + PSU ID')+'</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
+        '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>'+(p.ticketed ? 'Ticket + PSU ID' : p.inviteOnly ? 'Invite-only: brothers\' invites + PSU ID' : 'Invite list + PSU ID')+'</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
         hypeBlock(p) + chapterLinks(c) + (window.PFPremium ? window.PFPremium.followButton(c.id) : '') +
         '<div>'+reqButton(p)+'</div>' +
         (p.ticketed && window.PFTickets ? window.PFTickets.detail(p) : '') +
