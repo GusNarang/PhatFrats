@@ -794,6 +794,8 @@ tickets.mountAdmin(app);
 const sororities = require('./sororities.js').create({ pool, wrap, fail, requireUser, requireVerified, authLimiter, hashPassword, verifyPassword });
 sororities.mount(app);
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets });
+// The control room's Launch check: which outside services are set up, with test text and email buttons.
+require('./launch-check.js')(app, { pool, wrap, fail, requireUser, ops, community });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
 premium.mountRoutes(app, requireVerified);

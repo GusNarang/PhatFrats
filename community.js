@@ -469,7 +469,7 @@ function create({ pool, wrap, fail, requireUser, mailer, IS_PROD, ops, WEEK_STAR
     }));
   }
 
-  return { mountHooks, mountRoutes, mountAdmin, mountCron, awardDoorRushPrize, notify, profile, referralCode, addAlertSource: (fn) => alertSources.push(fn) };
+  return { mountHooks, mountRoutes, mountAdmin, mountCron, awardDoorRushPrize, notify, sendMail, profile, referralCode, addAlertSource: (fn) => alertSources.push(fn) };
 }
 
 module.exports = { create };
