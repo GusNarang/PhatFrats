@@ -35,11 +35,13 @@ function dayLabel(iso) {
 const isHostedId = (id) => typeof id === 'string' && /^h\d{1,18}$/.test(id);
 
 // People going to a posted party: approved requests plus brother invites not yet claimed. One person per invite.
+// Ticketed events also count everyone holding a valid ticket.
 const GOING_SQL = `(
   coalesce((SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.status = 'approved'), 0) +
   coalesce((SELECT count(*) FROM brother_invites b WHERE b.party_id = hp.id AND NOT EXISTS (
     SELECT 1 FROM invite_requests r JOIN users u ON u.id = r.user_id WHERE r.party_id = 'h' || hp.id AND u.email = b.email)), 0) +
-  coalesce((SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved'), 0)
+  coalesce((SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved'), 0) +
+  coalesce((SELECT count(*) FROM tickets t WHERE t.party_id = 'h' || hp.id AND t.status IN ('paid', 'used')), 0)
 )::int`;
 
 const hostedRow = (r) => ({

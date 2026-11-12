@@ -118,6 +118,13 @@
       <li>The house approves them, and you get a notification.</li>
       <li>Your guest's details are deleted two days after the party.</li></ul>`],
 
+    ['Your account', 'tickets', '🎟️', 'Ticketed events', 'Philanthropy and alcohol-free events', `
+      <p>Some chapters sell tickets to <b>philanthropy</b> or <b>alcohol-free</b> events, like a charity date night or a tournament. You'll see <b>Get ticket</b> with the price instead of Request invite.</p>
+      <ul><li>Tap <b>Get ticket</b>, read the ticket terms, and pay securely with Stripe. Your ticket is your spot on the list, no request needed.</li>
+      <li>Your <b>8-letter ticket code</b> shows on the event and in your bell. Show it with your Penn State ID at the door. It works once.</li>
+      <li>The chapter sells the ticket and runs the event; PhatFrats is only the ticketing platform. If the event is cancelled, you're refunded automatically.</li></ul>
+      <p>Full details: <a href="/about#ticket-terms">ticket terms</a>.</p>`],
+
     ['Fun extras', 'game', '🕹️', 'Door Rush and the weekly prize', 'Play free, win a free semester', `
       <p><b>Door Rush</b> is the PhatFrats game. Open it from <b>Door Rush Game</b> in the menu.</p>
       <ul><li>Guests walk up the street. Send each to the right party before they reach the red line: <b>★ → Neon</b>, <b>● → Chill</b>, <b>◆ → Costume</b>.</li>

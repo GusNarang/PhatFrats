@@ -149,6 +149,9 @@ async function accountPayload(user) {
   const { rows: saved } = await pool.query('SELECT party_id FROM saved_parties WHERE user_id = $1', [user.id]);
   // The admin's spotlight pins one party to the top with a glowing badge.
   if (s.spotlight) parties.forEach((p) => { if (p.id === s.spotlight) p.spotlight = true; });
+  // Ticketed events: price, cause and tickets left, only while ticketing is on and the chapter can take payments.
+  const ticketInfo = await tickets.publicInfo(parties.map((p) => p.id));
+  parties.forEach((p) => { const t = ticketInfo.get(p.id); if (t) Object.assign(p, t); });
   return { user: publicUser(user), requests, checkout: payments.enabled() && !(s.lockdown && s.lockdown.checkout), parties, days, early, saved: saved.map((r) => r.party_id) };
 }
 
@@ -290,6 +293,9 @@ if (IS_PROD) app.set('trust proxy', 1);
 // Stripe's webhook has to read the raw body to check its signature, so it's registered before the JSON parser.
 let stripeWebhook = (req, res) => res.status(503).json({ error: 'Payments are off.' });
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), (req, res, next) => stripeWebhook(req, res, next));
+// Events from chapters' own Stripe accounts (ticketed events). Same reason for the raw body.
+let ticketWebhook = (req, res) => res.status(503).json({ error: 'Not set up.' });
+app.post('/api/stripe/connect-webhook', express.raw({ type: 'application/json', limit: '1mb' }), (req, res, next) => ticketWebhook(req, res, next));
 app.use(express.json({ limit: '10kb' }));
 
 // Control room switches, the live activity ticker and the admin log. These listen in before the routes below.
@@ -689,7 +695,14 @@ app.post('/api/hit', hitLimiter, wrap(async (req, res) => {
   res.status(204).end();
 }));
 
-require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken });
+// Ticketed events (philanthropy and alcohol-free events only): see tickets.js.
+const tickets = require('./tickets.js').create({
+  pool, wrap, fail, requireUser, requireVerified, ops, community,
+  CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')],
+});
+ticketWebhook = tickets.webhookHandler;
+tickets.mountAdmin(app);
+require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
 premium.mountRoutes(app, requireVerified);
@@ -701,7 +714,7 @@ const pay = payments.create({ pool, wrap, fail, requireVerified, accountPayload,
 stripeWebhook = pay.webhookHandler;
 pay.mountRoutes(app);
 require('./game-routes.js')(app, { pool, wrap, fail, requireVerified, WEEK_START_SQL, ops });
-require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests });
+require('./chapters.js')(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests, tickets });
 
 app.use('/api', (req, res) => fail(res, 404, 'Not found.'));
 app.use(express.static(path.join(__dirname, 'public')));

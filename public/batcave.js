@@ -129,6 +129,16 @@
       <section class="card"><h2>🎯 Semester goal</h2><div id="goalBox"></div>
         <form id="goalForm" class="actions" style="justify-content:flex-start;margin-top:10px"><input class="cave-input" id="goalIn" type="number" min="0" step="1" style="max-width:140px" aria-label="Goal in dollars" placeholder="Goal in $"><button class="btn small" type="submit">Set goal</button></form></section>
     </div>
+    <section class="card" style="margin-bottom:16px"><h2>🎟️ Ticketed events</h2>
+      <p class="updated" style="margin-top:0">Lets chapters sell tickets to philanthropy and alcohol-free events through their own Stripe accounts. Keep it off until IFC and Penn State have signed off. Never for parties with alcohol.</p>
+      <div class="switches"><div class="switch-row" id="tkRow"></div></div>
+      <form id="tkForm" class="actions" style="justify-content:flex-start;margin-top:10px;flex-wrap:wrap;gap:10px">
+        <label>Fee, alcohol-free events % <input class="cave-input" id="tkFee" type="number" min="0" max="20" step="0.5" style="max-width:90px"></label>
+        <label>Fee, philanthropy % <input class="cave-input" id="tkCharity" type="number" min="0" max="20" step="0.5" style="max-width:90px"></label>
+        <button class="btn small" type="submit">Save fees</button>
+      </form>
+      <p class="updated" id="tkTotals"></p>
+    </section>
     <div class="grid even">
       <section class="card"><h2>🏷️ Promo codes</h2>
         <form id="promoForm"><div class="form-grid">
@@ -360,7 +370,30 @@
   $('#spotOff').addEventListener('click', async () => { try { await api('/api/admin/spotlight', { partyId: null }); toast('Spotlight cleared.'); loadLive(); } catch (err) { toast(err.message); } });
 
   // ---------- Money ----------
+  // ---------- Ticketed events ----------
+  async function loadTicketing() {
+    let t;
+    try { t = await api('/api/admin/ticketing'); } catch (e) { return; }
+    $('#tkRow').className = 'switch-row' + (t.on ? ' on' : '');
+    $('#tkRow').innerHTML = `<div><b>Ticketed events: ${t.on ? 'ON' : 'off'}</b><span>${t.on ? 'Chapters with payouts connected can sell tickets.' : 'Nobody can sell tickets. Chapters don\'t see the option.'}${t.stripe ? '' : ' Stripe keys are missing, so it stays off.'}</span></div>
+      <button class="bigbtn ${t.on ? 'danger' : 'go'}" type="button" data-tk-on="${!t.on}">${t.on ? 'Turn off' : 'Turn on'}</button>`;
+    $('#tkFee').value = t.feePct; $('#tkCharity').value = t.charityFeePct;
+    const x = t.totals;
+    $('#tkTotals').textContent = `${int(x.sold)} tickets sold · ${money(x.gross / 100)} in sales · ${money(x.fees / 100)} in PhatFrats fees · ${int(x.refunded)} refunded · ${int(x.chapters)} chapter${x.chapters === 1 ? '' : 's'} with payouts connected`;
+  }
+  $('#tkRow').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-tk-on]'); if (!b) return;
+    const on = b.dataset.tkOn === 'true';
+    if (on && !confirm('Turn on ticketed events? Chapters will be able to connect Stripe and sell tickets to philanthropy and alcohol-free events. Make sure IFC and Penn State are on board first.')) return;
+    try { await api('/api/admin/ticketing', { on }); toast(on ? '🎟️ Ticketed events are on.' : 'Ticketed events are off.'); loadTicketing(); } catch (err) { toast(err.message); }
+  });
+  $('#tkForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try { await api('/api/admin/ticketing', { feePct: Number($('#tkFee').value), charityFeePct: Number($('#tkCharity').value) }); toast('Ticket fees saved.'); loadTicketing(); } catch (err) { toast(err.message); }
+  });
+
   async function loadMoney() {
+    loadTicketing();
     let m;
     try { m = await api('/api/admin/money'); } catch (e) { return toast(e.message); }
     const t = m.totals;

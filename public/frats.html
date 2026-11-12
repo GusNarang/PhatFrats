@@ -279,6 +279,7 @@ textarea{min-height:96px;resize:vertical}
             </div>
           </form>
         </div>
+        <div id="ticketsCard"></div>
         <div id="partyList"></div>
       </div>
 
@@ -426,6 +427,7 @@ textarea{min-height:96px;resize:vertical}
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="/beacon.js" defer></script>
+<script src="/tickets-leader.js"></script>
 <script>
 (function(){
   const $ = (s)=>document.querySelector(s);
@@ -456,6 +458,8 @@ textarea{min-height:96px;resize:vertical}
   const leader = ()=> state.data?.membership?.role === "leader";
   const partyById = (id)=> state.data.parties.find(p=>p.id===id);
   const openParties = ()=> state.data.parties.filter(p=>p.status==="live" && !p.past).sort((a,b)=>a.day.localeCompare(b.day));
+  // Shared with tickets-leader.js (ticketed events).
+  window.PFChapter = { state, api, load:()=>load(), toast, esc, leader, partyById, VIBES, renderParties:()=>renderParties() };
 
   function show(view){
     $("#loading").hidden = true;
@@ -669,6 +673,7 @@ textarea{min-height:96px;resize:vertical}
       : "You'll stop seeing this page. You can rejoin with the chapter password.";
     $("#allInvitesCard").hidden = !leader();
     renderTabs(); renderParties(); renderInvite(); renderGuests(); renderRequests(); renderGuestRequests(); renderMembers();
+    if(window.PFTicketsLeader) window.PFTicketsLeader.render();
   }
 
   // ---------- parties ----------
@@ -684,11 +689,13 @@ textarea{min-height:96px;resize:vertical}
         ? '<button class="btn slim danger" type="button" data-status="cancelled" data-id="'+p.id+'">Cancel party</button>'
         : '<button class="btn slim good" type="button" data-status="live" data-id="'+p.id+'">Put back on the map</button>');
     }
+    if(window.PFTicketsLeader) btns.push(...window.PFTicketsLeader.buttons(p));
     return '<article class="party" style="--c:'+v.c+'">'
       + '<div class="btn-row" style="justify-content:space-between"><span class="when">'+esc(p.dayText)+' · '+esc(p.time)+'</span>'+status+'</div>'
       + '<h3 style="margin-top:6px">'+esc(p.title)+'</h3>'
       + '<p class="muted small">'+esc(v.label)+(p.dress?' · Dress: '+esc(p.dress):'')+(p.music?' · Music: '+esc(p.music):'')+'</p>'
       + '<p class="small" style="margin:4px 0">'+(p.allowGuests ? '<span class="badge guests">Outside guests on · '+p.outside+' on the list</span>' : '<span class="badge past">Penn State students only</span>')+(p.hideFriends ? ' <span class="badge past">Crowd private</span>' : '')+'</p>'
+      + (window.PFTicketsLeader ? window.PFTicketsLeader.badge(p) : '')
       + (p.blurb ? '<p>'+esc(p.blurb)+'</p>' : '')
       + '<div class="meter" role="img" aria-label="'+p.going+' of '+p.cap+' spots taken"><i style="width:'+pct+'%"></i></div>'
       + '<p class="small muted" style="margin-top:0">'+p.going+' of '+p.cap+' on the list ('+pct+'%)</p>'

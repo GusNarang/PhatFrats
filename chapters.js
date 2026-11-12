@@ -15,7 +15,7 @@ const PSU_EMAIL = /^[a-z0-9._%+-]+@psu\.edu$/;
 const INVITES_PER_BROTHER_PER_PARTY = 20;
 const SITE_URL = process.env.SITE_URL || 'https://phat-frats.vercel.app';
 
-module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests }) {
+module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified, authLimiter, hashPassword, verifyPassword, mailer, IS_PROD, guests, tickets }) {
   const memberOf = async (userId) => {
     const { rows: [m] } = await pool.query('SELECT chapter_id, role FROM chapter_members WHERE user_id = $1', [userId]);
     return m || null;
@@ -143,6 +143,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       pool.query(
         `SELECT hp.id, hp.title, to_char(hp.party_date, 'YYYY-MM-DD') AS day, hp.start_time, hp.vibe, hp.blurb, hp.dress,
            hp.music, hp.cap, hp.status, hp.allow_outside_guests, hp.hide_friends, ${partyList.GOING_SQL} AS going,
+           hp.ticketed, hp.ticket_cents, hp.ticket_kind, hp.ticket_cause,
            (SELECT count(*) FROM invite_requests r WHERE r.party_id = 'h' || hp.id AND r.invited_by IS NULL AND r.status = 'pending')::int
              + (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'pending')::int AS waiting,
            (SELECT count(*) FROM outside_guests g WHERE g.party_id = hp.id AND g.status = 'approved')::int AS outside
@@ -186,6 +187,7 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
         id: 'h' + p.id, title: p.title, day: p.day, dayText: partyList.dayLabel(p.day).long, time: p.start_time, vibe: p.vibe,
         blurb: p.blurb, dress: p.dress, music: p.music, cap: p.cap, status: p.status, going: p.going, waiting: p.waiting,
         allowGuests: p.allow_outside_guests, hideFriends: p.hide_friends, outside: p.outside, past: p.day < today,
+        ticketed: p.ticketed, price: p.ticket_cents, ticketKind: p.ticket_kind, cause: p.ticket_cause,
       })),
       members: members.rows.map((m) => ({
         id: String(m.id), name: m.name, role: m.role, joined: m.joined_at, invites: m.invites,
@@ -341,7 +343,9 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
       [id, req.member.chapter_id, status]
     );
     if (!rowCount) return fail(res, 404, "That party isn't one of your chapter's.");
-    res.json({ ok: true });
+    // Cancelling a ticketed event refunds everyone who bought a ticket.
+    const refunded = status === 'cancelled' && tickets ? await tickets.refundParty('h' + id) : 0;
+    res.json({ ok: true, refunded });
   }));
 
   // ---------- answering students' requests (leaders) ----------
@@ -524,4 +528,6 @@ module.exports = function chapterRoutes(app, { pool, wrap, fail, requireVerified
     );
     res.json({ ok: true });
   }));
+  // Ticketed events: payouts, selling tickets for an event, and checking tickets at the door.
+  if (tickets) tickets.mount(app, { requireMember, requireLeader });
 };

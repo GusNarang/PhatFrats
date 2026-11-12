@@ -7,6 +7,15 @@ const Stripe = require('stripe');
 const PRICING = require('./public/pricing.js');
 
 const SITE_URL = process.env.SITE_URL || 'https://phat-frats.vercel.app';
+
+// Send people back to the same PhatFrats address they paid from, so they're still logged in when they return
+// (each address has its own login). Anything else falls back to SITE_URL. Local addresses only work off Vercel.
+const HOME_ORIGINS = new Set([SITE_URL, 'https://phatfrats.vercel.app', 'https://phat-frats.vercel.app']);
+const siteFor = (req) => {
+  const o = req.get('origin') || '';
+  if (HOME_ORIGINS.has(o) || (!process.env.VERCEL && /^http:\/\/localhost:\d{2,5}$/.test(o))) return o;
+  return SITE_URL;
+};
 const ZONE = 'America/New_York';
 const todayISO = () => new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
@@ -142,8 +151,8 @@ function create({ pool, wrap, fail, requireVerified, accountPayload, loadUser, o
         customer_email: req.user.email,
         client_reference_id: String(req.user.id),
         metadata: { user_id: String(req.user.id), pass_until: passUntil, ...(promo ? { promo_code: promo.code } : {}) },
-        success_url: `${SITE_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}#plans`,
-        cancel_url: `${SITE_URL}/?checkout=cancel#plans`,
+        success_url: `${siteFor(req)}/?checkout=success&session_id={CHECKOUT_SESSION_ID}#plans`,
+        cancel_url: `${siteFor(req)}/?checkout=cancel#plans`,
       });
       res.json({ url: session.url });
     }));
@@ -166,4 +175,7 @@ function create({ pool, wrap, fail, requireVerified, accountPayload, loadUser, o
   return { grant, webhookHandler, mountRoutes };
 }
 
-module.exports = { create, enabled, useClient };
+// Ticketed events (tickets.js) use the same Stripe account, acting for each chapter's connected account.
+const getClient = () => client;
+
+module.exports = { create, enabled, useClient, getClient };

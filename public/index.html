@@ -823,6 +823,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
 <script src="/friends.js"></script>
 <script src="/guide.js"></script>
 <script src="/premium.js"></script>
+<script src="/tickets.js"></script>
 <script>
 (function(){
   // ---------- data ----------
@@ -898,6 +899,7 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
     state.saved = verified ? (data.saved || []) : [];
     state.early = verified ? (data.early || null) : null;
     setParties(verified ? data.parties : [], verified ? data.days : []);
+    if(verified && window.PFTickets) setTimeout(()=>window.PFTickets.start(), 0);
   }
   async function logOut(){
     await api("/api/logout", {});
@@ -1253,6 +1255,8 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
       '<div class="hype-row"><span>'+label+'</span><span>'+pct+'%</span></div></div>';
   }
   function reqButton(p, cls){
+    // Ticketed events: a ticket is the spot on the list, so it replaces the request button.
+    if(p.ticketed && window.PFTickets) return window.PFTickets.button(p, cls);
     const r = requestFor(p.id);
     if(!r && freeInviteUsed()) return '<button class="status-pill st-locked" type="button" data-out-of-invites="'+p.id+'" style="border:0;cursor:pointer;font:inherit">Invite used · Get another</button>';
     if(!r) return '<button class="btn '+(cls||"")+'" type="button" data-request="'+p.id+'">Request invite</button>';
@@ -1278,9 +1282,10 @@ dialog::backdrop{background:rgba(5,8,22,.75);backdrop-filter:blur(4px)}
         '<div><span class="vibe-tag" style="--c:'+v.c+';color:'+v.c+'">'+esc(v.label)+'</span><h3 style="font-family:var(--display);font-weight:400;font-size:1.6rem;line-height:1.05;margin-top:4px">'+esc(p.title)+'</h3>' +
         '<p class="muted">Hosted by '+esc(c.name)+(c.nick?' ('+esc(c.nick)+')':'')+'</p></div>' +
         '<p>'+esc(p.blurb)+'</p>' +
-        '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>Invite list + PSU ID</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
+        '<dl class="kv"><dt>When</dt><dd>'+esc(whenText(p))+'</dd><dt>Dress</dt><dd>'+esc(p.dress)+'</dd><dt>Music</dt><dd>'+esc(p.music)+'</dd><dt>Door</dt><dd>'+(p.ticketed ? 'Ticket + PSU ID' : 'Invite list + PSU ID')+'</dd>'+(p.hosted ? '<dt>Outside guests</dt><dd>'+(p.allowGuests ? 'Allowed: one per person, approved by the house' : 'Penn State students only')+'</dd>' : '')+'</dl>' +
         hypeBlock(p) + chapterLinks(c) + (window.PFPremium ? window.PFPremium.followButton(c.id) : '') +
         '<div>'+reqButton(p)+'</div>' +
+        (p.ticketed && window.PFTickets ? window.PFTickets.detail(p) : '') +
         (window.PFFriends ? window.PFFriends.detail(p) : '') +
         (window.PFCommunity ? window.PFCommunity.detailExtras(p) : '') +
         (others.length ? '<p class="muted" style="font-size:.88rem">Also at this house: '+others.map(o=>'<a href="#" data-party-link="'+o.id+'">'+esc(o.title)+'</a> ('+esc(dayOf(o.day).label)+')').join(", ")+'</p>' : '');

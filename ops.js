@@ -90,6 +90,7 @@ function create({ pool, CHAPTERS }) {
     if (p === '/announcement') return b.text ? `Lit the beacon: "${String(b.text).slice(0, 80)}" for ${b.audience || 'everyone'}` : 'Turned off the beacon';
     if (p === '/lockdown') return `Lockdown: ${Object.entries(b).map(([k, v]) => `${k} ${v ? 'paused' : 'open'}`).join(', ')}`;
     if (p === '/spotlight') return b.partyId ? `Spotlighted ${b.partyId}` : 'Cleared the spotlight';
+    if (p === '/ticketing') return typeof b.on === 'boolean' ? (b.on ? 'Turned ticketed events ON' : 'Turned ticketed events off') : `Set ticket fees to ${b.feePct}% (philanthropy ${b.charityFeePct}%)`;
     if (p === '/promo') return `Created promo code ${String(b.code || '').toUpperCase()} (${b.percentOff}% off)`;
     if ((m = /^\/promo\/([A-Z0-9-]+)\/off$/.exec(p))) return `Turned off promo code ${m[1]}`;
     if (p === '/gift') return `Gifted Full Access to ${b.audience}${b.until ? ` through ${b.until}` : ' with no end date'}`;

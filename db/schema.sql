@@ -420,3 +420,50 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   reset_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS rate_limits_reset_idx ON rate_limits (reset_at);
+
+-- ---------- Ticketed events ----------
+-- Chapters can sell tickets only to philanthropy or alcohol-free events, and only while the site admin
+-- has ticketing switched on. The chapter is the seller (its own Stripe account takes the payment);
+-- PhatFrats is the ticketing platform and may take a small fee. See tickets.js and /about#ticket-terms.
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticketed         BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticket_cents     INTEGER;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticket_kind      TEXT;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticket_cause     TEXT;
+-- When and by whom the leader confirmed the event is alcohol-free and follows the rules, and which terms.
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticket_attest_at TIMESTAMPTZ;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticket_attest_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE hosted_parties ADD COLUMN IF NOT EXISTS ticket_terms     TEXT;
+-- Each chapter's own Stripe account, and when its leader accepted the chapter ticketing agreement.
+CREATE TABLE IF NOT EXISTS chapter_payouts (
+  chapter_id     INTEGER PRIMARY KEY,
+  stripe_account TEXT UNIQUE,
+  ready          BOOLEAN NOT NULL DEFAULT FALSE,
+  terms_at       TIMESTAMPTZ,
+  terms_by       BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  terms_version  TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One row per ticket sold. status: paid, used (scanned at the door) or refunded.
+CREATE TABLE IF NOT EXISTS tickets (
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  party_id          TEXT NOT NULL,
+  chapter_id        INTEGER NOT NULL,
+  user_id           BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  code              TEXT NOT NULL UNIQUE,
+  amount_cents      INTEGER NOT NULL,
+  fee_cents         INTEGER NOT NULL DEFAULT 0,
+  stripe_account    TEXT NOT NULL,
+  stripe_session_id TEXT NOT NULL UNIQUE,
+  payment_intent    TEXT,
+  livemode          BOOLEAN NOT NULL DEFAULT FALSE,
+  status            TEXT NOT NULL DEFAULT 'paid',
+  terms_version     TEXT,
+  agreed_at         TIMESTAMPTZ,
+  used_at           TIMESTAMPTZ,
+  used_by           BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  refunded_at       TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One live ticket per person per event.
+CREATE UNIQUE INDEX IF NOT EXISTS tickets_one_per_person ON tickets (party_id, user_id) WHERE status IN ('paid', 'used');
+CREATE INDEX IF NOT EXISTS tickets_party_idx ON tickets (party_id);

@@ -19,7 +19,7 @@ const payments = require('./payments.js');
 // site, locks it again. This limit only matters if the tab is left open or the lock message gets lost.
 const UNLOCK_MINUTES = 120;
 
-module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken }) {
+module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets }) {
   // Being an admin isn't enough on its own: this login must also have been unlocked with the admin password.
   const requireAdmin = [requireUser, (req, res, next) => {
     if (req.user.role !== 'admin' || !req.user.admin_unlocked) return fail(res, 404, 'Not found.');
@@ -355,7 +355,9 @@ module.exports = function adminRoutes(app, { pool, wrap, fail, requireUser, PRIC
     if (!id || (status !== 'live' && status !== 'cancelled')) return fail(res, 400, 'Choose live or cancelled.');
     const { rowCount } = await pool.query('UPDATE hosted_parties SET status = $2, updated_at = now() WHERE id = $1', [id, status]);
     if (!rowCount) return fail(res, 404, 'That party is gone.');
-    res.json({ ok: true });
+    // Taking a ticketed event down refunds everyone who bought a ticket.
+    const refunded = status === 'cancelled' && tickets ? await tickets.refundParty('h' + id, 'taken down') : 0;
+    res.json({ ok: true, refunded });
   }));
 
   // Sets or replaces a chapter's brother (join) password, or with kind 'leader', its leader sign-in password.
