@@ -553,6 +553,7 @@
       'Radar: houses glowing gold are being looked at right now. The number is how many people.',
       'Ticker: everything happening on the site as it happens. A sale makes a cha-ching sound on any page.',
       'Beacon: type a message and it shows as a banner across the whole site. Pick the color, who sees it and how long.',
+      'Maintenance (top of Live): lock the whole site now, or schedule a window like the first Sunday of the month at 3 AM. Everyone but admins sees a back-soon screen; payments and the Monday prize keep running. Scheduled windows show a heads-up banner the day before and unlock by themselves.',
       'Lockdown: if something goes wrong, pause sign-ups, invite requests or checkout with one click. Click Reopen to undo.',
       'Spotlight: pin one party to the top of the party list with a glowing star.',
       'Weekend Drop: every Thursday, announce the lineup. It goes to everyone\'s bell and email and lights the beacon.',

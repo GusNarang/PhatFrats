@@ -34,6 +34,63 @@
     document.body.prepend(bar);
   }).catch(() => {});
 
+  // ---------- maintenance ----------
+  // While the control room has the site locked, cover the page with a "back soon" screen and check every
+  // 30 seconds; reload once it's over. Admins see a thin red bar instead, so they can still check the site.
+  // In the 24 hours before scheduled maintenance, a heads-up bar says when it starts.
+  const when = (iso, withDay) => new Date(iso).toLocaleString([], withDay
+    ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+    : { hour: 'numeric', minute: '2-digit' });
+  const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+  function bar(id, text, bg, fg) {
+    if (document.getElementById(id)) return;
+    const el = document.createElement('div');
+    el.id = id;
+    el.setAttribute('role', 'status');
+    el.style.cssText = `position:sticky;top:0;z-index:60;background:${bg};color:${fg};font:700 14px/1.4 "Bricolage Grotesque",system-ui,sans-serif;padding:8px 16px;text-align:center`;
+    el.textContent = text;
+    document.body.prepend(el);
+    return el;
+  }
+  function cover(m) {
+    if (document.getElementById('pfMaint')) return;
+    const box = document.createElement('div');
+    box.id = 'pfMaint';
+    box.setAttribute('role', 'alertdialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'pfMaintTitle');
+    box.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 30%,#1b2556,#0b1026 70%);color:#f5f2ff;text-align:center;font-family:"Bricolage Grotesque",system-ui,sans-serif';
+    box.innerHTML = '<div style="max-width:460px"><div style="font-size:64px;line-height:1">🔧</div>'
+      + '<h1 id="pfMaintTitle" style="font:400 clamp(26px,7vw,40px)/1.1 Bungee,Impact,\'Arial Black\',sans-serif;margin:16px 0 10px;color:#ffd23f">Back soon</h1>'
+      + '<p id="pfMaintMsg" style="font-size:18px;margin:0 0 12px"></p><p id="pfMaintUntil" style="color:#a7add8;margin:0"></p>'
+      + '<p style="color:#a7add8;font-size:14px;margin-top:22px">This page refreshes by itself when we\'re back.</p></div>';
+    box.querySelector('#pfMaintMsg').textContent = m.message;
+    box.querySelector('#pfMaintUntil').textContent = m.end ? 'Expected back around ' + when(m.end, !sameDay(m.end, Date.now())) + '.' : '';
+    document.body.appendChild(box);
+    document.documentElement.style.overflow = 'hidden';
+    // Pop-up dialogs draw above everything else on the page, so close any that are open and hide new ones.
+    const hide = document.createElement('style');
+    hide.textContent = 'dialog,dialog::backdrop{display:none!important}';
+    document.head.appendChild(hide);
+    document.querySelectorAll('dialog[open]').forEach((d) => { try { d.close(); } catch (e) {} });
+    const check = setInterval(() => {
+      fetch('/api/maintenance', { cache: 'no-store' }).then((r) => r.json()).then((n) => {
+        if (!n.active) { clearInterval(check); location.reload(); }
+      }).catch(() => {});
+    }, 30000);
+  }
+  // Checked on load and every 2 minutes, so a page left open still gets the screen when maintenance starts.
+  function checkMaintenance() {
+    if (document.getElementById('pfMaint')) return;
+    fetch('/api/maintenance', { cache: 'no-store' }).then((r) => r.json()).then((m) => {
+    if (m.active && m.bypass) bar('pfMaintBar', '🔧 Maintenance is on. Everyone else sees the "back soon" screen; you can see the site because you\'re an admin.', '#ff5d6c', '#fff');
+    else if (m.active) cover(m);
+    else if (m.warn) bar('pfMaintWarn', '🔧 Heads up: PhatFrats will be down for maintenance ' + when(m.start, true) + (m.end ? ' to ' + when(m.end, !sameDay(m.start, m.end)) : '') + '.', '#35e0ff', '#0b1026');
+    }).catch(() => {});
+  }
+  checkMaintenance();
+  setInterval(() => { if (!document.hidden) checkMaintenance(); }, 120000);
+
   // ---------- live radar presence ----------
   // The main page sets window.PF_LOOKING to report which party or house is open.
   function ping() {

@@ -89,6 +89,12 @@ function create({ pool, CHAPTERS }) {
     }
     if (p === '/announcement') return b.text ? `Lit the beacon: "${String(b.text).slice(0, 80)}" for ${b.audience || 'everyone'}` : 'Turned off the beacon';
     if (p === '/lockdown') return `Lockdown: ${Object.entries(b).map(([k, v]) => `${k} ${v ? 'paused' : 'open'}`).join(', ')}`;
+    if (p === '/maintenance') {
+      const t = (v) => new Date(v).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      if (b.action === 'off') return 'Unlocked the site (maintenance off)';
+      if (b.action === 'now') return `Locked the site for maintenance${b.minutes ? ` for ${b.minutes} minutes` : ' until unlocked'}`;
+      if (b.action === 'schedule') return `Scheduled maintenance ${t(b.start)} to ${t(b.end)} ET`;
+    }
     if (p === '/spotlight') return b.partyId ? `Spotlighted ${b.partyId}` : 'Cleared the spotlight';
     if ((m = /^\/chapters\/(\d+)\/ban$/.exec(p))) return `Banned ${chapterName(m[1])}: "${String(b.reason || '').slice(0, 80)}"`;
     if ((m = /^\/chapters\/(\d+)\/unban$/.exec(p))) return `Unbanned ${chapterName(m[1])}`;

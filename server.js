@@ -309,6 +309,9 @@ app.use(express.json({ limit: '10kb' }));
 const ops = require('./ops.js').create({ pool, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 ops.mountActivity(app);
 ops.mountAdminLog(app);
+// Maintenance mode: while the control room has the site locked, the API answers 503 to everyone but admins.
+const maintenance = require('./maintenance.js').create({ pool, ops, currentUser });
+maintenance.gate(app);
 // Texts: invite details and confirmations go to a confirmed phone by text (sms.js).
 const sms = require('./sms.js');
 const smsBox = sms.create({ pool });
@@ -795,6 +798,7 @@ const sororities = require('./sororities.js').create({ pool, wrap, fail, require
 sororities.mount(app);
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets });
 // The control room's Launch check: which outside services are set up, with test text and email buttons.
+maintenance.mount(app, { wrap, fail, requireUser });
 require('./launch-check.js')(app, { pool, wrap, fail, requireUser, ops, community });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
