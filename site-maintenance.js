@@ -274,7 +274,8 @@ function create({ pool, ops, launch, CHAPTERS }) {
 
   async function services() {
     const r = await launch.report(null);
-    return r.items.map((i) => ({
+    // To-do items (things only the admin can do) live on the Launch check, not here.
+    return r.items.filter((i) => !i.manual).map((i) => ({
       key: 'svc:' + i.key, name: i.name,
       state: i.state === 'bad' ? 'bad' : 'ok',
       detail: i.state === 'bad' ? i.detail : `${{ ok: 'Ready', warn: 'Working (see Launch check)', off: 'Not set up yet (see Launch check)', manual: 'Check yourself (see Launch check)' }[i.state] || i.state}.`,

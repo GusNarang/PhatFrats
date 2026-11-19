@@ -12,6 +12,22 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
   const env = (k) => (process.env[k] || '').trim();
   const has = (k) => !!env(k);
 
+  // The launch to-do list: things outside the site that only the admin can do.
+  const TODO = [
+    { key: 'uptime', name: 'Uptime monitor', doneText: 'UptimeRobot watches /api/health every 5 minutes and emails you if the site goes down.',
+      detail: 'Point a free monitor (UptimeRobot or Better Stack) at /api/health so you hear within minutes if the site goes down. Steps are on the Maintenance page.' },
+    { key: 'hosting', name: 'Hosting (Vercel Pro)', doneText: 'The project is on Vercel Pro, so charging money is allowed.',
+      detail: 'Vercel\'s free Hobby plan is for non-commercial use only. Move the project to Pro before the first real payment.' },
+    { key: 'neon_paid', name: 'Paid database plan (Neon)', doneText: 'The database is on a paid plan: no size cap worries, and 7+ days of backups.',
+      detail: 'Move to a paid Neon plan before a wide launch: more room for busy nights, no pause when idle, and 7+ days to undo mistakes (the free plan keeps 6 hours).' },
+    { key: 'legal', name: 'Legal review', doneText: 'A lawyer reviewed the terms, the party disclaimer, the Host Agreement and ticketing.',
+      detail: 'Have Penn State Law\'s Entrepreneur Assistance Clinic (or Student Legal Services) review the terms, the party disclaimer, the Host Agreement and ticketing. Keep ticketing off until then.' },
+    { key: 'song', name: 'Theme song rights', doneText: 'The Door Rush song is cleared for commercial use.',
+      detail: 'Door Rush\'s song "On The List" (Suno) is only yours to use commercially if a paid Suno plan was active when it was made. Check, or remake it while subscribed.' },
+    { key: 'phones', name: 'Real phone test', doneText: 'Clicked through on a real iPhone and a real Android.',
+      detail: 'Click through sign-up, requests, friends, Door Rush and a test payment on a real iPhone and a real Android.' },
+  ];
+
   // Asks Twilio about the account with the saved keys. Free, and sends nothing.
   async function twilioAnswers() {
     if (!has('TWILIO_ACCOUNT_SID') || !has('TWILIO_AUTH_TOKEN')) return null;
@@ -52,7 +68,7 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
       {
         key: 'tickets', name: 'Ticket payouts (Stripe Connect)',
         state: !s.ticketing?.on ? 'ok' : stripeMode === 'live' ? 'ok' : 'warn',
-        detail: !s.ticketing?.on ? 'Ticketing is switched off in Money, as planned until IFC and Penn State approve.'
+        detail: !s.ticketing?.on ? 'Ticketing is switched off in Money, as planned until the legal review is done.'
           : (stripeMode === 'live' ? 'Ticketing is on with live keys.' : 'Ticketing is on, but Stripe is in test mode.') + (has('STRIPE_CONNECT_WEBHOOK_SECRET') ? '' : ' Optional: add STRIPE_CONNECT_WEBHOOK_SECRET.'),
       },
       {
@@ -93,16 +109,15 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
         state: s.hide_demo ? 'ok' : 'warn',
         detail: (s.hide_demo ? 'Demo parties are hidden.' : 'Demo parties are still showing.') + (s.lockdown && Object.values(s.lockdown).some(Boolean) ? ' Some features are paused in Live.' : ''),
       },
-      {
-        key: 'uptime', name: 'Uptime monitor',
-        state: 'manual',
-        detail: 'Point a free monitor (UptimeRobot or Better Stack) at /api/health so you hear within minutes if the site goes down. Steps are on the Maintenance page. (The site can\'t check this itself.)',
-      },
-      {
-        key: 'hosting', name: 'Hosting (Vercel)',
-        state: 'manual',
-        detail: 'Vercel\'s free Hobby plan is for non-commercial use only. Move the project to Pro before charging money. (The site can\'t check this itself.)',
-      },
+      // Things only you can do. Mark each one done when it is; the site can't check them itself.
+      ...TODO.map((t) => {
+        const done = (s.launch_done || {})[t.key];
+        return {
+          key: t.key, name: t.name, manual: true, done: done ? done.at : null,
+          state: done ? 'ok' : 'manual',
+          detail: done ? `${t.doneText} Marked done ${new Date(done.at).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}.` : t.detail,
+        };
+      }),
     ];
     return {
       items,
@@ -113,6 +128,17 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
 
   app.get('/api/admin/launch-check', requireAdmin, wrap(async (req, res) => {
     res.json(await report(req.user.id));
+  }));
+
+  // Ticks a to-do item off (or back on).
+  app.post('/api/admin/launch-check/done', requireAdmin, wrap(async (req, res) => {
+    const key = req.body?.key;
+    if (!TODO.some((t) => t.key === key) || typeof req.body?.done !== 'boolean') return fail(res, 400, 'Unknown item.', 'BAD_ITEM');
+    const all = { ...((await ops.settings()).launch_done || {}) };
+    if (req.body.done) all[key] = { at: new Date().toISOString(), by: req.user.id };
+    else delete all[key];
+    await ops.setSetting('launch_done', Object.keys(all).length ? all : null);
+    res.json({ ok: true });
   }));
 
   // Sends the admin a real text, straight away (not through the outbox), and reports what Twilio said.

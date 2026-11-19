@@ -95,6 +95,7 @@ function create({ pool, CHAPTERS }) {
       if (b.action === 'now') return `Locked the site for maintenance${b.minutes ? ` for ${b.minutes} minutes` : ' until unlocked'}`;
       if (b.action === 'schedule') return `Scheduled maintenance ${t(b.start)} to ${t(b.end)} ET`;
     }
+    if (p === '/launch-check/done') return `Launch to-do: marked "${String(b.key)}" ${b.done ? 'done' : 'not done'}`;
     if (p === '/site-maintenance/run') return b.dryRun === true ? 'Ran a site maintenance check (nothing changed)' : 'Ran full site maintenance';
     if ((m = /^\/errors\/(\d+)\/resolve$/.exec(p))) return `Marked error #${m[1]} as fixed`;
     if (p === '/errors/resolve-all') return 'Marked every error as fixed';

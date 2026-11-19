@@ -14,6 +14,7 @@
   .lc-item b{display:flex;gap:8px;align-items:center}
   .lc-item p{margin:6px 0 0;font-size:14px;color:var(--muted)}
   .lc-sum{font:500 13px var(--mono)}
+  .lc-item .lc-do{margin-top:8px}
   .lc-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}`;
   document.head.appendChild(css);
   const LOOK = { ok: ['✅', 'var(--lime, #9dff4a)', 'Ready'], warn: ['⚠️', 'var(--gold, #ffd23f)', 'Needs attention'], off: ['⭕', 'var(--muted)', 'Not set up'], bad: ['❌', 'var(--red, #ff5d6c)', 'Broken'], manual: ['👀', 'var(--cyan, #35e0ff)', 'Check yourself'] };
@@ -30,14 +31,15 @@
     try { d = await A.api('/api/admin/launch-check'); }
     catch (err) { card.innerHTML = '<summary><h2 style="margin:0">🚀 Launch check</h2><span class="updated">' + esc(err.message) + '</span></summary>'; return; }
     const count = (k) => d.items.filter((i) => i.state === k).length;
-    const allGood = !count('bad') && !count('off') && !count('warn');
+    const todo = count('manual');
+    const allGood = !count('bad') && !count('off') && !count('warn') && !todo;
     card.open = !allGood && card.dataset.touched !== '1';
     card.innerHTML = '<summary><h2 style="margin:0">🚀 Launch check</h2><span class="lc-sum">'
-      + (allGood ? '✅ Everything is set up' : [count('ok') + ' ready', count('warn') + ' need attention', count('off') + ' not set up', count('bad') ? count('bad') + ' broken' : ''].filter(Boolean).join(' · '))
+      + (allGood ? '✅ Everything is set up' : [count('ok') + ' ready', count('warn') ? count('warn') + ' need attention' : '', count('off') ? count('off') + ' not set up' : '', todo ? todo + ' to do yourself' : '', count('bad') ? count('bad') + ' broken' : ''].filter(Boolean).join(' · '))
       + ' · checked ' + esc(A.ago(d.checkedAt)) + '</span></summary>'
       + '<div class="lc-list">' + d.items.map((i) => {
-        const [icon, color, label] = LOOK[i.state] || LOOK.manual;
-        return '<div class="lc-item" style="--lc:' + color + '"><b>' + icon + ' ' + esc(i.name) + ' <span class="updated">' + label + '</span></b><p>' + esc(i.detail) + '</p>' + (i.extra ? '<p>' + esc(i.extra) + '</p>' : '') + '</div>';
+        const [icon, color, label] = i.manual ? (i.done ? ['✅', LOOK.ok[1], 'Done'] : ['📝', LOOK.manual[1], 'To do']) : LOOK[i.state] || LOOK.manual;
+        return '<div class="lc-item" style="--lc:' + color + '"><b>' + icon + ' ' + esc(i.name) + ' <span class="updated">' + label + '</span></b><p>' + esc(i.detail) + '</p>' + (i.extra ? '<p>' + esc(i.extra) + '</p>' : '') + (i.manual ? '<div class="lc-do"><button class="btn small' + (i.done ? '' : ' gold') + '" type="button" data-done="' + esc(i.key) + '" data-to="' + !i.done + '">' + (i.done ? 'Undo' : '✓ Mark done') + '</button></div>' : '') + '</div>';
       }).join('') + '</div>'
       + '<div class="lc-btns"><button class="btn small" type="button" data-lc="text">📱 Send me a test text</button>'
       + '<button class="btn small" type="button" data-lc="email">✉️ Send me a test email</button>'
@@ -46,6 +48,13 @@
   }
   card.addEventListener('toggle', () => { card.dataset.touched = '1'; });
   card.addEventListener('click', async (e) => {
+    const d = e.target.closest('[data-done]');
+    if (d) {
+      d.disabled = true;
+      try { await A.api('/api/admin/launch-check/done', { key: d.dataset.done, done: d.dataset.to === 'true' }); A.toast(d.dataset.to === 'true' ? '✅ Marked done.' : 'Moved back to the to-do list.'); load(); }
+      catch (err) { A.toast(err.message); d.disabled = false; }
+      return;
+    }
     const b = e.target.closest('[data-lc]'); if (!b) return;
     if (b.dataset.lc === 'again') { load(); return; }
     b.disabled = true;
