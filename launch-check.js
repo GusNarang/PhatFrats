@@ -25,7 +25,8 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
     } catch (err) { return { ok: false, error: err.message }; }
   }
 
-  app.get('/api/admin/launch-check', requireAdmin, wrap(async (req, res) => {
+  // Every outside service's state, for the Launch check card and for Site maintenance. userId: whose phone to show.
+  async function report(userId) {
     const s = await ops.settings();
     const stripeKey = env('STRIPE_SECRET_KEY');
     const stripeMode = !stripeKey ? null : /^(sk|rk)_live_/.test(stripeKey) ? 'live' : 'test';
@@ -37,7 +38,7 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
                     count(*) FILTER (WHERE failed_at > now() - interval '1 day')::int AS failed,
                     (SELECT last_error FROM sms_outbox WHERE failed_at IS NOT NULL ORDER BY failed_at DESC LIMIT 1) AS last_error
                   FROM sms_outbox`),
-      pool.query('SELECT phone, phone_verified_at FROM users WHERE id = $1', [req.user.id]),
+      pool.query('SELECT email, phone, phone_verified_at FROM users WHERE id = $1', [userId || 0]),
     ]);
     // ok: green. warn: works, but needs attention before launch. off: not set up.
     const items = [
@@ -98,11 +99,15 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
         detail: 'Vercel\'s free Hobby plan is for non-commercial use only. Move the project to Pro before charging money. (The site can\'t check this itself.)',
       },
     ];
-    res.json({
+    return {
       items,
-      me: { email: req.user.email, phone: sms.pretty(me?.phone), phoneVerified: !!me?.phone_verified_at },
+      me: { email: me?.email || null, phone: sms.pretty(me?.phone), phoneVerified: !!me?.phone_verified_at },
       checkedAt: new Date().toISOString(),
-    });
+    };
+  }
+
+  app.get('/api/admin/launch-check', requireAdmin, wrap(async (req, res) => {
+    res.json(await report(req.user.id));
   }));
 
   // Sends the admin a real text, straight away (not through the outbox), and reports what Twilio said.
@@ -128,4 +133,6 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
       fail(res, 502, `The email didn't send: ${err.message}`, 'EMAIL_FAILED');
     }
   }));
+
+  return { report };
 };

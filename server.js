@@ -799,7 +799,10 @@ sororities.mount(app);
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets });
 // The control room's Launch check: which outside services are set up, with test text and email buttons.
 maintenance.mount(app, { wrap, fail, requireUser });
-require('./launch-check.js')(app, { pool, wrap, fail, requireUser, ops, community });
+const launch = require('./launch-check.js')(app, { pool, wrap, fail, requireUser, ops, community });
+// The control room's Maintenance page: clean-up, health checks and a monthly automatic run. See site-maintenance.js.
+require('./site-maintenance.js').create({ pool, ops, launch, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] })
+  .mount(app, { wrap, fail, requireUser });
 require('./admin-extras.js')(app, { pool, wrap, fail, requireUser, ops, TODAY_SQL, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] });
 community.mountRoutes(app, requireVerified);
 premium.mountRoutes(app, requireVerified);

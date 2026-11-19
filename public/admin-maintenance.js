@@ -1,4 +1,4 @@
-// The control room's Maintenance card (top of Live): lock the whole site now, or schedule a window.
+// The site lock card (top of the control room's Maintenance page): lock the whole site now, or schedule a window.
 // Everyone but admins sees a "back soon" screen while it's locked. See maintenance.js on the server.
 (function () {
   const A = window.PFAdmin;
@@ -16,13 +16,13 @@
   #maintStrip{position:sticky;top:0;z-index:70;background:var(--red);color:#fff;text-align:center;font:700 14px var(--body);padding:8px 12px;cursor:pointer}`;
   document.head.appendChild(css);
 
-  const page = document.getElementById('pageLive');
+  const page = document.getElementById('pageMaintenance');
   if (!page) return;
   const card = document.createElement('section');
   card.className = 'card';
   card.id = 'maintCard';
   card.innerHTML = `
-    <div class="chart-head"><h2 style="margin:0">🔧 Maintenance</h2><span class="updated">You can always see the site while it's locked. Payments and the Monday prize keep running.</span></div>
+    <div class="chart-head"><h2 style="margin:0">🔒 Site lock</h2><span class="updated">You can always see the site while it's locked. Payments and the Monday prize keep running.</span></div>
     <p id="maintStatus">Checking…</p>
     <div id="maintOff"></div>
     <label class="cave-label" for="mMsg" style="margin-top:12px">Message people see</label>
@@ -56,7 +56,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'maintStrip';
-      el.onclick = () => { A.showPage && A.showPage('live'); card.scrollIntoView({ behavior: 'smooth' }); };
+      el.onclick = () => { A.showPage && A.showPage('maintenance'); card.scrollIntoView({ behavior: 'smooth' }); };
       document.body.prepend(el);
     }
     el.textContent = '🔧 The site is LOCKED for maintenance' + (st.end ? ' until ' + fmt(st.end) : '') + '. Tap to manage.';

@@ -591,3 +591,17 @@ CREATE TABLE IF NOT EXISTS sms_outbox (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS sms_outbox_waiting_idx ON sms_outbox (id) WHERE sent_at IS NULL AND failed_at IS NULL;
+
+-- ---------- Site maintenance ----------
+-- Every maintenance run (from the control room's Maintenance page or the monthly schedule) and what it found.
+-- The newest 60 are kept. See site-maintenance.js.
+CREATE TABLE IF NOT EXISTS maintenance_runs (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  started_at  TIMESTAMPTZ NOT NULL,
+  finished_at TIMESTAMPTZ NOT NULL,
+  trigger     TEXT NOT NULL CHECK (trigger IN ('admin', 'monthly')),
+  admin_id    BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  dry_run     BOOLEAN NOT NULL DEFAULT FALSE,
+  summary     JSONB NOT NULL,
+  results     JSONB NOT NULL
+);

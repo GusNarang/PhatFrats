@@ -95,6 +95,7 @@ function create({ pool, CHAPTERS }) {
       if (b.action === 'now') return `Locked the site for maintenance${b.minutes ? ` for ${b.minutes} minutes` : ' until unlocked'}`;
       if (b.action === 'schedule') return `Scheduled maintenance ${t(b.start)} to ${t(b.end)} ET`;
     }
+    if (p === '/site-maintenance/run') return b.dryRun === true ? 'Ran a site maintenance check (nothing changed)' : 'Ran full site maintenance';
     if (p === '/spotlight') return b.partyId ? `Spotlighted ${b.partyId}` : 'Cleared the spotlight';
     if ((m = /^\/chapters\/(\d+)\/ban$/.exec(p))) return `Banned ${chapterName(m[1])}: "${String(b.reason || '').slice(0, 80)}"`;
     if ((m = /^\/chapters\/(\d+)\/unban$/.exec(p))) return `Unbanned ${chapterName(m[1])}`;
