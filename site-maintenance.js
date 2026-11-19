@@ -31,6 +31,7 @@ const CLEANUPS = [
   { key: 'going', name: '"Going" marks for past parties', table: 'friend_going', where: `party_day < ${ET_TODAY}` },
   { key: 'guests', name: 'Outside guest lists of parties over 2 days ago', table: 'outside_guests', where: `party_id IN (SELECT id FROM hosted_parties WHERE party_date < ${ET_TODAY} - 2)` },
   { key: 'chat_usage', name: 'PhatBot daily counters over 30 days old', table: 'chat_usage', where: `day < ${ET_TODAY} - 30` },
+  { key: 'errors', name: 'Errors marked fixed over 30 days ago, or not seen in 90 days', table: 'error_events', where: "resolved_at < now() - interval '30 days' OR last_at < now() - interval '90 days'" },
 ];
 // Rows that get fixed rather than deleted.
 const FIXES = [
@@ -217,6 +218,13 @@ function create({ pool, ops, launch, CHAPTERS }) {
           + (SELECT count(*) FROM contact_messages WHERE closed_at IS NULL AND created_at < now() - interval '3 days') AS n`);
         const n = Number(r.n);
         return n ? { state: 'warn', count: n, detail: `${plural(n, 'report or message', 'reports and messages')}. Answer them on the Live page.` } : { state: 'ok', detail: 'All caught up.' };
+      }],
+      ['errors', 'Errors not marked fixed', async () => {
+        const { rows: [r] } = await pool.query(`SELECT count(*)::int AS n, coalesce(sum(count), 0)::int AS times,
+            (SELECT message FROM error_events WHERE resolved_at IS NULL ORDER BY last_at DESC LIMIT 1) AS latest
+          FROM error_events WHERE resolved_at IS NULL AND last_at > now() - interval '7 days'`);
+        return r.n ? { state: 'warn', count: r.n, detail: `${plural(r.n, 'error')} this week (${plural(r.times, 'time')} in all). Latest: "${String(r.latest).slice(0, 100)}". See Errors above.` }
+          : { state: 'ok', detail: 'No new errors this week.' };
       }],
       ['stale_requests', 'Unanswered requests for past parties', async () => {
         const { rows: [r] } = await pool.query(`SELECT count(*)::int AS n FROM invite_requests x JOIN hosted_parties hp ON x.party_id = 'h' || hp.id

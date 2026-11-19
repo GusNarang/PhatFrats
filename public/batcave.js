@@ -553,7 +553,7 @@
       'Radar: houses glowing gold are being looked at right now. The number is how many people.',
       'Ticker: everything happening on the site as it happens. A sale makes a cha-ching sound on any page.',
       'Beacon: type a message and it shows as a banner across the whole site. Pick the color, who sees it and how long.',
-      'Maintenance: Site lock closes the whole site now or at a scheduled time (everyone but admins sees a back-soon screen; payments keep running). Run full maintenance clears expired temporary data and checks the database, data, every page and outside services; Check only shows what it would do without changing anything. It also runs by itself on the 1st of every month and rings your bell if it finds anything.',
+      'Maintenance: Site lock closes the whole site now or at a scheduled time (everyone but admins sees a back-soon screen; payments keep running). Run full maintenance clears expired temporary data and checks the database, data, every page and outside services; Check only shows what it would do without changing anything. It also runs by itself on the 1st of every month and rings your bell if it finds anything. Errors lists crashes and browser errors (you get an email the first time each new one happens); Uptime monitor has the address to give a free monitor like UptimeRobot.',
       'Lockdown: if something goes wrong, pause sign-ups, invite requests or checkout with one click. Click Reopen to undo.',
       'Spotlight: pin one party to the top of the party list with a glowing star.',
       'Weekend Drop: every Thursday, announce the lineup. It goes to everyone\'s bell and email and lights the beacon.',

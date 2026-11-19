@@ -94,6 +94,11 @@ module.exports = function launchCheck(app, { pool, wrap, fail, requireUser, ops,
         detail: (s.hide_demo ? 'Demo parties are hidden.' : 'Demo parties are still showing.') + (s.lockdown && Object.values(s.lockdown).some(Boolean) ? ' Some features are paused in Live.' : ''),
       },
       {
+        key: 'uptime', name: 'Uptime monitor',
+        state: 'manual',
+        detail: 'Point a free monitor (UptimeRobot or Better Stack) at /api/health so you hear within minutes if the site goes down. Steps are on the Maintenance page. (The site can\'t check this itself.)',
+      },
+      {
         key: 'hosting', name: 'Hosting (Vercel)',
         state: 'manual',
         detail: 'Vercel\'s free Hobby plan is for non-commercial use only. Move the project to Pro before charging money. (The site can\'t check this itself.)',

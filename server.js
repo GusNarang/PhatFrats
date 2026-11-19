@@ -323,6 +323,13 @@ const community = require('./community.js').create({
   mailer, IS_PROD, ops, WEEK_START_SQL, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')],
 });
 community.mountHooks(app);
+// Error tracking: server crashes and browser script errors are recorded and emailed to admins. See error-tracker.js.
+const errors = require('./error-tracker.js').create({ pool, ops, sendMail: community.sendMail });
+// A promise that fails with nobody handling it would otherwise stop the whole server; record it instead.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  errors.record({ source: 'server', message: 'Unhandled: ' + (reason && reason.message ? reason.message : String(reason)), stack: reason && reason.stack });
+});
 // Full Access perks: following houses, with instant alerts for Full Access.
 const premium = require('./premium.js').create({
   pool, wrap: (fn) => (req, res, next) => fn(req, res, next).catch(next), fail: (res, status, error, code) => res.status(status).json({ error, code }), community,
@@ -799,6 +806,11 @@ sororities.mount(app);
 require('./admin.js')(app, { pool, wrap, fail, requireUser, PRICING, phatbot, TODAY_SQL, authLimiter, hashPassword, verifyPassword, hashToken, readSessionToken, tickets });
 // The control room's Launch check: which outside services are set up, with test text and email buttons.
 maintenance.mount(app, { wrap, fail, requireUser });
+errors.mount(app, {
+  wrap, fail, requireUser,
+  clientLimiter: rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many reports.' } }),
+  healthLimiter: rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message: { ok: false, error: 'Too many checks.' } }),
+});
 const launch = require('./launch-check.js')(app, { pool, wrap, fail, requireUser, ops, community });
 // The control room's Maintenance page: clean-up, health checks and a monthly automatic run. See site-maintenance.js.
 require('./site-maintenance.js').create({ pool, ops, launch, CHAPTERS: [...require('./public/chapters.js'), ...require('./data/test-chapters.js')] })
@@ -824,11 +836,8 @@ app.get('/sororities', (req, res) => res.sendFile(path.join(__dirname, 'public',
 app.get('/game', (req, res) => res.sendFile(path.join(__dirname, 'public', 'game.html')));
 app.get('/about', (req, res) => res.sendFile(path.join(__dirname, 'public', 'about.html')));
 
-app.use((err, req, res, next) => {
-  if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') return fail(res, 400, 'That request could not be read.');
-  console.error(err);
-  fail(res, 500, 'Something went wrong on our end. Try again in a moment.');
-});
+// Crashes are recorded for the control room's Errors list (and emailed to admins), then answered as before.
+app.use(errors.handler(fail));
 
 if (require.main === module) {
   const port = process.env.PORT || 3000;

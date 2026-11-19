@@ -605,3 +605,23 @@ CREATE TABLE IF NOT EXISTS maintenance_runs (
   summary     JSONB NOT NULL,
   results     JSONB NOT NULL
 );
+
+-- ---------- Error tracking ----------
+-- Server crashes and browser script errors, grouped: the same error again adds to count. See error-tracker.js.
+-- No request bodies, accounts or query strings are stored.
+CREATE TABLE IF NOT EXISTS error_events (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  fingerprint TEXT NOT NULL UNIQUE,
+  source      TEXT NOT NULL CHECK (source IN ('server', 'browser')),
+  message     TEXT NOT NULL,
+  stack       TEXT,
+  path        TEXT,
+  method      TEXT,
+  status      INTEGER,
+  count       INTEGER NOT NULL DEFAULT 1,
+  first_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at TIMESTAMPTZ,
+  alerted_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS error_events_open_idx ON error_events (last_at DESC) WHERE resolved_at IS NULL;

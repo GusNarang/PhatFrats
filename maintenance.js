@@ -9,7 +9,7 @@ const WARN_MS = 24 * 60 * 60 * 1000;
 const MAX_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Paths that stay open while the site is locked.
-const OPEN = [/^\/api\/stripe\//, /^\/api\/cron\//, /^\/api\/admin(\/|$)/, /^\/api\/(login|logout|me|maintenance|beacon|hit)$/];
+const OPEN = [/^\/api\/stripe\//, /^\/api\/cron\//, /^\/api\/admin(\/|$)/, /^\/api\/(login|logout|me|maintenance|beacon|hit|health|client-error)$/];
 
 function stateOf(m, now = Date.now()) {
   if (!m || !m.start) return { active: false, upcoming: false };
